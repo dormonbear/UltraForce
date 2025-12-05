@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import type { SearchCommand } from '~types'
-import { DEFAULT_COMMANDS } from '~lib/command-parser'
+import type { SearchCommand, CustomCommand } from '~types'
+import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands } from '~lib/command-parser'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
@@ -21,8 +21,8 @@ interface SettingsPanelProps {
   navigationMode: NavigationMode
   onNavigationModeChange: (mode: NavigationMode) => void
   sfHost: string | null
-  commands: Record<string, SearchCommand>
-  onCommandsChange: (commands: Record<string, SearchCommand>) => void
+  customCommands: Record<string, CustomCommand>
+  onCustomCommandsChange: (commands: Record<string, CustomCommand>) => void
 }
 
 const METADATA_TYPES = [
@@ -42,19 +42,14 @@ const NAVIGATION_MODES = [
   { value: 'classic', label: 'Salesforce Classic' }
 ]
 
-const ALL_TYPES = [
-  { value: 'ApexClass', label: 'ApexClass' },
-  { value: 'ApexTrigger', label: 'ApexTrigger' },
-  { value: 'CustomObject', label: 'CustomObject' },
-  { value: 'CustomField', label: 'CustomField' },
-  { value: 'Flow', label: 'Flow' },
-  { value: 'User', label: 'User' },
-  { value: 'PermissionSet', label: 'PermissionSet' },
-  { value: 'Profile', label: 'Profile' },
-  { value: 'CustomLabel', label: 'CustomLabel' },
-  { value: 'CustomMetadataType', label: 'CustomMetadataType' },
-  { value: 'CustomSetting', label: 'CustomSetting' }
-]
+interface CommandFormState {
+  key: string
+  description: string
+  soql: string
+  useToolingApi: boolean
+  nameField: string
+  descriptionFields: string
+}
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onClose,
@@ -71,88 +66,211 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   navigationMode,
   onNavigationModeChange,
   sfHost,
-  commands,
-  onCommandsChange,
+  customCommands,
+  onCustomCommandsChange,
   hideManagedPackage,
   onHideManagedPackageChange
 }) => {
   const displayName = sfHost ? sfHost.split('.')[0] : null
-  const [editingCommand, setEditingCommand] = useState<string | null>(null)
-  const [newCommandKey, setNewCommandKey] = useState('')
-  const [newCommandTypes, setNewCommandTypes] = useState<string[]>([])
+  const [editingKey, setEditingKey] = useState<string | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
+  const [formState, setFormState] = useState<CommandFormState>({
+    key: '',
+    description: '',
+    soql: '',
+    useToolingApi: false,
+    nameField: 'Name',
+    descriptionFields: ''
+  })
+  const [formError, setFormError] = useState<string | null>(null)
 
-  const handleEditCommand = (cmd: SearchCommand) => {
-    setEditingCommand(cmd.key)
-    setNewCommandKey(cmd.key)
-    setNewCommandTypes([...cmd.types])
-  }
+  const allCommands = mergeCommands(customCommands)
 
-  const isKeyDuplicate = (key: string) => {
-    if (!key) return false
-    if (editingCommand === key) return false
-    return key in commands
+  const handleEditCommand = (cmd: CustomCommand) => {
+    setEditingKey(cmd.key)
+    setIsAddingNew(false)
+    setFormState({
+      key: cmd.key,
+      description: cmd.description,
+      soql: cmd.soql,
+      useToolingApi: cmd.useToolingApi,
+      nameField: cmd.nameField || 'Name',
+      descriptionFields: cmd.descriptionFields?.join(', ') || ''
+    })
+    setFormError(null)
   }
 
   const handleSaveCommand = () => {
-    if (!newCommandKey.trim() || newCommandTypes.length === 0) return
-    if (isKeyDuplicate(newCommandKey)) return
+    const keyValidation = validateCommandKey(formState.key)
+    if (!keyValidation.valid) {
+      setFormError(keyValidation.error || 'Invalid command')
+      return
+    }
 
-    const newCommands = { ...commands }
-    if (editingCommand && editingCommand !== newCommandKey) {
-      delete newCommands[editingCommand]
+    if (!isKeyUnique(formState.key, allCommands, editingKey || undefined)) {
+      setFormError('This command is already in use')
+      return
     }
-    newCommands[newCommandKey] = {
-      key: newCommandKey,
-      description: newCommandTypes.join(', '),
-      types: newCommandTypes
+
+    if (!formState.description.trim()) {
+      setFormError('Description is required')
+      return
     }
-    onCommandsChange(newCommands)
+
+    if (!formState.soql.trim()) {
+      setFormError('SOQL query is required')
+      return
+    }
+
+    if (!formState.soql.toLowerCase().includes('{query}')) {
+      setFormError('SOQL must contain {query} placeholder')
+      return
+    }
+
+    if (!formState.nameField.trim()) {
+      setFormError('Name field is required')
+      return
+    }
+
+    const newCommands = { ...customCommands }
+
+    if (editingKey && editingKey !== formState.key.toLowerCase()) {
+      delete newCommands[editingKey]
+    }
+
+    const key = formState.key.toLowerCase()
+    const descFields = formState.descriptionFields
+      .split(',')
+      .map(f => f.trim())
+      .filter(f => f)
+    newCommands[key] = {
+      key,
+      description: formState.description,
+      soql: formState.soql,
+      useToolingApi: formState.useToolingApi,
+      isBuiltin: false,
+      nameField: formState.nameField.trim(),
+      descriptionFields: descFields.length > 0 ? descFields : undefined
+    }
+
+    onCustomCommandsChange(newCommands)
     resetForm()
   }
 
   const handleDeleteCommand = (key: string) => {
-    const newCommands = { ...commands }
+    const newCommands = { ...customCommands }
     delete newCommands[key]
-    onCommandsChange(newCommands)
-  }
-
-  const handleResetCommands = () => {
-    onCommandsChange({ ...DEFAULT_COMMANDS })
+    onCustomCommandsChange(newCommands)
   }
 
   const resetForm = () => {
-    setEditingCommand(null)
+    setEditingKey(null)
     setIsAddingNew(false)
-    setNewCommandKey('')
-    setNewCommandTypes([])
-  }
-
-  const toggleType = (type: string) => {
-    setNewCommandTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    )
+    setFormState({
+      key: '',
+      description: '',
+      soql: '',
+      useToolingApi: false,
+      nameField: 'Name',
+      descriptionFields: ''
+    })
+    setFormError(null)
   }
 
   const startAddNew = () => {
     setIsAddingNew(true)
-    setEditingCommand(null)
-    setNewCommandKey('')
-    setNewCommandTypes([])
+    setEditingKey(null)
+    setFormState({
+      key: '',
+      description: '',
+      soql: "SELECT Id, Name FROM MyObject__c WHERE Name LIKE '%{query}%' ORDER BY Name LIMIT 50",
+      useToolingApi: false,
+      nameField: 'Name',
+      descriptionFields: ''
+    })
+    setFormError(null)
   }
+
+  const renderCommandForm = () => (
+    <div className="command-edit-form">
+      <div className="command-form-row">
+        <label className="command-form-label">Command</label>
+        <input
+          type="text"
+          value={formState.key}
+          onChange={(e) => setFormState({ ...formState, key: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
+          placeholder="e.g. log"
+          className="command-input"
+          maxLength={10}
+        />
+      </div>
+      <div className="command-form-row">
+        <label className="command-form-label">Description</label>
+        <input
+          type="text"
+          value={formState.description}
+          onChange={(e) => setFormState({ ...formState, description: e.target.value })}
+          placeholder="e.g. My Logs"
+          className="command-input"
+        />
+      </div>
+      <div className="command-form-row">
+        <label className="command-form-label">SOQL Query</label>
+        <textarea
+          value={formState.soql}
+          onChange={(e) => setFormState({ ...formState, soql: e.target.value })}
+          placeholder="SELECT Id, Name FROM ... WHERE Name LIKE '%{query}%'"
+          className="command-textarea"
+          rows={3}
+        />
+        <span className="command-form-hint">Use {'{query}'} as search placeholder</span>
+      </div>
+      <div className="command-form-row-inline">
+        <div className="command-form-row">
+          <label className="command-form-label">Name Field</label>
+          <input
+            type="text"
+            value={formState.nameField}
+            onChange={(e) => setFormState({ ...formState, nameField: e.target.value })}
+            placeholder="Name"
+            className="command-input"
+          />
+        </div>
+        <div className="command-form-row">
+          <label className="command-form-label">Description Fields</label>
+          <input
+            type="text"
+            value={formState.descriptionFields}
+            onChange={(e) => setFormState({ ...formState, descriptionFields: e.target.value })}
+            placeholder="Field1, Field2"
+            className="command-input"
+          />
+        </div>
+      </div>
+      <span className="command-form-hint">Supports relationship fields (e.g., Owner.Name). Multiple fields separated by comma.</span>
+      <div className="command-form-row">
+        <label className="command-toggle-option">
+          <input
+            type="checkbox"
+            checked={formState.useToolingApi}
+            onChange={(e) => setFormState({ ...formState, useToolingApi: e.target.checked })}
+          />
+          <span>Use Tooling API</span>
+        </label>
+      </div>
+      {formError && <div className="command-form-error">{formError}</div>}
+      <div className="command-edit-actions">
+        <button className="cmd-btn cmd-btn-save" onClick={handleSaveCommand}>Save</button>
+        <button className="cmd-btn cmd-btn-cancel" onClick={resetForm}>Cancel</button>
+      </div>
+    </div>
+  )
 
   return (
     <>
       <div className="settings-header">
         <button className="back-button" onClick={onClose}>
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H6m0 0l6 6m-6-6l6-6" />
           </svg>
         </button>
@@ -179,12 +297,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               }
               return (
                 <label key={type.value} className="type-option">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={handleToggle}
-                    className="type-checkbox"
-                  />
+                  <input type="checkbox" checked={isChecked} onChange={handleToggle} className="type-checkbox" />
                   <span className="type-label">{type.label}</span>
                 </label>
               )
@@ -198,15 +311,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="shortcut-display">
               <span>Cmd/Ctrl</span>
               <span>+</span>
-              <select
-                value={shortcutKey}
-                onChange={(e) => onShortcutChange(e.target.value)}
-                className="shortcut-key-select"
-              >
+              <select value={shortcutKey} onChange={(e) => onShortcutChange(e.target.value)} className="shortcut-key-select">
                 {Array.from('abcdefghijklmnopqrstuvwxyz').map((letter) => (
-                  <option key={letter} value={letter}>
-                    {letter.toUpperCase()}
-                  </option>
+                  <option key={letter} value={letter}>{letter.toUpperCase()}</option>
                 ))}
               </select>
             </div>
@@ -216,39 +323,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="setting-section">
           <h3 className="section-title">Behavior</h3>
           <label className="toggle-option">
-            <input
-              type="checkbox"
-              checked={closeOnNavigate}
-              onChange={(e) => onCloseOnNavigateChange(e.target.checked)}
-              className="toggle-checkbox"
-            />
+            <input type="checkbox" checked={closeOnNavigate} onChange={(e) => onCloseOnNavigateChange(e.target.checked)} className="toggle-checkbox" />
             <span className="toggle-label">Close modal after opening result</span>
           </label>
           <label className="toggle-option">
-            <input
-              type="checkbox"
-              checked={autoLoadFields}
-              onChange={(e) => onAutoLoadFieldsChange(e.target.checked)}
-              className="toggle-checkbox"
-            />
+            <input type="checkbox" checked={autoLoadFields} onChange={(e) => onAutoLoadFieldsChange(e.target.checked)} className="toggle-checkbox" />
             <span className="toggle-label">Auto-load all fields on Setup pages</span>
           </label>
           <label className="toggle-option">
-            <input
-              type="checkbox"
-              checked={fuzzySearch}
-              onChange={(e) => onFuzzySearchChange(e.target.checked)}
-              className="toggle-checkbox"
-            />
+            <input type="checkbox" checked={fuzzySearch} onChange={(e) => onFuzzySearchChange(e.target.checked)} className="toggle-checkbox" />
             <span className="toggle-label">Fuzzy search (typo-tolerant matching)</span>
           </label>
           <label className="toggle-option">
-            <input
-              type="checkbox"
-              checked={hideManagedPackage}
-              onChange={(e) => onHideManagedPackageChange(e.target.checked)}
-              className="toggle-checkbox"
-            />
+            <input type="checkbox" checked={hideManagedPackage} onChange={(e) => onHideManagedPackageChange(e.target.checked)} className="toggle-checkbox" />
             <span className="toggle-label">Hide managed package items</span>
           </label>
         </div>
@@ -259,13 +346,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="type-grid">
             {NAVIGATION_MODES.map((mode) => (
               <label key={mode.value} className="type-option">
-                <input
-                  type="radio"
-                  name="navigationMode"
-                  checked={navigationMode === mode.value}
-                  onChange={() => onNavigationModeChange(mode.value as NavigationMode)}
-                  className="type-checkbox"
-                />
+                <input type="radio" name="navigationMode" checked={navigationMode === mode.value} onChange={() => onNavigationModeChange(mode.value as NavigationMode)} className="type-checkbox" />
                 <span className="type-label">{mode.label}</span>
               </label>
             ))}
@@ -273,47 +354,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="setting-section">
-          <h3 className="section-title">Commands</h3>
+          <h3 className="section-title">Built-in Commands</h3>
           <p className="section-desc">Type : followed by a command to filter search.</p>
           <div className="commands-list">
-            {Object.values(commands).map((cmd) => (
+            {Object.values(BUILTIN_COMMANDS).map((cmd) => (
+              <div key={cmd.key} className="command-row command-row-builtin">
+                <span className="command-key">:{cmd.key}</span>
+                <span className="command-desc">{cmd.description}</span>
+                <span className="command-lock">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                  </svg>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="setting-section">
+          <h3 className="section-title">Custom Commands</h3>
+          <p className="section-desc">Create your own commands with custom SOQL queries.</p>
+          <div className="commands-list">
+            {Object.values(customCommands).map((cmd) => (
               <div key={cmd.key} className="command-row">
-                {editingCommand === cmd.key ? (
-                  <div className="command-edit-form">
-                    <div className="command-edit-row">
-                      <input
-                        type="text"
-                        value={newCommandKey}
-                        onChange={(e) => setNewCommandKey(e.target.value.toLowerCase().replace(/[^a-z]/g, ''))}
-                        placeholder="key"
-                        className={`command-input command-input-key ${isKeyDuplicate(newCommandKey) ? 'input-error' : ''}`}
-                        maxLength={2}
-                      />
-                    </div>
-                    <div className="command-types-select">
-                      {ALL_TYPES.map((t) => (
-                        <label key={t.value} className="command-type-option">
-                          <input
-                            type="checkbox"
-                            checked={newCommandTypes.includes(t.value)}
-                            onChange={() => toggleType(t.value)}
-                          />
-                          <span>{t.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="command-edit-actions">
-                      <button className="cmd-btn cmd-btn-save" onClick={handleSaveCommand}>Save</button>
-                      <button className="cmd-btn cmd-btn-cancel" onClick={resetForm}>Cancel</button>
-                    </div>
-                  </div>
+                {editingKey === cmd.key ? (
+                  renderCommandForm()
                 ) : (
                   <>
                     <span className="command-key">:{cmd.key}</span>
-                    <div className="command-types-display">
-                      {cmd.types.map((type) => (
-                        <span key={type} className="command-type-tag">{type}</span>
-                      ))}
+                    <div className="command-info">
+                      <span className="command-desc">{cmd.description}</span>
+                      <span className="command-api-tag">{cmd.useToolingApi ? 'Tooling' : 'REST'}</span>
                     </div>
                     <div className="command-actions">
                       <button className="cmd-icon-btn" onClick={() => handleEditCommand(cmd)} title="Edit">
@@ -336,43 +407,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
             {isAddingNew && (
               <div className="command-row">
-                <div className="command-edit-form">
-                  <div className="command-edit-row">
-                    <input
-                      type="text"
-                      value={newCommandKey}
-                      onChange={(e) => setNewCommandKey(e.target.value.toLowerCase().replace(/[^a-z]/g, ''))}
-                      placeholder="key"
-                      className={`command-input command-input-key ${isKeyDuplicate(newCommandKey) ? 'input-error' : ''}`}
-                      maxLength={2}
-                    />
-                  </div>
-                  <div className="command-types-select">
-                    {ALL_TYPES.map((t) => (
-                      <label key={t.value} className="command-type-option">
-                        <input
-                          type="checkbox"
-                          checked={newCommandTypes.includes(t.value)}
-                          onChange={() => toggleType(t.value)}
-                        />
-                        <span>{t.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="command-edit-actions">
-                    <button className="cmd-btn cmd-btn-save" onClick={handleSaveCommand}>Save</button>
-                    <button className="cmd-btn cmd-btn-cancel" onClick={resetForm}>Cancel</button>
-                  </div>
-                </div>
+                {renderCommandForm()}
               </div>
             )}
-          </div>
-          <div className="commands-footer">
-            {!isAddingNew && !editingCommand && (
-              <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>+ Add Command</button>
+
+            {Object.keys(customCommands).length === 0 && !isAddingNew && (
+              <div className="commands-empty">No custom commands yet</div>
             )}
-            <button className="cmd-btn cmd-btn-reset" onClick={handleResetCommands}>Reset to Default</button>
           </div>
+          {!isAddingNew && !editingKey && (
+            <div className="commands-footer">
+              <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>+ Add Command</button>
+            </div>
+          )}
         </div>
 
         {sfHost && (
