@@ -1,0 +1,192 @@
+/* Popup styles for UltraForce */
+.ultraforce-popup {
+  width: 350px;
+  min-height: 400px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.popup-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo {
+  width: 24px;
+  height: 24px;
+  margin-right: 12px;
+}
+
+.popup-header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.popup-content {
+  padding: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #888;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-state p {
+  margin: 0 0 16px 0;
+  color: #888;
+}
+
+.setup-btn {
+  background: #007AFF;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.setup-btn:hover {
+  background: #0056CC;
+}
+
+.org-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.org-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.org-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.org-item.active {
+  background: rgba(0, 122, 255, 0.2);
+  border-color: rgba(0, 122, 255, 0.4);
+}
+
+.org-info {
+  flex: 1;
+}
+
+.org-name {
+  font-weight: 500;
+  margin-bottom: 2px;
+  color: #ffffff;
+}
+
+.org-domain {
+  font-size: 12px;
+  color: #888;
+}
+
+.org-type {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.org-type.production {
+  background: rgba(255, 59, 48, 0.2);
+  color: #FF3B30;
+  border: 1px solid rgba(255, 59, 48, 0.3);
+}
+
+.org-type.sandbox {
+  background: rgba(52, 199, 89, 0.2);
+  color: #34C759;
+  border: 1px solid rgba(52, 199, 89, 0.3);
+}
+
+.popup-footer {
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.shortcut-hint {
+  font-size: 12px;
+  color: #888;
+}
+
+.shortcut-hint kbd {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  color: #ffffff;
+}
+
+/* Scrollbar styling */
+.popup-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popup-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.popup-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.popup-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
