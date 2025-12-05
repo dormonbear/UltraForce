@@ -160,6 +160,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }
 
   const handleDeleteCommand = (key: string) => {
+    if (!confirm(`Delete command ":${key}"?`)) {
+      return
+    }
     const newCommands = { ...customCommands }
     delete newCommands[key]
     onCustomCommandsChange(newCommands)

@@ -11,6 +11,8 @@ interface EmptyStateProps {
 
 const SEARCH_HINTS = [
   'Type : for commands (e.g., :c for Apex, :o for Objects)',
+  'Use "quotes" for exact match (e.g., "Account")',
+  'Use | to filter results (e.g., Account | test)',
   'Use dot-notation for fields (e.g., Account.Name)',
   'Use dot-notation for CMDT records (e.g., My_Setting__mdt.Record)',
   'Press Tab to autocomplete object names',
