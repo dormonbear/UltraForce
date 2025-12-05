@@ -55,6 +55,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
   const isCustomField = result.type === 'CustomField'
   const isApex = result.type === 'ApexClass' || result.type === 'ApexTrigger'
   const isApexPage = result.type === 'ApexPage'
+  const isLightningComponent = result.type === 'LightningComponentBundle' || result.type === 'AuraDefinitionBundle'
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return ''
@@ -93,7 +94,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
           </div>
         )}
 
-        {isApexPage && (
+        {(isApexPage || isLightningComponent) && (
           <div className="object-actions">
             <ActionButton
               title="Preview"
