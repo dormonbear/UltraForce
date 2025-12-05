@@ -84,36 +84,53 @@ async function handleGetSfHost(
       }
     }
 
-    // Handle China setup domains - convert to my domains
-    if (currentDomain.endsWith('.setup.sfcrmproducts.cn')) {
-      const orgName = currentDomain.replace('.setup.sfcrmproducts.cn', '')
-      const myDomain = `${orgName}.my.sfcrmproducts.cn`
-
-      const myDomainCookie = await chrome.cookies.get({
-        url: `https://${myDomain}`,
-        name: 'sid',
-        storeId
-      })
-
+    // China sandbox domains: .sandbox.setup. -> .sandbox.my.
+    const sfcrmproductsSandboxMatch = currentDomain.match(/^(.+)\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\.cn$/)
+    if (sfcrmproductsSandboxMatch) {
+      const orgName = sfcrmproductsSandboxMatch[1]
+      const myDomain = `${orgName}.sandbox.my.sfcrmproducts.cn`
+      const myDomainCookie = await chrome.cookies.get({ url: `https://${myDomain}`, name: 'sid', storeId })
       if (myDomainCookie) {
         sendResponse(myDomain)
         return
       }
     }
 
-    if (currentDomain.endsWith('.setup.sfcrmapps.cn')) {
-      const orgName = currentDomain.replace('.setup.sfcrmapps.cn', '')
-      const myDomain = `${orgName}.my.sfcrmapps.cn`
-
-      const myDomainCookie = await chrome.cookies.get({
-        url: `https://${myDomain}`,
-        name: 'sid',
-        storeId
-      })
-
+    // China production domains: .setup. -> .my.
+    const sfcrmproductsSetupMatch = currentDomain.match(/^(.+)\.(setup|lightning|file|content|c)\.sfcrmproducts\.cn$/)
+    if (sfcrmproductsSetupMatch) {
+      const orgName = sfcrmproductsSetupMatch[1]
+      const myDomain = `${orgName}.my.sfcrmproducts.cn`
+      const myDomainCookie = await chrome.cookies.get({ url: `https://${myDomain}`, name: 'sid', storeId })
       if (myDomainCookie) {
         sendResponse(myDomain)
         return
+      }
+    }
+
+    // SFoA sandbox: sfcrmapps.cn uses sfcrmproducts.cn cookies
+    const sfcrmappsSandboxMatch = currentDomain.match(/^(.+)\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\.cn$/)
+    if (sfcrmappsSandboxMatch) {
+      const orgName = sfcrmappsSandboxMatch[1]
+      for (const myDomain of [`${orgName}.sandbox.my.sfcrmproducts.cn`, `${orgName}.sandbox.my.sfcrmapps.cn`]) {
+        const myDomainCookie = await chrome.cookies.get({ url: `https://${myDomain}`, name: 'sid', storeId })
+        if (myDomainCookie) {
+          sendResponse(myDomain)
+          return
+        }
+      }
+    }
+
+    // SFoA production: sfcrmapps.cn uses sfcrmproducts.cn cookies
+    const sfcrmappsSetupMatch = currentDomain.match(/^(.+)\.(setup|lightning|file|content|c)\.sfcrmapps\.cn$/)
+    if (sfcrmappsSetupMatch) {
+      const orgName = sfcrmappsSetupMatch[1]
+      for (const myDomain of [`${orgName}.my.sfcrmproducts.cn`, `${orgName}.my.sfcrmapps.cn`]) {
+        const myDomainCookie = await chrome.cookies.get({ url: `https://${myDomain}`, name: 'sid', storeId })
+        if (myDomainCookie) {
+          sendResponse(myDomain)
+          return
+        }
       }
     }
 
@@ -124,29 +141,19 @@ async function handleGetSfHost(
     })
 
     if (!cookie) {
-      // Try to find cookie on my.salesforce.com for current org
       const orgName = currentDomain.split('.')[0]
-      const myDomainCandidates = [
-        `${orgName}.my.salesforce.com`,
-        `${orgName}.my.sfcrmproducts.cn`,
-        `${orgName}.my.sfcrmapps.cn`
-      ]
+      const myDomainCandidates = currentDomain.endsWith('.sfcrmapps.cn')
+        ? [`${orgName}.my.sfcrmproducts.cn`, `${orgName}.my.sfcrmapps.cn`, `${orgName}.my.salesforce.com`]
+        : [`${orgName}.my.salesforce.com`, `${orgName}.my.sfcrmproducts.cn`, `${orgName}.my.sfcrmapps.cn`]
 
       for (const myDomain of myDomainCandidates) {
         try {
-          const myDomainCookie = await chrome.cookies.get({
-            url: `https://${myDomain}`,
-            name: 'sid',
-            storeId
-          })
-
+          const myDomainCookie = await chrome.cookies.get({ url: `https://${myDomain}`, name: 'sid', storeId })
           if (myDomainCookie) {
             sendResponse(myDomain)
             return
           }
-        } catch (e) {
-          // Continue to next candidate
-        }
+        } catch (e) {}
       }
 
       sendResponse(currentDomain)
@@ -155,21 +162,13 @@ async function handleGetSfHost(
 
     const [orgId] = cookie.value.split('!')
     const orgName = currentDomain.split('.')[0]
+    const myDomainCandidates2 = currentDomain.endsWith('.sfcrmapps.cn')
+      ? [`${orgName}.my.sfcrmproducts.cn`, `${orgName}.my.sfcrmapps.cn`, `${orgName}.my.salesforce.com`]
+      : [`${orgName}.my.sfcrmproducts.cn`, `${orgName}.my.salesforce.com`, `${orgName}.my.sfcrmapps.cn`]
 
-    const myDomainCandidates = [
-      `${orgName}.my.sfcrmproducts.cn`,
-      `${orgName}.my.salesforce.com`,
-      `${orgName}.my.sfcrmapps.cn`
-    ]
-
-    for (const myDomain of myDomainCandidates) {
+    for (const myDomain of myDomainCandidates2) {
       try {
-        const myDomainCookie = await chrome.cookies.get({
-          url: `https://${myDomain}`,
-          name: 'sid',
-          storeId
-        })
-
+        const myDomainCookie = await chrome.cookies.get({ url: `https://${myDomain}`, name: 'sid', storeId })
         if (myDomainCookie) {
           const myOrgId = myDomainCookie.value.split('!')[0]
           if (myOrgId === orgId || !orgId) {
@@ -177,9 +176,7 @@ async function handleGetSfHost(
             return
           }
         }
-      } catch (e) {
-        // Continue to next candidate
-      }
+      } catch (e) {}
     }
 
     for (const domain of SF_DOMAINS) {
@@ -207,9 +204,6 @@ async function handleGetSfHost(
   }
 }
 
-/**
- * Handle getSession message
- */
 async function handleGetSession(
   request: { sfHost: string },
   sender: chrome.runtime.MessageSender,
@@ -218,22 +212,22 @@ async function handleGetSession(
   try {
     const sfHost = request.sfHost
     const storeId = sender.tab?.cookieStoreId
+    const domainsToCheck = [sfHost]
 
-    const sessionCookie = await chrome.cookies.get({
-      url: `https://${sfHost}`,
-      name: 'sid',
-      storeId
-    })
-
-    if (!sessionCookie) {
-      sendResponse(null)
-      return
+    // SFoA: sfcrmapps.cn uses sfcrmproducts.cn cookies
+    if (sfHost.endsWith('.sfcrmapps.cn')) {
+      domainsToCheck.unshift(sfHost.replace('.sfcrmapps.cn', '.sfcrmproducts.cn'))
     }
 
-    sendResponse({
-      key: sessionCookie.value,
-      hostname: sessionCookie.domain
-    })
+    for (const host of domainsToCheck) {
+      const sessionCookie = await chrome.cookies.get({ url: `https://${host}`, name: 'sid', storeId })
+      if (sessionCookie) {
+        sendResponse({ key: sessionCookie.value, hostname: sessionCookie.domain })
+        return
+      }
+    }
+
+    sendResponse(null)
   } catch (error) {
     logger.error('Error in getSession:', error)
     sendResponse(null)
