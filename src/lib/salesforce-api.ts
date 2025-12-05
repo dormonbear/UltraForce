@@ -7,7 +7,8 @@ import {
   searchIndex,
   hasSearchIndex,
   clearSearchIndex,
-  clearAllSearchIndexes
+  clearAllSearchIndexes,
+  parseSearchQuery
 } from './fuzzy-search'
 
 const METADATA_TYPES: Record<string, { query: string }> = {
@@ -794,8 +795,11 @@ export async function executeCustomCommand(
   const apiHost = normalizeHost(sfHost)
   const start = Date.now()
 
+  // Parse query for exact match and filter
+  const { searchTerm, filterTerm, isExactMatch } = parseSearchQuery(searchQuery)
+
   // Replace {query} placeholder with escaped search query
-  const escapedQuery = escapeSoql(searchQuery)
+  const escapedQuery = escapeSoql(searchTerm)
   const soql = soqlTemplate.replace(/\{query\}/gi, escapedQuery)
 
   const apiPath = useToolingApi ? 'tooling/query' : 'query'
@@ -808,13 +812,30 @@ export async function executeCustomCommand(
     const records = await fetchAllPages(url, apiHost, session.key, { maxRecords: 100 })
     logger.debug('custom-command:result', { count: records.length, ms: Date.now() - start })
 
-    return records.map((record: any) => ({
+    let results: SearchResult[] = records.map((record: any) => ({
       id: record.Id || record.DurableId || '',
       name: getFieldValue(record, nameField) || 'Unknown',
       type: 'CustomQuery',
       description: buildDescriptionFromFields(record, descriptionFields, nameField),
       metadata: record
     }))
+
+    // Apply exact match filter
+    if (isExactMatch && searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      results = results.filter((r) => r.name.toLowerCase() === searchLower)
+    }
+
+    // Apply post-filter if present
+    if (filterTerm) {
+      results = results.filter((r) => {
+        const name = (r.name || '').toLowerCase()
+        const description = (r.description || '').toLowerCase()
+        return name.includes(filterTerm) || description.includes(filterTerm)
+      })
+    }
+
+    return results
   } catch (error: any) {
     logger.error('custom-command:error', { soql, error: error.message })
     throw new Error(formatCustomCommandError(error.message))

@@ -195,6 +195,40 @@ interface SearchIndexOptions {
   hideManagedPackage?: boolean
 }
 
+export interface ParsedQuery {
+  searchTerm: string
+  filterTerm: string | null
+  isExactMatch: boolean
+}
+
+export function parseSearchQuery(query: string): ParsedQuery {
+  let searchTerm = query.trim()
+  let filterTerm: string | null = null
+  let isExactMatch = false
+
+  // Check for pipe filter: "search | filter"
+  const pipeIndex = searchTerm.indexOf('|')
+  if (pipeIndex !== -1) {
+    filterTerm = searchTerm.slice(pipeIndex + 1).trim().toLowerCase()
+    searchTerm = searchTerm.slice(0, pipeIndex).trim()
+    if (!filterTerm) filterTerm = null
+  }
+
+  // Check for exact match: "term"
+  if (searchTerm.startsWith('"') && searchTerm.endsWith('"') && searchTerm.length > 2) {
+    isExactMatch = true
+    searchTerm = searchTerm.slice(1, -1)
+  }
+
+  return { searchTerm, filterTerm, isExactMatch }
+}
+
+function matchesFilter(result: SearchResult, filter: string): boolean {
+  const name = (result.name || '').toLowerCase()
+  const description = (result.description || '').toLowerCase()
+  return name.includes(filter) || description.includes(filter)
+}
+
 function isManagedPackage(record: any): boolean {
   const ns = record.NamespacePrefix
   return ns !== null && ns !== undefined && ns !== ''
@@ -219,31 +253,53 @@ export function searchIndex(
     return []
   }
 
-  // Empty query returns all records
-  if (!query.trim()) {
+  // Parse query for exact match and filter
+  const { searchTerm, filterTerm, isExactMatch } = parseSearchQuery(query)
+
+  // Empty search term returns all records (but still apply filter if present)
+  if (!searchTerm) {
     let results = Array.from(index.records.values()).map((r) => toSearchResult(r))
     if (hideManagedPackage) {
       results = results.filter((r) => !isManagedPackage(r.metadata || {}))
     }
+    if (filterTerm) {
+      results = results.filter((r) => matchesFilter(r, filterTerm))
+    }
     return results
   }
 
-  const searchResults = index.miniSearch.search(query, {
-    fuzzy: useFuzzy ? (term) => (term.length <= 3 ? false : 0.2) : false,
-    prefix: true,
-    boost: FIELD_BOOST,
-    combineWith: 'AND'
-  })
+  let results: SearchResult[]
 
-  let results = searchResults
-    .map((result) => {
-      const indexed = index.records.get(result.id)
-      return indexed ? toSearchResult(indexed, result.score) : null
+  if (isExactMatch) {
+    // Exact match: filter records where name matches exactly (case-insensitive)
+    const searchLower = searchTerm.toLowerCase()
+    results = Array.from(index.records.values())
+      .filter((r) => r.name.toLowerCase() === searchLower)
+      .map((r) => toSearchResult(r))
+  } else {
+    // Fuzzy/prefix search
+    const searchResults = index.miniSearch.search(searchTerm, {
+      fuzzy: useFuzzy ? (term) => (term.length <= 3 ? false : 0.2) : false,
+      prefix: true,
+      boost: FIELD_BOOST,
+      combineWith: 'AND'
     })
-    .filter((r): r is SearchResult => r !== null)
+
+    results = searchResults
+      .map((result) => {
+        const indexed = index.records.get(result.id)
+        return indexed ? toSearchResult(indexed, result.score) : null
+      })
+      .filter((r): r is SearchResult => r !== null)
+  }
 
   if (hideManagedPackage) {
     results = results.filter((r) => !isManagedPackage(r.metadata || {}))
+  }
+
+  // Apply post-filter if present
+  if (filterTerm) {
+    results = results.filter((r) => matchesFilter(r, filterTerm))
   }
 
   return results
