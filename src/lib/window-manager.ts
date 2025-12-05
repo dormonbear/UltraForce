@@ -705,8 +705,8 @@ class UltraForceWindowManager {
       } else if (result.type === 'LightningComponentBundle') {
         const lwcName = result.namespace
           ? `${result.namespace}__${componentName}`
-          : componentName
-        previewUrl = `${baseUrl}/c/${lwcName}.app`
+          : `c__${componentName}`
+        previewUrl = `${baseUrl}/lightning/cmp/${lwcName}`
       }
 
       if (previewUrl) {
