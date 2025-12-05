@@ -65,6 +65,22 @@ Click the gear icon to configure:
 - **Navigation Mode** - Auto / Lightning / Classic
 - **Custom Commands** - Configure your own command shortcuts
 
+## Security and Privacy
+
+UltraForce communicates directly between your web browser and Salesforce servers. **No data is sent to third parties.**
+
+### Data Storage
+
+We store minimal data in browser localStorage to save your preferences (search settings, keyboard shortcuts, custom commands). None of the stored data contains Salesforce record data (Accounts, Contacts, etc.).
+
+### API Access
+
+The extension communicates via official Salesforce APIs on behalf of the currently logged-in user. This means UltraForce can only access data and features that you already have permission to access in Salesforce.
+
+### Session Handling
+
+All Salesforce API calls reuse the access token/session from your browser's existing Salesforce session. To acquire this access token, UltraForce requires permission to read browser cookie information for Salesforce domains.
+
 ## Inspired by
 
 - [EasyMeta](https://chromewebstore.google.com/detail/easymeta/jmlnbdjigfmgodkdaaikakhfabfjohcd) - Chrome extension for Salesforce metadata
