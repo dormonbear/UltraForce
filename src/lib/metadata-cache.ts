@@ -4,7 +4,7 @@ const CACHE_CONFIG = {
   TTL: 24 * 60 * 60 * 1000,
   REFRESH_THRESHOLD: 2 * 60 * 60 * 1000,
   MAX_CACHE_SIZE: 10 * 1024 * 1024,
-  VERSION: '1.1'
+  VERSION: '1.2'
 }
 
 interface CacheItem {
@@ -78,8 +78,14 @@ export class MetadataCache {
   async set(orgId: string, metadataType: string, data: any[]): Promise<void> {
     try {
       const key = getCacheKey(orgId, metadataType)
+
+      // For CustomLabel, strip Value field to reduce storage size (Value is only needed for search indexing)
+      const cacheData = metadataType === 'CustomLabel'
+        ? data.map(({ Value, ...rest }) => rest)
+        : data
+
       const cacheItem: CacheItem = {
-        data,
+        data: cacheData,
         timestamp: Date.now(),
         version: CACHE_CONFIG.VERSION,
         orgId,
@@ -89,8 +95,48 @@ export class MetadataCache {
 
       await chrome.storage.local.set({ [key]: cacheItem })
       await this.cleanupIfNeeded()
+    } catch (error: any) {
+      // Handle quota exceeded error
+      if (error?.message?.includes('quota') || error?.message?.includes('QUOTA')) {
+        logger.warn('cache:quota-exceeded', { orgId, metadataType })
+        await this.cleanupForQuota()
+        // Retry once after cleanup
+        try {
+          const key = getCacheKey(orgId, metadataType)
+          const cacheData = metadataType === 'CustomLabel'
+            ? data.map(({ Value, ...rest }) => rest)
+            : data
+          const cacheItem: CacheItem = {
+            data: cacheData,
+            timestamp: Date.now(),
+            version: CACHE_CONFIG.VERSION,
+            orgId,
+            metadataType,
+            hash: generateDataHash(data)
+          }
+          await chrome.storage.local.set({ [key]: cacheItem })
+        } catch (retryError) {
+          logger.error('cache:set-retry-failed', { orgId, metadataType, error: retryError })
+        }
+      } else {
+        logger.error('cache:set', { orgId, metadataType, error })
+      }
+    }
+  }
+
+  private async cleanupForQuota(): Promise<void> {
+    try {
+      const stats = await this.getStats()
+      // Remove oldest 50% of entries
+      const sortedEntries = stats.entries.sort((a, b) => b.age - a.age)
+      const entriesToRemove = sortedEntries.slice(0, Math.ceil(sortedEntries.length / 2))
+
+      for (const entry of entriesToRemove) {
+        await chrome.storage.local.remove(entry.key)
+      }
+      logger.debug('cache:quota-cleanup', { removed: entriesToRemove.length })
     } catch (error) {
-      logger.error('cache:set', { orgId, metadataType, error })
+      logger.error('cache:quota-cleanup-failed', { error })
     }
   }
 

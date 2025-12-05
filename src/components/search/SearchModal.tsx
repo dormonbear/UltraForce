@@ -1,19 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import type { SearchResult } from '~types'
+import type { SearchResult, SearchCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
 import SettingsPanel, { type NavigationMode } from './SettingsPanel'
 import EmptyState from './EmptyState'
+import CommandHints from './CommandHints'
 import { SEARCH_MODAL_STYLES } from './styles'
+import { parseCommand, getMatchingCommands, DEFAULT_COMMANDS } from '~lib/command-parser'
 
 import type { ObjectAction } from './ResultItem'
 
 interface SearchModalProps {
   isVisible: boolean
   onClose: () => void
-  onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean) => void
+  onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
   onResultClick: (result: SearchResult) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
+  onClearResults?: () => void
   searchResults: Record<string, SearchResult[]>
   isLoading: boolean
   sfHost: string | null
@@ -30,6 +33,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onSearch,
   onResultClick,
   onActionClick,
+  onClearResults,
   searchResults,
   isLoading,
   sfHost,
@@ -49,8 +53,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [autoLoadFields, setAutoLoadFields] = useState<boolean>(true)
   const [navigationMode, setNavigationMode] = useState<NavigationMode>(externalNavMode || 'auto')
   const [fuzzySearch, setFuzzySearch] = useState<boolean>(externalFuzzySearch ?? true)
+  const [hideManagedPackage, setHideManagedPackage] = useState<boolean>(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [visibleItemCount, setVisibleItemCount] = useState(0)
+  const [commands, setCommands] = useState<Record<string, SearchCommand>>(DEFAULT_COMMANDS)
+  const [showCommandHints, setShowCommandHints] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -77,6 +84,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
         if (result.ultraforce_search_settings?.fuzzySearch !== undefined) {
           setFuzzySearch(result.ultraforce_search_settings.fuzzySearch)
         }
+        if (result.ultraforce_search_settings?.hideManagedPackage !== undefined) {
+          setHideManagedPackage(result.ultraforce_search_settings.hideManagedPackage)
+        }
+        if (result.ultraforce_search_settings?.commands) {
+          setCommands(result.ultraforce_search_settings.commands)
+        }
         setSettingsLoaded(true)
       } catch (error) {
         console.error('Failed to load settings:', error)
@@ -99,6 +112,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
           autoLoadFields,
           navigationMode,
           fuzzySearch,
+          hideManagedPackage,
+          commands,
           lastUpdated: Date.now()
         }
         await chrome.storage.local.set({ ultraforce_search_settings: settings })
@@ -108,7 +123,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
 
     saveSettings()
-  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, settingsLoaded])
+  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, hideManagedPackage, commands, settingsLoaded])
 
   // Notify parent when navigationMode changes
   const handleNavigationModeChange = (mode: NavigationMode) => {
@@ -138,17 +153,42 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const onSearchRef = React.useRef(onSearch)
   onSearchRef.current = onSearch
 
+  // Parse command from query
+  const parsedCommand = useMemo(() => parseCommand(query, commands), [query, commands])
+  const matchingCommands = useMemo(() => getMatchingCommands(query, commands), [query, commands])
+
+  // Show/hide command hints
   useEffect(() => {
-    if (!query.trim() || selectedTypes.length === 0 || !hasSession) {
+    const shouldShow = query === ':' && matchingCommands.length > 0
+    setShowCommandHints(shouldShow)
+  }, [query, matchingCommands.length])
+
+  // Clear results when entering a new command
+  const prevCommandKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    const currentKey = parsedCommand.isCommand ? parsedCommand.commandKey : null
+    if (currentKey !== prevCommandKeyRef.current) {
+      prevCommandKeyRef.current = currentKey
+      if (currentKey !== null) {
+        onClearResults?.()
+      }
+    }
+  }, [parsedCommand.isCommand, parsedCommand.commandKey, onClearResults])
+
+  useEffect(() => {
+    const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
+    const searchTypes = parsedCommand.types || selectedTypes
+
+    if (!searchQuery.trim() || searchTypes.length === 0 || !hasSession) {
       return
     }
 
     const debounceTimer = setTimeout(() => {
-      onSearchRef.current(query, selectedTypes, fuzzySearch)
+      onSearchRef.current(searchQuery, searchTypes, fuzzySearch, hideManagedPackage)
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, selectedTypes, hasSession, fuzzySearch])
+  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -221,6 +261,32 @@ const SearchModal: React.FC<SearchModalProps> = ({
             if (objectApiName) {
               setQuery(`${objectApiName}.${fieldApiName}`)
             }
+          } else if (selectedResult.type === 'CustomMetadataType') {
+            if (selectedResult.metadata?._isTypeDefinition) {
+              // Type definition: autocomplete to "Type__mdt." to search records
+              const cmdtApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
+              setQuery(`${cmdtApiName}.`)
+            } else {
+              // Record: autocomplete to "ParentType__mdt.RecordName"
+              const parentType = selectedResult.metadata?._parentType
+              const recordName = selectedResult.metadata?.DeveloperName || selectedResult.name
+              if (parentType) {
+                setQuery(`${parentType}.${recordName}`)
+              }
+            }
+          } else if (selectedResult.type === 'CustomSetting') {
+            if (selectedResult.metadata?._isSettingDefinition) {
+              // Setting definition: autocomplete to "Setting__c." to search records
+              const settingApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
+              setQuery(`${settingApiName}.`)
+            } else {
+              // Record: autocomplete to "ParentSetting__c.RecordName"
+              const parentType = selectedResult.metadata?._parentType
+              const recordName = selectedResult.metadata?.Name || selectedResult.name
+              if (parentType) {
+                setQuery(`${parentType}.${recordName}`)
+              }
+            }
           }
         }
         break
@@ -279,9 +345,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
             onAutoLoadFieldsChange={setAutoLoadFields}
             fuzzySearch={fuzzySearch}
             onFuzzySearchChange={handleFuzzySearchChange}
+            hideManagedPackage={hideManagedPackage}
+            onHideManagedPackageChange={setHideManagedPackage}
             navigationMode={navigationMode}
             onNavigationModeChange={handleNavigationModeChange}
             sfHost={sfHost}
+            commands={commands}
+            onCommandsChange={setCommands}
           />
         ) : (
           <>
@@ -299,12 +369,18 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 sfHost={sfHost}
               />
 
+              {showCommandHints && (
+                <CommandHints commands={matchingCommands} />
+              )}
+
               {!hasSession ? (
                 <EmptyState type="no-session" />
               ) : isLoading ? (
                 <EmptyState type="loading" />
               ) : !query.trim() ? (
-                <EmptyState type="start" />
+                <EmptyState type="start" selectedTypes={selectedTypes} />
+              ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.types ? (
+                <EmptyState type="command" commandTypes={parsedCommand.types} />
               ) : !hasResults ? (
                 <EmptyState type="empty" query={query} />
               ) : (

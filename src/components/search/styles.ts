@@ -285,6 +285,25 @@ export const SEARCH_MODAL_STYLES = `
     font-family: monospace;
   }
 
+  .result-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .meta-user {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .meta-date {
+    color: rgba(255, 255, 255, 0.3);
+  }
+
   .object-actions {
     display: flex;
     align-items: center;
@@ -293,8 +312,7 @@ export const SEARCH_MODAL_STYLES = `
     transition: opacity 0.15s ease;
   }
 
-  .result-item:hover .object-actions,
-  .result-item.selected .object-actions {
+  .result-item:hover .object-actions {
     opacity: 1;
   }
 
@@ -512,6 +530,25 @@ export const SEARCH_MODAL_STYLES = `
     padding: 24px;
   }
 
+  .settings-content::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .settings-content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .settings-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .settings-content::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
   .setting-section {
     margin-bottom: 32px;
   }
@@ -634,5 +671,248 @@ export const SEARCH_MODAL_STYLES = `
     font-size: 13px;
     color: rgba(255, 255, 255, 0.7);
     font-weight: 500;
+  }
+
+  /* Command Hints */
+  .command-hints {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .command-hint-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    font-size: 11px;
+  }
+
+  .command-key {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-weight: 600;
+    color: #3b82f6;
+  }
+
+  .command-desc {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Commands List in Settings */
+  .commands-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .command-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+  }
+
+  .command-row .command-key {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-weight: 600;
+    color: #3b82f6;
+    min-width: 28px;
+  }
+
+  .command-row .command-desc {
+    color: rgba(255, 255, 255, 0.8);
+    flex: 1;
+  }
+
+  .command-row .command-types {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    flex: 1;
+    text-align: right;
+  }
+
+  .command-types-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .command-type-tag {
+    padding: 3px 8px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #60a5fa;
+  }
+
+  .command-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .command-row:hover .command-actions {
+    opacity: 1;
+  }
+
+  .cmd-icon-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    border-radius: 4px;
+    padding: 4px;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cmd-icon-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+  }
+
+  .cmd-icon-btn-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+  }
+
+  .command-edit-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .command-edit-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .command-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #fff;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .command-input:focus {
+    border-color: #3b82f6;
+  }
+
+  .command-input.input-error {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .command-input-key {
+    width: 50px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-weight: 600;
+  }
+
+  .command-input-desc {
+    flex: 1;
+  }
+
+  .command-types-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .command-type-option {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+  }
+
+  .command-type-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .command-type-option input {
+    accent-color: #3b82f6;
+  }
+
+  .command-edit-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .cmd-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+  }
+
+  .cmd-btn-save {
+    background: #3b82f6;
+    color: #fff;
+  }
+
+  .cmd-btn-save:hover {
+    background: #2563eb;
+  }
+
+  .cmd-btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .cmd-btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .commands-footer {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .cmd-btn-add {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  .cmd-btn-add:hover {
+    background: rgba(59, 130, 246, 0.25);
+  }
+
+  .cmd-btn-reset {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .cmd-btn-reset:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
   }
 `
