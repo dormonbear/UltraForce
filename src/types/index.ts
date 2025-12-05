@@ -178,12 +178,34 @@ export interface SearchEvent {
 }
 
 // Command System Types
-export interface SearchCommand {
+export interface BuiltinCommand {
   key: string
   types: string[]
   description: string
+  isBuiltin: true
 }
+
+export interface CustomCommand {
+  key: string
+  description: string
+  soql: string
+  useToolingApi: boolean
+  isBuiltin: false
+  nameField: string
+  descriptionFields?: string[]
+}
+
+export type SearchCommand = BuiltinCommand | CustomCommand
 
 export interface CommandConfig {
   commands: Record<string, SearchCommand>
+}
+
+// Type guard for custom commands
+export function isCustomCommand(cmd: SearchCommand): cmd is CustomCommand {
+  return cmd.isBuiltin === false
+}
+
+export function isBuiltinCommand(cmd: SearchCommand): cmd is BuiltinCommand {
+  return cmd.isBuiltin === true
 }
