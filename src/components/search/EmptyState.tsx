@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react'
 
 interface EmptyStateProps {
-  type: 'loading' | 'empty' | 'no-session' | 'start' | 'command'
+  type: 'loading' | 'empty' | 'no-session' | 'start' | 'command' | 'error'
   query?: string
   commandTypes?: string[]
+  commandDescription?: string
   selectedTypes?: string[]
+  errorMessage?: string
 }
 
 const SEARCH_HINTS = [
@@ -32,7 +34,7 @@ const TYPE_LABELS: Record<string, string> = {
   CustomSetting: 'Custom Settings'
 }
 
-const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, selectedTypes }) => {
+const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, commandDescription, selectedTypes, errorMessage }) => {
   const randomHint = useMemo(() => {
     return SEARCH_HINTS[Math.floor(Math.random() * SEARCH_HINTS.length)]
   }, [])
@@ -46,12 +48,15 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, sele
     )
   }
 
-  if (type === 'command' && commandTypes) {
+  if (type === 'command') {
+    const title = commandTypes && commandTypes.length > 0
+      ? `Searching ${commandTypes.join(', ')}`
+      : commandDescription || 'Custom Search'
     return (
       <div className="search-empty">
-        <div className="empty-icon">Search</div>
-        <div className="empty-title">Searching {commandTypes.join(', ')}</div>
-        <div className="empty-desc">Type to search within selected types</div>
+        <div className="empty-icon">🔍</div>
+        <div className="empty-title">{title}</div>
+        <div className="empty-desc">Type to search</div>
       </div>
     )
   }
@@ -73,7 +78,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, sele
   if (type === 'empty') {
     return (
       <div className="search-empty">
-        <div className="empty-icon">No Results</div>
+        <div className="empty-icon">📭</div>
         <div className="empty-title">No Results Found</div>
         <div className="empty-desc">We couldn't find anything matching "{query}"</div>
       </div>
@@ -83,7 +88,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, sele
   if (type === 'no-session') {
     return (
       <div className="search-empty">
-        <div className="empty-icon">Locked</div>
+        <div className="empty-icon">🔒</div>
         <div className="empty-title">Not Logged In</div>
         <div className="empty-desc">
           Please log in to Salesforce in this browser to use UltraForce.
@@ -91,6 +96,24 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, sele
           <span style={{ fontSize: '12px', opacity: 0.7, marginTop: '8px', display: 'block' }}>
             UltraForce uses your browser session to access Salesforce APIs.
           </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === 'error') {
+    const lines = (errorMessage || 'An error occurred').split('\n')
+    return (
+      <div className="search-empty search-error">
+        <div className="empty-icon">⚠️</div>
+        <div className="empty-title">Search Error</div>
+        <div className="empty-desc error-message">
+          {lines.map((line, i) => (
+            <React.Fragment key={i}>
+              {line}
+              {i < lines.length - 1 && <br />}
+            </React.Fragment>
+          ))}
         </div>
       </div>
     )

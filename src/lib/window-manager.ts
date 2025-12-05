@@ -2,7 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
-import { searchSalesforceMetadata } from '~lib/salesforce-api'
+import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
 import type { SearchResult } from '~types'
@@ -20,6 +20,7 @@ interface WindowManagerState {
   closeOnNavigate: boolean
   navigationMode: NavigationMode
   fuzzySearch: boolean
+  searchError: string | null
 }
 
 interface WindowManagerOptions {
@@ -113,7 +114,8 @@ class UltraForceWindowManager {
     hasSession: false,
     closeOnNavigate: true,
     navigationMode: 'auto',
-    fuzzySearch: true
+    fuzzySearch: true,
+    searchError: null
   }
 
   private options: Required<WindowManagerOptions> = {
@@ -381,6 +383,7 @@ class UltraForceWindowManager {
           isVisible: this.state.isVisible,
           onClose: this.hide,
           onSearch: this.handleSearch.bind(this),
+          onCustomSearch: this.handleCustomSearch.bind(this),
           onResultClick: this.handleResultClick.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onClearResults: this.handleClearResults.bind(this),
@@ -391,7 +394,8 @@ class UltraForceWindowManager {
           navigationMode: this.state.navigationMode,
           onNavigationModeChange: this.handleNavigationModeChange.bind(this),
           fuzzySearch: this.state.fuzzySearch,
-          onFuzzySearchChange: this.handleFuzzySearchChange.bind(this)
+          onFuzzySearchChange: this.handleFuzzySearchChange.bind(this),
+          searchError: this.state.searchError
         })
       )
     )
@@ -409,6 +413,7 @@ class UltraForceWindowManager {
 
     const currentNonce = ++this.searchNonce
     this.state.isLoading = true
+    this.state.searchError = null
     this.emit('searchStart', { query, selectedTypes })
 
     // Render loading state immediately
@@ -424,11 +429,61 @@ class UltraForceWindowManager {
 
       this.state.searchResults = results
       this.emit('searchSuccess', results)
-    } catch (error) {
+    } catch (error: any) {
       if (currentNonce !== this.searchNonce) {
         return
       }
       logger.error('Search failed:', error)
+      this.state.searchError = error.message || 'Search failed'
+      this.emit('searchError', error)
+    } finally {
+      if (currentNonce === this.searchNonce) {
+        this.state.isLoading = false
+        this.emit('searchEnd')
+        await this.renderComponent()
+      }
+    }
+  }
+
+  private async handleCustomSearch(soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]): Promise<void> {
+    this.log(`Custom search requested: "${query}" with template, tooling: ${useToolingApi}`)
+
+    if (!this.state.sfHost) {
+      logger.error('No SF host available for custom search')
+      return
+    }
+
+    const currentNonce = ++this.searchNonce
+    this.state.isLoading = true
+    this.state.searchError = null
+    this.emit('searchStart', { query, customCommand: true })
+
+    await this.renderComponent()
+
+    try {
+      const options: CustomCommandOptions = {
+        soqlTemplate,
+        searchQuery: query,
+        useToolingApi,
+        nameField,
+        descriptionFields
+      }
+      const results = await executeCustomCommand(options, this.state.sfHost)
+
+      if (currentNonce !== this.searchNonce) {
+        this.log(`Discarding stale custom search results (nonce ${currentNonce} vs ${this.searchNonce})`)
+        return
+      }
+
+      this.state.searchResults = { CustomQuery: results }
+      this.emit('searchSuccess', this.state.searchResults)
+    } catch (error: any) {
+      if (currentNonce !== this.searchNonce) {
+        return
+      }
+      logger.error('Custom search failed:', error)
+      this.state.searchError = error.message || 'Custom search failed'
+      this.state.searchResults = {}
       this.emit('searchError', error)
     } finally {
       if (currentNonce === this.searchNonce) {
@@ -451,6 +506,7 @@ class UltraForceWindowManager {
 
   private async handleClearResults(): Promise<void> {
     this.state.searchResults = {}
+    this.state.searchError = null
     await this.renderComponent()
   }
 
@@ -533,6 +589,10 @@ class UltraForceWindowManager {
             }
             break
           }
+          case 'CustomQuery':
+            // Custom query results - navigate to record directly
+            targetUrl = `${baseUrl}/lightning/r/sObject/${result.id}/view`
+            break
           default:
             targetUrl = `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
         }
@@ -584,6 +644,9 @@ class UltraForceWindowManager {
             }
             break
           }
+          case 'CustomQuery':
+            targetUrl = `${baseUrl}/${result.id}`
+            break
           default:
             targetUrl = `${baseUrl}/${result.id}`
         }
@@ -739,7 +802,8 @@ class UltraForceWindowManager {
         hasSession: false,
         closeOnNavigate: true,
         navigationMode: 'auto',
-        fuzzySearch: true
+        fuzzySearch: true,
+        searchError: null
       }
 
       this.log('WindowManager destroyed successfully')

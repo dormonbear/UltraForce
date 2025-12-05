@@ -753,3 +753,114 @@ export function isSalesforceDomain(url: string): boolean {
   if (!url) return false
   return SALESFORCE_PATTERNS.some((pattern) => pattern.test(url))
 }
+
+export interface CustomCommandOptions {
+  soqlTemplate: string
+  searchQuery: string
+  useToolingApi: boolean
+  nameField: string
+  descriptionFields?: string[]
+}
+
+export async function executeCustomCommand(
+  options: CustomCommandOptions,
+  sfHost: string
+): Promise<SearchResult[]> {
+  const { soqlTemplate, searchQuery, useToolingApi, nameField, descriptionFields } = options
+
+  if (!sfHost) {
+    logger.error('executeCustomCommand: missing sfHost')
+    return []
+  }
+
+  const session = await getSession(sfHost)
+  if (!session) {
+    logger.error('executeCustomCommand: no session', { host: sfHost })
+    return []
+  }
+
+  const apiHost = normalizeHost(sfHost)
+  const start = Date.now()
+
+  // Replace {query} placeholder with escaped search query
+  const escapedQuery = escapeSoql(searchQuery)
+  const soql = soqlTemplate.replace(/\{query\}/gi, escapedQuery)
+
+  const apiPath = useToolingApi ? 'tooling/query' : 'query'
+  const endpoint = `https://${apiHost}/services/data/v${API_VERSION}/${apiPath}`
+  const url = `${endpoint}?q=${encodeURIComponent(soql)}`
+
+  logger.debug('custom-command:execute', { soql, api: apiPath })
+
+  try {
+    const records = await fetchAllPages(url, apiHost, session.key, { maxRecords: 100 })
+    logger.debug('custom-command:result', { count: records.length, ms: Date.now() - start })
+
+    return records.map((record: any) => ({
+      id: record.Id || record.DurableId || '',
+      name: getFieldValue(record, nameField) || 'Unknown',
+      type: 'CustomQuery',
+      description: buildDescriptionFromFields(record, descriptionFields, nameField),
+      metadata: record
+    }))
+  } catch (error: any) {
+    logger.error('custom-command:error', { soql, error: error.message })
+    throw new Error(formatCustomCommandError(error.message))
+  }
+}
+
+function formatCustomCommandError(errorMessage: string): string {
+  // Try to parse Salesforce API error
+  const apiMatch = errorMessage.match(/API \d+: (.+)/)
+  if (apiMatch) {
+    try {
+      const errorData = JSON.parse(apiMatch[1])
+      if (Array.isArray(errorData) && errorData[0]?.message) {
+        const sfError = errorData[0].message
+        return `SOQL Error: ${sfError}\n\nPlease check your custom command configuration in Settings.`
+      }
+    } catch {
+      // Not JSON, use as-is
+    }
+  }
+  return `${errorMessage}\n\nPlease check your custom command configuration in Settings.`
+}
+
+function getFieldValue(record: any, fieldPath: string): string {
+  if (!fieldPath) return ''
+  const parts = fieldPath.split('.')
+  let value: any = record
+  for (const part of parts) {
+    if (value === null || value === undefined) return ''
+    value = value[part]
+  }
+  return value?.toString() || ''
+}
+
+function buildDescriptionFromFields(record: any, descriptionFields?: string[], nameField?: string): string {
+  if (descriptionFields && descriptionFields.length > 0) {
+    const values = descriptionFields
+      .map(field => getFieldValue(record, field.trim()))
+      .filter(v => v)
+    if (values.length > 0) {
+      return values.join(' | ')
+    }
+  }
+  return buildCustomResultDescription(record, nameField)
+}
+
+function buildCustomResultDescription(record: any, nameField?: string): string {
+  const parts: string[] = []
+  const excludeFields = ['Id', 'Name', 'MasterLabel', 'DeveloperName', 'Label', 'attributes']
+  if (nameField) excludeFields.push(nameField)
+
+  for (const [key, value] of Object.entries(record)) {
+    if (excludeFields.includes(key)) continue
+    if (value === null || value === undefined) continue
+    if (typeof value === 'object') continue
+    parts.push(`${key}: ${value}`)
+    if (parts.length >= 3) break
+  }
+
+  return parts.join(' | ')
+}

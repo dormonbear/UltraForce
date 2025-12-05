@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import type { SearchResult, SearchCommand } from '~types'
+import type { SearchResult, CustomCommand } from '~types'
+import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
 import SettingsPanel, { type NavigationMode } from './SettingsPanel'
 import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import { SEARCH_MODAL_STYLES } from './styles'
-import { parseCommand, getMatchingCommands, DEFAULT_COMMANDS } from '~lib/command-parser'
+import { parseCommand, getMatchingCommands, mergeCommands, BUILTIN_COMMANDS } from '~lib/command-parser'
 
 import type { ObjectAction } from './ResultItem'
 
@@ -14,6 +15,7 @@ interface SearchModalProps {
   isVisible: boolean
   onClose: () => void
   onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
+  onCustomSearch?: (soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]) => void
   onResultClick: (result: SearchResult) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   onClearResults?: () => void
@@ -25,12 +27,14 @@ interface SearchModalProps {
   onNavigationModeChange?: (mode: NavigationMode) => void
   fuzzySearch?: boolean
   onFuzzySearchChange?: (value: boolean) => void
+  searchError?: string | null
 }
 
 const SearchModal: React.FC<SearchModalProps> = ({
   isVisible,
   onClose,
   onSearch,
+  onCustomSearch,
   onResultClick,
   onActionClick,
   onClearResults,
@@ -41,7 +45,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
   navigationMode: externalNavMode,
   onNavigationModeChange,
   fuzzySearch: externalFuzzySearch,
-  onFuzzySearchChange
+  onFuzzySearchChange,
+  searchError
 }) => {
   const [query, setQuery] = useState('')
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['ApexClass'])
@@ -56,7 +61,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [hideManagedPackage, setHideManagedPackage] = useState<boolean>(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [visibleItemCount, setVisibleItemCount] = useState(0)
-  const [commands, setCommands] = useState<Record<string, SearchCommand>>(DEFAULT_COMMANDS)
+  const [customCommands, setCustomCommands] = useState<Record<string, CustomCommand>>({})
   const [showCommandHints, setShowCommandHints] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
@@ -87,8 +92,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
         if (result.ultraforce_search_settings?.hideManagedPackage !== undefined) {
           setHideManagedPackage(result.ultraforce_search_settings.hideManagedPackage)
         }
-        if (result.ultraforce_search_settings?.commands) {
-          setCommands(result.ultraforce_search_settings.commands)
+        if (result.ultraforce_search_settings?.customCommands) {
+          setCustomCommands(result.ultraforce_search_settings.customCommands)
         }
         setSettingsLoaded(true)
       } catch (error) {
@@ -113,7 +118,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           navigationMode,
           fuzzySearch,
           hideManagedPackage,
-          commands,
+          customCommands,
           lastUpdated: Date.now()
         }
         await chrome.storage.local.set({ ultraforce_search_settings: settings })
@@ -123,7 +128,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
 
     saveSettings()
-  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, hideManagedPackage, commands, settingsLoaded])
+  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, hideManagedPackage, customCommands, settingsLoaded])
 
   // Notify parent when navigationMode changes
   const handleNavigationModeChange = (mode: NavigationMode) => {
@@ -153,9 +158,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const onSearchRef = React.useRef(onSearch)
   onSearchRef.current = onSearch
 
+  // Merge builtin and custom commands
+  const allCommands = useMemo(() => mergeCommands(customCommands), [customCommands])
+
   // Parse command from query
-  const parsedCommand = useMemo(() => parseCommand(query, commands), [query, commands])
-  const matchingCommands = useMemo(() => getMatchingCommands(query, commands), [query, commands])
+  const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
+  const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands), [query, allCommands])
 
   // Show/hide command hints
   useEffect(() => {
@@ -175,11 +183,29 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [parsedCommand.isCommand, parsedCommand.commandKey, onClearResults])
 
+  // Ref for custom search callback
+  const onCustomSearchRef = React.useRef(onCustomSearch)
+  onCustomSearchRef.current = onCustomSearch
+
   useEffect(() => {
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
-    const searchTypes = parsedCommand.types || selectedTypes
 
-    if (!searchQuery.trim() || searchTypes.length === 0 || !hasSession) {
+    if (!searchQuery.trim() || !hasSession) {
+      return
+    }
+
+    // Check if this is a custom command
+    if (parsedCommand.isCommand && parsedCommand.command && isCustomCommand(parsedCommand.command)) {
+      const customCmd = parsedCommand.command
+      const debounceTimer = setTimeout(() => {
+        onCustomSearchRef.current?.(customCmd.soql, searchQuery, customCmd.useToolingApi, customCmd.nameField, customCmd.descriptionFields)
+      }, 300)
+      return () => clearTimeout(debounceTimer)
+    }
+
+    // Builtin command or normal search
+    const searchTypes = parsedCommand.types || selectedTypes
+    if (searchTypes.length === 0) {
       return
     }
 
@@ -350,8 +376,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
             navigationMode={navigationMode}
             onNavigationModeChange={handleNavigationModeChange}
             sfHost={sfHost}
-            commands={commands}
-            onCommandsChange={setCommands}
+            customCommands={customCommands}
+            onCustomCommandsChange={setCustomCommands}
           />
         ) : (
           <>
@@ -377,10 +403,19 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 <EmptyState type="no-session" />
               ) : isLoading ? (
                 <EmptyState type="loading" />
+              ) : searchError ? (
+                <EmptyState
+                  type="error"
+                  errorMessage={searchError}
+                />
               ) : !query.trim() ? (
                 <EmptyState type="start" selectedTypes={selectedTypes} />
-              ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.types ? (
-                <EmptyState type="command" commandTypes={parsedCommand.types} />
+              ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
+                <EmptyState
+                  type="command"
+                  commandTypes={parsedCommand.types || []}
+                  commandDescription={parsedCommand.command.description}
+                />
               ) : !hasResults ? (
                 <EmptyState type="empty" query={query} />
               ) : (

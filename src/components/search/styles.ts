@@ -373,6 +373,23 @@ export const SEARCH_MODAL_STYLES = `
     line-height: 1.4;
   }
 
+  /* Error State */
+  .search-error .empty-title {
+    color: #ef4444;
+  }
+
+  .search-error .error-message {
+    color: rgba(255, 255, 255, 0.6);
+    max-width: 360px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    word-break: break-word;
+  }
+
   .action-button {
     margin-top: 24px;
     background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
@@ -916,5 +933,114 @@ export const SEARCH_MODAL_STYLES = `
   .cmd-btn-reset:hover {
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Custom Command Form Styles */
+  .command-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .command-form-row-inline {
+    display: flex;
+    gap: 12px;
+  }
+
+  .command-form-row-inline .command-form-row {
+    flex: 1;
+  }
+
+  .command-form-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .command-textarea {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #fff;
+    font-size: 12px;
+    font-family: 'SF Mono', Monaco, monospace;
+    outline: none;
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  .command-textarea:focus {
+    border-color: #3b82f6;
+  }
+
+  .command-form-hint {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .command-form-error {
+    font-size: 11px;
+    color: #ef4444;
+    padding: 4px 8px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 4px;
+  }
+
+  .command-api-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 500;
+  }
+
+  .command-toggle-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+  }
+
+  .command-toggle-option input {
+    accent-color: #3b82f6;
+    cursor: pointer;
+  }
+
+  .commands-empty {
+    padding: 16px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  .command-row-builtin {
+    opacity: 0.8;
+  }
+
+  .command-row-builtin:hover {
+    opacity: 1;
+  }
+
+  .command-lock {
+    color: rgba(255, 255, 255, 0.3);
+    margin-left: auto;
+  }
+
+  .command-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .command-info .command-desc {
+    flex: 1;
   }
 `
