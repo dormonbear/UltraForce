@@ -41,7 +41,7 @@ function createMiniSearchInstance(): MiniSearch<IndexedRecord> {
       if (!text) return []
       return text
         .toLowerCase()
-        .split(/[\s_\-\.]+/)
+        .split(/[\s_\-\.,;|:\/\\]+/)
         .filter((token) => token.length > 0)
     }
   })
@@ -60,6 +60,18 @@ function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord
     label = record.MasterLabel || record.Label || ''
     apiName = record.QualifiedApiName || ''
     description = `${record.ObjectApiName || 'Object'}.${apiName} (${record.DataType || 'Field'})`
+  } else if (metadataType.startsWith('CMDTRecord:')) {
+    actualType = 'CustomMetadataType'
+    name = record.MasterLabel || record.DeveloperName || ''
+    label = record.MasterLabel || ''
+    apiName = record.DeveloperName || ''
+    description = record._parentLabel || record._parentType || ''
+  } else if (metadataType.startsWith('CustomSettingRecord:')) {
+    actualType = 'CustomSetting'
+    name = record.Name || ''
+    label = record.Name || ''
+    apiName = record.Name || ''
+    description = record._parentLabel || record._parentType || ''
   } else {
     switch (metadataType) {
       case 'ApexClass':
@@ -85,7 +97,9 @@ function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord
         break
       case 'User':
         name = record.Name || ''
-        description = record.Username || ''
+        label = record.Email || ''
+        apiName = record.Username || ''
+        description = record.FederationIdentifier || ''
         break
       case 'PermissionSet':
         name = record.Label || record.Name || ''
@@ -95,15 +109,49 @@ function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord
       case 'Profile':
         name = record.Name || ''
         break
+      case 'CustomLabel':
+        name = record.MasterLabel || record.Name || ''
+        label = record.MasterLabel || ''
+        apiName = record.Name || ''
+        // Store full Value for search indexing (truncate only for display in toSearchResult)
+        description = record.Value || ''
+        break
+      case 'CustomMetadataType':
+        if (record._isTypeDefinition) {
+          // Custom Metadata Type definition (object)
+          name = record.MasterLabel || record.DeveloperName || ''
+          label = record.MasterLabel || ''
+          apiName = record.QualifiedApiName || record.DeveloperName || ''
+          description = 'Custom Metadata Type'
+        } else {
+          // Custom Metadata Type record
+          name = record.MasterLabel || record.DeveloperName || ''
+          label = record.MasterLabel || ''
+          apiName = record.DeveloperName || ''
+          description = record._parentLabel || record._parentType || ''
+        }
+        break
+      case 'CustomSetting':
+        name = record.Label || record.QualifiedApiName || ''
+        label = record.Label || ''
+        apiName = record.QualifiedApiName || record.DeveloperName || ''
+        break
       default:
         name = record.Name || record.QualifiedApiName || record.MasterLabel || ''
     }
   }
 
-  // Field ID: ObjectName.FieldName for uniqueness
+  // Generate unique ID based on type
   let id: string
-  if (metadataType.startsWith('Field:') || actualType === 'CustomField') {
+  if (metadataType.startsWith('Field:')) {
+    // Field ID: ObjectName.FieldName for uniqueness
     id = `${record.ObjectApiName || 'Unknown'}.${record.QualifiedApiName || name}`
+  } else if (metadataType.startsWith('CMDTRecord:')) {
+    // CMDT Record ID: ParentType.DeveloperName for uniqueness
+    id = `${record._parentType || 'Unknown'}.${record.DeveloperName || name}`
+  } else if (metadataType.startsWith('CustomSettingRecord:')) {
+    // Custom Setting Record ID: use actual record Id
+    id = record.Id || `${record._parentType || 'Unknown'}.${record.Name || name}`
   } else {
     id = record.Id || record.DurableId || record.QualifiedApiName || `${metadataType}-${name}`
   }
@@ -136,12 +184,27 @@ export function buildSearchIndex(metadataType: string, records: any[], sfHost: s
   logger.debug('index:build', { type: metadataType, count: recordsMap.size })
 }
 
+interface SearchIndexOptions {
+  useFuzzy?: boolean
+  hideManagedPackage?: boolean
+}
+
+function isManagedPackage(record: any): boolean {
+  const ns = record.NamespacePrefix
+  return ns !== null && ns !== undefined && ns !== ''
+}
+
 export function searchIndex(
   query: string,
   metadataType: string,
   sfHost: string,
-  useFuzzy = true
+  useFuzzyOrOptions: boolean | SearchIndexOptions = true
 ): SearchResult[] {
+  const options: SearchIndexOptions = typeof useFuzzyOrOptions === 'boolean'
+    ? { useFuzzy: useFuzzyOrOptions }
+    : useFuzzyOrOptions
+  const { useFuzzy = true, hideManagedPackage = true } = options
+
   const indexKey = `${sfHost}:${metadataType}`
   const index = searchIndexes.get(indexKey)
 
@@ -152,7 +215,11 @@ export function searchIndex(
 
   // Empty query returns all records
   if (!query.trim()) {
-    return Array.from(index.records.values()).map((r) => toSearchResult(r))
+    let results = Array.from(index.records.values()).map((r) => toSearchResult(r))
+    if (hideManagedPackage) {
+      results = results.filter((r) => !isManagedPackage(r.metadata || {}))
+    }
+    return results
   }
 
   const searchResults = index.miniSearch.search(query, {
@@ -162,12 +229,18 @@ export function searchIndex(
     combineWith: 'AND'
   })
 
-  return searchResults
+  let results = searchResults
     .map((result) => {
       const indexed = index.records.get(result.id)
       return indexed ? toSearchResult(indexed, result.score) : null
     })
     .filter((r): r is SearchResult => r !== null)
+
+  if (hideManagedPackage) {
+    results = results.filter((r) => !isManagedPackage(r.metadata || {}))
+  }
+
+  return results
 }
 
 function toSearchResult(indexed: IndexedRecord, score?: number): SearchResult {
@@ -191,14 +264,40 @@ function toSearchResult(indexed: IndexedRecord, score?: number): SearchResult {
     case 'CustomField':
       result.description = indexed.description
       break
-    case 'User':
-      result.description = record.Username
+    case 'User': {
+      const parts = [record.Username]
+      if (record.Email) parts.push(record.Email)
+      if (record.Profile?.Name) parts.push(record.Profile.Name)
+      if (record.UserRole?.Name) parts.push(record.UserRole.Name)
+      if (record.IsActive === false) parts.push('Inactive')
+      result.description = parts.join(' | ')
       break
+    }
     case 'Flow':
       result.description = indexed.description
       break
     case 'PermissionSet':
       result.description = record.Name !== record.Label ? record.Name : undefined
+      break
+    case 'CustomLabel': {
+      const value = indexed.description || ''
+      result.description = value.length > 80 ? value.substring(0, 80) + '...' : value
+      break
+    }
+    case 'CustomMetadataType':
+      if (record._isTypeDefinition) {
+        result.description = record.QualifiedApiName !== record.MasterLabel ? record.QualifiedApiName : 'Custom Metadata Type'
+      } else {
+        result.description = indexed.description
+      }
+      break
+    case 'CustomSetting':
+      if (record._isSettingDefinition) {
+        // Always show QualifiedApiName for Tab autocomplete
+        result.description = record.QualifiedApiName || 'Custom Setting'
+      } else {
+        result.description = indexed.description
+      }
       break
   }
 

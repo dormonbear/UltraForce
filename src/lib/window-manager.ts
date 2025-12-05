@@ -383,6 +383,7 @@ class UltraForceWindowManager {
           onSearch: this.handleSearch.bind(this),
           onResultClick: this.handleResultClick.bind(this),
           onActionClick: this.handleActionClick.bind(this),
+          onClearResults: this.handleClearResults.bind(this),
           searchResults: this.state.searchResults,
           isLoading: this.state.isLoading,
           sfHost: this.state.sfHost,
@@ -398,8 +399,8 @@ class UltraForceWindowManager {
     this.log('React component rendered with error boundary')
   }
 
-  private async handleSearch(query: string, selectedTypes: string[], useFuzzy: boolean): Promise<void> {
-    this.log(`Search requested: "${query}" for types: ${selectedTypes.join(', ')}, fuzzy: ${useFuzzy}`)
+  private async handleSearch(query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean): Promise<void> {
+    this.log(`Search requested: "${query}" for types: ${selectedTypes.join(', ')}, fuzzy: ${useFuzzy}, hideManagedPkg: ${hideManagedPkg}`)
 
     if (!this.state.sfHost) {
       logger.error('No SF host available for search')
@@ -410,8 +411,11 @@ class UltraForceWindowManager {
     this.state.isLoading = true
     this.emit('searchStart', { query, selectedTypes })
 
+    // Render loading state immediately
+    await this.renderComponent()
+
     try {
-      const results = await searchSalesforceMetadata(query, selectedTypes, this.state.sfHost, { useFuzzy })
+      const results = await searchSalesforceMetadata(query, selectedTypes, this.state.sfHost, { useFuzzy, hideManagedPackage: hideManagedPkg })
 
       if (currentNonce !== this.searchNonce) {
         this.log(`Discarding stale search results (nonce ${currentNonce} vs ${this.searchNonce})`)
@@ -445,6 +449,11 @@ class UltraForceWindowManager {
     this.log(`Fuzzy search changed to: ${value}`)
   }
 
+  private async handleClearResults(): Promise<void> {
+    this.state.searchResults = {}
+    await this.renderComponent()
+  }
+
   private handleResultClick(result: SearchResult): void {
     this.log(`Result clicked: ${result.name} (${result.type})`)
     this.emit('resultClick', result)
@@ -467,9 +476,12 @@ class UltraForceWindowManager {
           case 'Flow':
             targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
             break
-          case 'User':
-            targetUrl = `${baseUrl}/lightning/r/User/${result.id}/view`
+          case 'User': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            targetUrl = `https://${setupHost}/lightning/setup/ManageUsers/page?address=%2F${result.id}%3Fnoredirect%3D1%26isUserEntityOverride%3D1`
             break
+          }
           case 'CustomObject':
             targetUrl = `${baseUrl}/lightning/o/${result.metadata?.QualifiedApiName}/list`
             break
@@ -491,6 +503,36 @@ class UltraForceWindowManager {
           case 'Profile':
             targetUrl = `${baseUrl}/lightning/setup/EnhancedProfiles/page?address=%2F${result.id}`
             break
+          case 'CustomLabel':
+            targetUrl = `${baseUrl}/lightning/setup/ExternalStrings/page?address=%2F${result.id}`
+            break
+          case 'CustomMetadataType': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            // Use metadata.Id for the actual Salesforce record ID (result.id may be index key like "Type__mdt.RecordName")
+            const recordId = result.metadata?.Id || result.metadata?.DurableId || result.id
+            if (result.metadata?._isTypeDefinition) {
+              // Type definition page: /lightning/setup/CustomMetadata/page?address=%2F01Ixxxxx
+              targetUrl = `https://${setupHost}/lightning/setup/CustomMetadata/page?address=%2F${recordId}`
+            } else {
+              // Record page: /lightning/setup/CustomMetadata/page?address=%2Fm0Axxxxx
+              targetUrl = `https://${setupHost}/lightning/setup/CustomMetadata/page?address=%2F${recordId}`
+            }
+            break
+          }
+          case 'CustomSetting': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const settingId = result.metadata?.DurableId || result.id
+            if (result.metadata?._isSettingDefinition) {
+              // Setting definition page
+              targetUrl = `https://${setupHost}/lightning/setup/CustomSettings/page?address=%2Fsetup%2Fui%2FviewCustomSettings.apexp%3Fid%3D${settingId}`
+            } else {
+              // Setting record page
+              targetUrl = `https://${setupHost}/lightning/setup/CustomSettings/page?address=%2F${result.id}`
+            }
+            break
+          }
           default:
             targetUrl = `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
         }
@@ -521,6 +563,24 @@ class UltraForceWindowManager {
             const fieldId = durableId.includes('.') ? durableId.split('.')[1] : durableId
             if (fieldId) {
               targetUrl = `${baseUrl}/${fieldId}`
+            }
+            break
+          }
+          case 'CustomLabel':
+            targetUrl = `${baseUrl}/${result.id}`
+            break
+          case 'CustomMetadataType': {
+            // Use metadata.Id for the actual Salesforce record ID (result.id may be index key like "Type__mdt.RecordName")
+            const classicRecordId = result.metadata?.Id || result.metadata?.DurableId || result.id
+            targetUrl = `${baseUrl}/${classicRecordId}`
+            break
+          }
+          case 'CustomSetting': {
+            const settingId = result.metadata?.DurableId || result.id
+            if (result.metadata?._isSettingDefinition) {
+              targetUrl = `${baseUrl}/setup/ui/viewCustomSettings.apexp?id=${settingId}`
+            } else {
+              targetUrl = `${baseUrl}/${result.id}`
             }
             break
           }

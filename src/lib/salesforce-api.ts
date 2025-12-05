@@ -12,30 +12,40 @@ import {
 
 const METADATA_TYPES: Record<string, { query: string }> = {
   ApexClass: {
-    query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate FROM ApexClass ORDER BY Name ASC LIMIT 50000`
+    query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate, LastModifiedBy.Name FROM ApexClass ORDER BY Name ASC LIMIT 50000`
   },
   ApexTrigger: {
-    query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate FROM ApexTrigger ORDER BY Name ASC LIMIT 10000`
+    query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate, LastModifiedBy.Name FROM ApexTrigger ORDER BY Name ASC LIMIT 10000`
   },
   CustomObject: {
-    query: `SELECT QualifiedApiName, Label, DurableId, KeyPrefix FROM EntityDefinition WHERE IsCustomizable = true ORDER BY QualifiedApiName ASC LIMIT 10000`
+    query: `SELECT QualifiedApiName, Label, DurableId, KeyPrefix FROM EntityDefinition WHERE IsCustomizable = true AND (NOT QualifiedApiName LIKE '%__mdt') ORDER BY QualifiedApiName ASC LIMIT 10000`
   },
   Flow: {
     query: `SELECT Id, MasterLabel, VersionNumber, Status FROM Flow ORDER BY MasterLabel ASC LIMIT 10000`
   },
   User: {
-    query: `SELECT Id, Name, Username, IsActive FROM User ORDER BY Name ASC LIMIT 5000`
+    query: `SELECT Id, Name, Username, Email, FederationIdentifier, IsActive, Profile.Name, UserRole.Name FROM User ORDER BY Name ASC LIMIT 5000`
   },
   PermissionSet: {
     query: `SELECT Id, Name, Label, NamespacePrefix FROM PermissionSet ORDER BY Label ASC LIMIT 2000`
   },
   Profile: {
     query: `SELECT Id, Name FROM Profile ORDER BY Name ASC LIMIT 1000`
+  },
+  CustomLabel: {
+    query: `SELECT Id, Name, MasterLabel, Value, NamespacePrefix FROM ExternalString ORDER BY Name ASC`
+  },
+  CustomMetadataType: {
+    query: `SELECT DurableId, QualifiedApiName, Label, NamespacePrefix FROM EntityDefinition WHERE QualifiedApiName LIKE '%__mdt' ORDER BY QualifiedApiName ASC LIMIT 500`
+  },
+  CustomSetting: {
+    query: `SELECT DurableId, QualifiedApiName, DeveloperName, Label, NamespacePrefix FROM EntityDefinition WHERE IsCustomSetting = true ORDER BY QualifiedApiName ASC LIMIT 2000`
   }
 }
 
 export interface SearchOptions {
   useFuzzy?: boolean
+  hideManagedPackage?: boolean
 }
 
 function normalizeHost(host: string): string {
@@ -48,7 +58,13 @@ function normalizeHost(host: string): string {
     .replace(/\.mcas\.ms$/, '')
 }
 
-function parseDotNotation(query: string): { objectName: string; fieldQuery: string } | null {
+interface DotNotationResult {
+  objectName: string
+  fieldQuery: string
+  isCMDT: boolean
+}
+
+function parseDotNotation(query: string): DotNotationResult | null {
   const dotIndex = query.indexOf('.')
   if (dotIndex === -1) return null
 
@@ -57,15 +73,13 @@ function parseDotNotation(query: string): { objectName: string; fieldQuery: stri
 
   if (objectName.length === 0) return null
 
-  return { objectName, fieldQuery }
+  const isCMDT = objectName.toLowerCase().endsWith('__mdt')
+
+  return { objectName, fieldQuery, isCMDT }
 }
 
-function escapeSoqlLike(input: string): string {
-  return input
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
+function escapeSoql(input: string): string {
+  return input.replace(/'/g, "\\'")
 }
 
 export async function searchSalesforceMetadata(
@@ -74,7 +88,7 @@ export async function searchSalesforceMetadata(
   sfHost: string,
   options: SearchOptions = {}
 ): Promise<Record<string, SearchResult[]>> {
-  const { useFuzzy = true } = options
+  const { useFuzzy = true, hideManagedPackage = true } = options
 
   if (!sfHost) {
     logger.error('searchSalesforceMetadata: missing sfHost')
@@ -91,36 +105,152 @@ export async function searchSalesforceMetadata(
   const results: Record<string, SearchResult[]> = {}
   const dotNotation = parseDotNotation(query)
 
-  // Dot-notation field search: "Account.Name" or "account."
-  if (dotNotation && selectedTypes.includes('CustomField')) {
-    const { objectName, fieldQuery } = dotNotation
-    logger.debug('search:field', { object: objectName, query: fieldQuery })
+  // Dot-notation search: "Object.Field" or "Type__mdt.Record"
+  if (dotNotation) {
+    const { objectName, fieldQuery, isCMDT } = dotNotation
 
-    try {
-      await ensureFieldIndex(objectName, apiHost, session.key)
-      if (hasSearchIndex(`Field:${objectName}`, apiHost)) {
-        results['CustomField'] = searchIndex(fieldQuery, `Field:${objectName}`, apiHost, useFuzzy)
-      } else {
+    // CMDT record search: "My_Setting__mdt." or "My_Setting__mdt.RecordName"
+    if (isCMDT && selectedTypes.includes('CustomMetadataType')) {
+      logger.debug('search:cmdt-record', { cmdt: objectName, query: fieldQuery })
+
+      try {
+        await ensureCMDTRecordIndex(objectName, apiHost, session.key)
+        if (hasSearchIndex(`CMDTRecord:${objectName}`, apiHost)) {
+          results['CustomMetadataType'] = searchIndex(fieldQuery, `CMDTRecord:${objectName}`, apiHost, { useFuzzy, hideManagedPackage })
+        } else {
+          results['CustomMetadataType'] = []
+        }
+      } catch (error) {
+        logger.error('search:cmdt-record failed', { cmdt: objectName, error })
+        results['CustomMetadataType'] = []
+      }
+
+      // Other types use original query
+      const otherTypes = selectedTypes.filter((t) => t !== 'CustomMetadataType')
+      if (otherTypes.length > 0) {
+        const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, session.key, useFuzzy, hideManagedPackage)
+        Object.assign(results, otherResults)
+      }
+
+      return results
+    }
+
+    // Custom Setting record search: "My_Setting__c." or "My_Setting__c.RecordName"
+    if (!isCMDT && selectedTypes.includes('CustomSetting')) {
+      const isCustomSetting = await checkIsCustomSetting(objectName, apiHost, session.key)
+      if (isCustomSetting) {
+        logger.debug('search:custom-setting-record', { setting: objectName, query: fieldQuery })
+
+        try {
+          await ensureCustomSettingRecordIndex(objectName, apiHost, session.key)
+          if (hasSearchIndex(`CustomSettingRecord:${objectName}`, apiHost)) {
+            results['CustomSetting'] = searchIndex(fieldQuery, `CustomSettingRecord:${objectName}`, apiHost, { useFuzzy, hideManagedPackage })
+          } else {
+            results['CustomSetting'] = []
+          }
+        } catch (error) {
+          logger.error('search:custom-setting-record failed', { setting: objectName, error })
+          results['CustomSetting'] = []
+        }
+
+        // Other types use original query
+        const otherTypes = selectedTypes.filter((t) => t !== 'CustomSetting')
+        if (otherTypes.length > 0) {
+          const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, session.key, useFuzzy, hideManagedPackage)
+          Object.assign(results, otherResults)
+        }
+
+        return results
+      }
+    }
+
+    // Field search: "Account.Name" or "account."
+    if (!isCMDT && selectedTypes.includes('CustomField')) {
+      logger.debug('search:field', { object: objectName, query: fieldQuery })
+
+      try {
+        await ensureFieldIndex(objectName, apiHost, session.key)
+        if (hasSearchIndex(`Field:${objectName}`, apiHost)) {
+          results['CustomField'] = searchIndex(fieldQuery, `Field:${objectName}`, apiHost, { useFuzzy, hideManagedPackage })
+        } else {
+          results['CustomField'] = []
+        }
+      } catch (error) {
+        logger.error('search:field failed', { object: objectName, error })
         results['CustomField'] = []
       }
-    } catch (error) {
-      logger.error('search:field failed', { object: objectName, error })
-      results['CustomField'] = []
-    }
 
-    // Other types use original query (not objectName) to preserve full search term
-    const otherTypes = selectedTypes.filter((t) => t !== 'CustomField')
-    if (otherTypes.length > 0) {
-      const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, session.key, useFuzzy)
-      Object.assign(results, otherResults)
-    }
+      // Other types use original query (not objectName) to preserve full search term
+      const otherTypes = selectedTypes.filter((t) => t !== 'CustomField')
+      if (otherTypes.length > 0) {
+        const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, session.key, useFuzzy, hideManagedPackage)
+        Object.assign(results, otherResults)
+      }
 
-    return results
+      return results
+    }
   }
 
-  // Filter out CustomField for non-dot-notation queries (CustomField requires dot-notation)
-  const typesToSearch = selectedTypes.filter((t) => t !== 'CustomField')
-  return await searchMetadataTypes(query, typesToSearch, apiHost, session.key, useFuzzy)
+  // Handle User search separately (real-time SOQL search)
+  if (selectedTypes.includes('User') && query.trim()) {
+    try {
+      const userResults = await searchUsersRealtime(query, apiHost, session.key)
+      results['User'] = userResults
+    } catch (error) {
+      logger.error('search:user failed', { error })
+      results['User'] = []
+    }
+  }
+
+  // Filter out CustomField (requires dot-notation) and User (handled above)
+  const typesToSearch = selectedTypes.filter((t) => t !== 'CustomField' && t !== 'User')
+  if (typesToSearch.length > 0) {
+    const otherResults = await searchMetadataTypes(query, typesToSearch, apiHost, session.key, useFuzzy, hideManagedPackage)
+    Object.assign(results, otherResults)
+  }
+
+  return results
+}
+
+async function searchUsersRealtime(
+  searchTerm: string,
+  sfHost: string,
+  sessionId: string
+): Promise<SearchResult[]> {
+  const host = normalizeHost(sfHost)
+  const endpoint = `https://${host}/services/data/v${API_VERSION}/query`
+
+  const start = Date.now()
+  const escaped = escapeSoql(searchTerm)
+  const searchPattern = `%${escaped}%`
+
+  const query = `SELECT Id, Name, Username, Email, FederationIdentifier, IsActive, Profile.Name, UserRole.Name FROM User WHERE Name LIKE '${searchPattern}' OR Username LIKE '${searchPattern}' OR Email LIKE '${searchPattern}' OR FederationIdentifier LIKE '${searchPattern}' ORDER BY Name ASC LIMIT 50`
+
+  logger.debug('search:user:soql', { query })
+
+  try {
+    const records = await fetchAllPages(`${endpoint}?q=${encodeURIComponent(query)}`, host, sessionId)
+    logger.debug('search:user', { term: searchTerm, count: records.length, ms: Date.now() - start })
+
+    return records.map((record: any) => {
+      const parts = [record.Username]
+      if (record.Email) parts.push(record.Email)
+      if (record.Profile?.Name) parts.push(record.Profile.Name)
+      if (record.UserRole?.Name) parts.push(record.UserRole.Name)
+      if (record.IsActive === false) parts.push('Inactive')
+
+      return {
+        id: record.Id,
+        name: record.Name,
+        type: 'User',
+        description: parts.join(' | '),
+        metadata: record
+      }
+    })
+  } catch (error) {
+    logger.error('search:user failed', { term: searchTerm, error })
+    return []
+  }
 }
 
 async function ensureFieldIndex(objectName: string, apiHost: string, sessionId: string): Promise<void> {
@@ -132,19 +262,116 @@ async function ensureFieldIndex(objectName: string, apiHost: string, sessionId: 
   }
 }
 
+async function ensureCMDTRecordIndex(cmdtName: string, apiHost: string, sessionId: string): Promise<void> {
+  if (hasSearchIndex(`CMDTRecord:${cmdtName}`, apiHost)) return
+
+  const records = await fetchRecordsForCMDT(cmdtName, apiHost, sessionId)
+  if (records.length > 0) {
+    buildSearchIndex(`CMDTRecord:${cmdtName}`, records, apiHost)
+  }
+}
+
+async function fetchRecordsForCMDT(
+  cmdtApiName: string,
+  sfHost: string,
+  sessionId: string
+): Promise<any[]> {
+  const host = normalizeHost(sfHost)
+  const endpoint = `https://${host}/services/data/v${API_VERSION}/query`
+
+  const start = Date.now()
+  const query = `SELECT Id, DeveloperName, MasterLabel, NamespacePrefix FROM ${cmdtApiName} ORDER BY MasterLabel ASC LIMIT 2000`
+
+  try {
+    const records = await fetchAllPages(`${endpoint}?q=${encodeURIComponent(query)}`, host, sessionId)
+    const enrichedRecords = records.map((record: any) => ({
+      ...record,
+      _parentType: cmdtApiName,
+      _parentLabel: cmdtApiName.replace('__mdt', '').replace(/_/g, ' '),
+      _isTypeDefinition: false,
+      _recordType: 'Record'
+    }))
+
+    logger.debug('fetch:cmdt-records', { cmdt: cmdtApiName, count: enrichedRecords.length, ms: Date.now() - start })
+    return enrichedRecords
+  } catch (error) {
+    logger.error('fetch:cmdt-records failed', { cmdt: cmdtApiName, error })
+    return []
+  }
+}
+
+// Cache of Custom Setting API names for dot-notation detection
+const customSettingCache = new Map<string, Set<string>>()
+
+async function checkIsCustomSetting(objectName: string, sfHost: string, sessionId: string): Promise<boolean> {
+  const host = normalizeHost(sfHost)
+
+  // Check cache first
+  if (!customSettingCache.has(host)) {
+    // Fetch Custom Settings list and cache
+    await ensureMetadataIndex('CustomSetting', host, sessionId)
+    const settings = searchIndex('', 'CustomSetting', host, { useFuzzy: false, hideManagedPackage: false })
+    const settingNames = new Set(settings.map(s => s.metadata?.QualifiedApiName?.toLowerCase()).filter(Boolean))
+    customSettingCache.set(host, settingNames)
+  }
+
+  const settingNames = customSettingCache.get(host)
+  return settingNames?.has(objectName.toLowerCase()) || false
+}
+
+async function ensureCustomSettingRecordIndex(settingName: string, apiHost: string, sessionId: string): Promise<void> {
+  if (hasSearchIndex(`CustomSettingRecord:${settingName}`, apiHost)) return
+
+  const records = await fetchRecordsForCustomSetting(settingName, apiHost, sessionId)
+  if (records.length > 0) {
+    buildSearchIndex(`CustomSettingRecord:${settingName}`, records, apiHost)
+  }
+}
+
+async function fetchRecordsForCustomSetting(
+  settingApiName: string,
+  sfHost: string,
+  sessionId: string
+): Promise<any[]> {
+  const host = normalizeHost(sfHost)
+  const endpoint = `https://${host}/services/data/v${API_VERSION}/query`
+
+  const start = Date.now()
+  // Custom Settings use Name field, query common fields
+  const query = `SELECT Id, Name, SetupOwnerId FROM ${settingApiName} ORDER BY Name ASC`
+
+  try {
+    const records = await fetchAllPages(`${endpoint}?q=${encodeURIComponent(query)}`, host, sessionId)
+    const enrichedRecords = records.map((record: any) => ({
+      ...record,
+      _parentType: settingApiName,
+      _parentLabel: settingApiName.replace('__c', '').replace(/_/g, ' '),
+      _isSettingDefinition: false,
+      _recordType: 'Record'
+    }))
+
+    logger.debug('fetch:custom-setting-records', { setting: settingApiName, count: enrichedRecords.length, ms: Date.now() - start })
+    return enrichedRecords
+  } catch (error) {
+    logger.error('fetch:custom-setting-records failed', { setting: settingApiName, error })
+    return []
+  }
+}
+
 async function searchMetadataTypes(
   query: string,
   selectedTypes: string[],
   apiHost: string,
   sessionId: string,
-  useFuzzy: boolean
+  useFuzzy: boolean,
+  hideManagedPackage: boolean
 ): Promise<Record<string, SearchResult[]>> {
   const results: Record<string, SearchResult[]> = {}
 
   const searchPromises = selectedTypes.map(async (metadataType) => {
     try {
       await ensureMetadataIndex(metadataType, apiHost, sessionId)
-      const searchResults = searchIndex(query, metadataType, apiHost, useFuzzy)
+      const searchResults = searchIndex(query, metadataType, apiHost, { useFuzzy, hideManagedPackage })
       return { type: metadataType, results: searchResults }
     } catch (error) {
       logger.error('search:metadata failed', { type: metadataType, error })
@@ -173,6 +400,10 @@ async function ensureMetadataIndex(
   }
 }
 
+// Types that should always fetch fresh data (no cache)
+// CustomLabel needs fresh data to search Value field (not cached to save storage)
+const REALTIME_TYPES: string[] = ['CustomLabel']
+
 async function listMetadata(
   metadataType: string,
   sfHost: string,
@@ -182,7 +413,10 @@ async function listMetadata(
   const cache = MetadataCache.getInstance()
   const cacheKey = normalizeHost(sfHost)
 
-  if (!forceRefresh) {
+  // Skip cache for real-time types
+  const skipCache = forceRefresh || REALTIME_TYPES.includes(metadataType)
+
+  if (!skipCache) {
     const cachedData = await cache.get(cacheKey, metadataType)
     if (cachedData) {
       return { data: cachedData, fromCache: true }
@@ -190,27 +424,49 @@ async function listMetadata(
   }
 
   const freshData = await fetchMetadataFromAPI(metadataType, sfHost, sessionId)
-  await cache.set(cacheKey, metadataType, freshData)
+
+  // Skip caching for real-time types to avoid quota issues
+  if (!REALTIME_TYPES.includes(metadataType)) {
+    await cache.set(cacheKey, metadataType, freshData)
+  }
 
   return { data: freshData, fromCache: false }
+}
+
+interface FetchOptions {
+  batchSize?: number
+  maxRecords?: number
+  onBatch?: (records: any[]) => Promise<void>
+  skipLocalCollection?: boolean
 }
 
 async function fetchAllPages(
   initialUrl: string,
   sfHost: string,
-  sessionId: string
+  sessionId: string,
+  options: FetchOptions = {}
 ): Promise<any[]> {
+  const {
+    batchSize = 2000,
+    maxRecords = Infinity,
+    onBatch,
+    skipLocalCollection = false
+  } = options
+
   const host = normalizeHost(sfHost)
   const baseUrl = `https://${host}`
-  let allRecords: any[] = []
+  const allRecords: any[] = []
   let url = initialUrl
+  let totalSize: number | null = null
+  let fetchedCount = 0
 
   while (url) {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${sessionId}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Sforce-Query-Options': `batchSize=${batchSize}`
       }
     })
 
@@ -223,13 +479,55 @@ async function fetchAllPages(
     }
 
     const data = await response.json()
-    allRecords = allRecords.concat(data.records || [])
+    const records = data.records || []
 
+    // Get total size from first response
+    if (totalSize === null && data.totalSize !== undefined) {
+      totalSize = data.totalSize
+      logger.debug('fetch:start', { total: totalSize })
+    }
+
+    if (records.length > 0) {
+      const remaining = maxRecords - fetchedCount
+      const batchToProcess = records.slice(0, Math.min(records.length, remaining))
+      fetchedCount += batchToProcess.length
+
+      // Batch callback for streaming processing
+      if (onBatch) {
+        await onBatch(batchToProcess)
+      }
+
+      // Collect records unless skipped (for large datasets to avoid OOM)
+      if (!skipLocalCollection) {
+        allRecords.push(...batchToProcess)
+      }
+
+      // Log progress
+      if (totalSize && totalSize > batchSize) {
+        logger.debug('fetch:progress', {
+          fetched: fetchedCount,
+          total: totalSize,
+          percent: Math.round((fetchedCount / totalSize) * 100)
+        })
+      }
+
+      // Check max records limit
+      if (fetchedCount >= maxRecords) {
+        logger.debug('fetch:limit-reached', { fetched: fetchedCount, max: maxRecords })
+        break
+      }
+    }
+
+    // Get next page URL (queryMore pattern)
     url = data.nextRecordsUrl ? `${baseUrl}${data.nextRecordsUrl}` : ''
   }
 
+  logger.debug('fetch:complete', { total: fetchedCount })
   return allRecords
 }
+
+// Types that use regular REST API (not Tooling API)
+const REST_API_TYPES = ['CustomObject', 'CustomSetting', 'User']
 
 async function fetchMetadataFromAPI(
   metadataType: string,
@@ -237,6 +535,19 @@ async function fetchMetadataFromAPI(
   sessionId: string
 ): Promise<any[]> {
   const host = normalizeHost(sfHost)
+
+  // Special handling for CustomMetadataType - only fetch type definitions
+  // Records are fetched via dot-notation search (Type__mdt.)
+  if (metadataType === 'CustomMetadataType') {
+    return await fetchCustomMetadataTypes(host, sessionId)
+  }
+
+  // Special handling for CustomSetting - mark as type definitions
+  // Records are fetched via dot-notation search (Setting__c.)
+  if (metadataType === 'CustomSetting') {
+    return await fetchCustomSettings(host, sessionId)
+  }
+
   const config = METADATA_TYPES[metadataType]
 
   if (!config) {
@@ -244,13 +555,78 @@ async function fetchMetadataFromAPI(
   }
 
   const start = Date.now()
-  const endpoint = `https://${host}/services/data/v${API_VERSION}/tooling/query`
+  // Use regular REST API for EntityDefinition queries, Tooling API for others
+  const apiPath = REST_API_TYPES.includes(metadataType) ? 'query' : 'tooling/query'
+  const endpoint = `https://${host}/services/data/v${API_VERSION}/${apiPath}`
   const url = `${endpoint}?q=${encodeURIComponent(config.query)}`
+
+  logger.debug('fetch:soql', { type: metadataType, api: apiPath, query: config.query })
 
   const records = await fetchAllPages(url, host, sessionId)
   logger.debug('fetch:metadata', { type: metadataType, count: records.length, ms: Date.now() - start })
 
   return records
+}
+
+async function fetchCustomMetadataTypes(
+  sfHost: string,
+  sessionId: string
+): Promise<any[]> {
+  const start = Date.now()
+  const dataEndpoint = `https://${sfHost}/services/data/v${API_VERSION}/query`
+
+  // Get all Custom Metadata Type definitions using EntityDefinition (QualifiedApiName ends with __mdt)
+  // Only fetch type definitions here - records are fetched via dot-notation search (Type__mdt.)
+  const typeQuery = `SELECT DurableId, QualifiedApiName, Label, NamespacePrefix FROM EntityDefinition WHERE QualifiedApiName LIKE '%__mdt' ORDER BY QualifiedApiName ASC LIMIT 500`
+  logger.debug('fetch:cmdt:types', { query: typeQuery })
+  const types = await fetchAllPages(`${dataEndpoint}?q=${encodeURIComponent(typeQuery)}`, sfHost, sessionId)
+  logger.debug('fetch:cmdt:types:result', { count: types.length, types: types.map((t: any) => t.QualifiedApiName) })
+
+  // Add the type definitions as searchable items
+  const allRecords: any[] = []
+  for (const t of types) {
+    allRecords.push({
+      ...t,
+      Id: t.DurableId,
+      MasterLabel: t.Label || t.QualifiedApiName.replace('__mdt', '').replace(/_/g, ' '),
+      _isTypeDefinition: true,
+      _recordType: 'TypeDefinition'
+    })
+  }
+
+  logger.debug('fetch:metadata', { type: 'CustomMetadataType', count: allRecords.length, ms: Date.now() - start })
+
+  return allRecords
+}
+
+async function fetchCustomSettings(
+  sfHost: string,
+  sessionId: string
+): Promise<any[]> {
+  const start = Date.now()
+  const dataEndpoint = `https://${sfHost}/services/data/v${API_VERSION}/query`
+
+  // Get all Custom Setting definitions using EntityDefinition
+  // Only fetch type definitions here - records are fetched via dot-notation search (Setting__c.)
+  const typeQuery = `SELECT DurableId, QualifiedApiName, DeveloperName, Label, NamespacePrefix FROM EntityDefinition WHERE IsCustomSetting = true ORDER BY QualifiedApiName ASC LIMIT 2000`
+  logger.debug('fetch:custom-setting:types', { query: typeQuery })
+  const types = await fetchAllPages(`${dataEndpoint}?q=${encodeURIComponent(typeQuery)}`, sfHost, sessionId)
+  logger.debug('fetch:custom-setting:types:result', { count: types.length })
+
+  // Add the type definitions as searchable items with _isSettingDefinition flag
+  const allRecords: any[] = []
+  for (const t of types) {
+    allRecords.push({
+      ...t,
+      Id: t.DurableId,
+      _isSettingDefinition: true,
+      _recordType: 'SettingDefinition'
+    })
+  }
+
+  logger.debug('fetch:metadata', { type: 'CustomSetting', count: allRecords.length, ms: Date.now() - start })
+
+  return allRecords
 }
 
 async function fetchFieldsForObject(
@@ -262,8 +638,8 @@ async function fetchFieldsForObject(
   const endpoint = `https://${host}/services/data/v${API_VERSION}/tooling/query`
 
   const start = Date.now()
-  const escapedName = escapeSoqlLike(objectApiName)
-  const query = `SELECT Id, DurableId, QualifiedApiName, Label, DataType, EntityDefinition.QualifiedApiName FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName LIKE '${escapedName}' ORDER BY QualifiedApiName ASC`
+  const escapedName = escapeSoql(objectApiName)
+  const query = `SELECT Id, DurableId, QualifiedApiName, Label, DataType, EntityDefinition.QualifiedApiName FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = '${escapedName}' ORDER BY QualifiedApiName ASC`
 
   try {
     const records = await fetchAllPages(`${endpoint}?q=${encodeURIComponent(query)}`, host, sessionId)
