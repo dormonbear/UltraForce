@@ -1,0 +1,52 @@
+{
+  "name": "ultraforce-plasmo",
+  "version": "0.0.3",
+  "displayName": "UltraForce for Salesforce",
+  "description": "Modern Salesforce metadata search and management tool",
+  "author": "UltraForce Team",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package"
+  },
+  "keywords": [
+    "salesforce",
+    "chrome-extension",
+    "metadata",
+    "react"
+  ],
+  "license": "MIT",
+  "manifest": {
+    "permissions": [
+      "storage",
+      "activeTab",
+      "tabs",
+      "cookies"
+    ],
+    "host_permissions": [
+      "https://*.salesforce.com/*",
+      "https://*.salesforce-setup.com/*",
+      "https://*.visual.force.com/*",
+      "https://*.visualforce.com/*",
+      "https://*.lightning.force.com/*",
+      "https://*.my.salesforce.com/*",
+      "https://*.force.com/*",
+      "https://*.sfcrmapps.cn/*",
+      "https://*.sfcrmproducts.cn/*",
+      "https://*.setup.sfcrmproducts.cn/*",
+      "https://*.setup.sfcrmapps.cn/*",
+      "https://login.salesforce.com/*",
+      "https://test.salesforce.com/*"
+    ]
+  },
+  "dependencies": {
+    "@types/chrome": "^0.1.4",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "minisearch": "^7.2.0",
+    "plasmo": "^0.90.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.2"
+  }
+}
