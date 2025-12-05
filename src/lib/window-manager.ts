@@ -687,15 +687,33 @@ class UltraForceWindowManager {
 
     const baseUrl = `https://${this.state.sfHost}`
 
-    // Handle preview action for ApexPage
-    if (action === 'preview' && result.type === 'ApexPage') {
-      const pageName = result.namespace
-        ? `${result.namespace}__${result.name}`
-        : result.name
-      const previewUrl = `${baseUrl}/apex/${pageName}`
-      window.open(previewUrl, '_blank')
-      if (this.state.closeOnNavigate) {
-        this.hide()
+    // Handle preview action
+    if (action === 'preview') {
+      let previewUrl = ''
+      const componentName = result.metadata?.DeveloperName || result.name
+
+      if (result.type === 'ApexPage') {
+        const pageName = result.namespace
+          ? `${result.namespace}__${result.name}`
+          : result.name
+        previewUrl = `${baseUrl}/apex/${pageName}`
+      } else if (result.type === 'AuraDefinitionBundle') {
+        const appName = result.namespace
+          ? `${result.namespace}__${componentName}`
+          : componentName
+        previewUrl = `${baseUrl}/c/${appName}.app`
+      } else if (result.type === 'LightningComponentBundle') {
+        const lwcName = result.namespace
+          ? `${result.namespace}__${componentName}`
+          : componentName
+        previewUrl = `${baseUrl}/c/${lwcName}.app`
+      }
+
+      if (previewUrl) {
+        window.open(previewUrl, '_blank')
+        if (this.state.closeOnNavigate) {
+          this.hide()
+        }
       }
       return
     }
