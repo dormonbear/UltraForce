@@ -53,6 +53,25 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
 
   const isCustomObject = result.type === 'CustomObject'
   const isCustomField = result.type === 'CustomField'
+  const isApex = result.type === 'ApexClass' || result.type === 'ApexTrigger'
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return 'today'
+    if (diffDays === 1) return 'yesterday'
+    if (diffDays < 7) return `${diffDays}d ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
+    return `${Math.floor(diffDays / 365)}y ago`
+  }
+
+  const lastModifiedBy = result.metadata?.LastModifiedBy?.Name
+  const lastModifiedDate = result.metadata?.LastModifiedDate
 
   return (
     <div
@@ -66,6 +85,13 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
       </div>
 
       <div className="result-actions">
+        {isApex && lastModifiedDate && (
+          <div className="result-meta">
+            {lastModifiedBy && <span className="meta-user">{lastModifiedBy}</span>}
+            <span className="meta-date">{formatDate(lastModifiedDate)}</span>
+          </div>
+        )}
+
         {result.namespace && <div className="result-namespace">{result.namespace}</div>}
 
         {isCustomField && (

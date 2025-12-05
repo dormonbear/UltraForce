@@ -21,8 +21,27 @@ A Chrome extension for lightning-fast Salesforce metadata search.
 - **Custom Objects** - Search by object API name or label
 - **Fields** - Use dot-notation: `Account.Name` or `Account.`
 - **Flows** - Search by flow name
+- **Users** - Search by name, username, email, or federation ID
 - **Permission Sets** - Search by permission set name
 - **Profiles** - Search by profile name
+- **Custom Labels** - Search by label name or value content
+- **Custom Metadata Types** - Search types, use dot-notation for records: `My_Setting__mdt.`
+- **Custom Settings** - Search settings, use dot-notation for records: `My_Setting__c.`
+
+## Commands
+
+Type `:` to see available commands for quick filtering:
+
+| Command | Description | Example |
+|---------|-------------|---------|
+| `:o` | Objects & Fields | `:o account` |
+| `:c` | Apex (Classes + Triggers) | `:c mycontroller` |
+| `:w` | Flows | `:w approval` |
+| `:u` | Users | `:u john` |
+| `:p` | Permission Sets | `:p admin` |
+| `:r` | Profiles | `:r system` |
+| `:l` | Custom Labels | `:l error_message` |
+| `:s` | Custom Settings | `:s my_setting` |
 
 ## Keyboard Shortcuts
 
@@ -31,7 +50,7 @@ A Chrome extension for lightning-fast Salesforce metadata search.
 | `Cmd/Ctrl + B` | Open/Close UltraForce |
 | `Up/Down` | Navigate results |
 | `Enter` | Open selected result |
-| `Tab` | Autocomplete (on Object → adds `.` for field search) |
+| `Tab` | Autocomplete (Object → `.` for fields, CMDT/Custom Setting → `.` for records) |
 | `Esc` | Close |
 
 ## Settings
@@ -42,7 +61,15 @@ Click the gear icon to configure:
 - **Keyboard Shortcut** - Customize the activation key
 - **Close on Navigate** - Auto-close after opening a result
 - **Fuzzy Search** - Enable typo-tolerant matching
+- **Hide Managed Package** - Filter out managed package components
 - **Navigation Mode** - Auto / Lightning / Classic
+- **Custom Commands** - Configure your own command shortcuts
+
+## Inspired by
+
+- [EasyMeta](https://chromewebstore.google.com/detail/easymeta/jmlnbdjigfmgodkdaaikakhfabfjohcd) - Chrome extension for Salesforce metadata
+- [Salesforce Inspector Reloaded](https://github.com/tprouvot/Salesforce-Inspector-reloaded) - Chrome extension for Salesforce admins and developers
+- [Raycast](https://www.raycast.com/) - Productivity tool with beautiful UI/UX
 
 ## License
 

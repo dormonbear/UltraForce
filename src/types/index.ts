@@ -176,3 +176,14 @@ export interface SearchEvent {
   timestamp: number
   resultCount: number
 }
+
+// Command System Types
+export interface SearchCommand {
+  key: string
+  types: string[]
+  description: string
+}
+
+export interface CommandConfig {
+  commands: Record<string, SearchCommand>
+}
