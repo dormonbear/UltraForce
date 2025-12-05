@@ -100,6 +100,7 @@ export const SEARCH_MODAL_STYLES = `
     text-transform: uppercase;
     white-space: nowrap;
     transition: all 0.2s ease;
+    user-select: none;
   }
 
   /* Production - Red warning */
@@ -409,6 +410,7 @@ export const SEARCH_MODAL_STYLES = `
     font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     flex-shrink: 0;
+    user-select: none;
   }
 
   .shortcuts {
