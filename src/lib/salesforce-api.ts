@@ -17,6 +17,18 @@ const METADATA_TYPES: Record<string, { query: string }> = {
   ApexTrigger: {
     query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate, LastModifiedBy.Name FROM ApexTrigger ORDER BY Name ASC LIMIT 10000`
   },
+  ApexPage: {
+    query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate, LastModifiedBy.Name FROM ApexPage ORDER BY Name ASC LIMIT 10000`
+  },
+  ApexComponent: {
+    query: `SELECT Id, Name, NamespacePrefix, LastModifiedDate, LastModifiedBy.Name FROM ApexComponent ORDER BY Name ASC LIMIT 10000`
+  },
+  LightningComponentBundle: {
+    query: `SELECT Id, DeveloperName, NamespacePrefix, MasterLabel, LastModifiedDate, LastModifiedBy.Name FROM LightningComponentBundle ORDER BY DeveloperName ASC LIMIT 10000`
+  },
+  AuraDefinitionBundle: {
+    query: `SELECT Id, DeveloperName, NamespacePrefix, MasterLabel, LastModifiedDate, LastModifiedBy.Name FROM AuraDefinitionBundle ORDER BY DeveloperName ASC LIMIT 10000`
+  },
   CustomObject: {
     query: `SELECT QualifiedApiName, Label, DurableId, KeyPrefix FROM EntityDefinition WHERE IsCustomizable = true AND (NOT QualifiedApiName LIKE '%__mdt') ORDER BY QualifiedApiName ASC LIMIT 10000`
   },

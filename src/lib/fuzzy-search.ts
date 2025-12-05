@@ -79,6 +79,12 @@ function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord
         name = record.Name || ''
         apiName = record.Name || ''
         break
+      case 'LightningComponentBundle':
+      case 'AuraDefinitionBundle':
+        name = record.MasterLabel || record.DeveloperName || ''
+        label = record.MasterLabel || ''
+        apiName = record.DeveloperName || ''
+        break
       case 'CustomObject':
         name = record.Label || record.QualifiedApiName || ''
         label = record.Label || ''
@@ -278,6 +284,10 @@ function toSearchResult(indexed: IndexedRecord, score?: number): SearchResult {
       break
     case 'PermissionSet':
       result.description = record.Name !== record.Label ? record.Name : undefined
+      break
+    case 'LightningComponentBundle':
+    case 'AuraDefinitionBundle':
+      result.description = record.DeveloperName !== record.MasterLabel ? record.DeveloperName : undefined
       break
     case 'CustomLabel': {
       const value = indexed.description || ''

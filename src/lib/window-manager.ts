@@ -529,6 +529,18 @@ class UltraForceWindowManager {
           case 'ApexTrigger':
             targetUrl = `${baseUrl}/lightning/setup/ApexTriggers/page?address=%2F${result.id}`
             break
+          case 'ApexPage':
+            targetUrl = `${baseUrl}/lightning/setup/ApexPages/page?address=%2F${result.id}`
+            break
+          case 'ApexComponent':
+            targetUrl = `${baseUrl}/lightning/setup/ApexComponents/page?address=%2F${result.id}`
+            break
+          case 'LightningComponentBundle':
+            targetUrl = `${baseUrl}/lightning/setup/LightningComponentBundles/page?address=%2F${result.id}`
+            break
+          case 'AuraDefinitionBundle':
+            targetUrl = `${baseUrl}/lightning/setup/AuraBundles/page?address=%2F${result.id}`
+            break
           case 'Flow':
             targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
             break
@@ -601,6 +613,10 @@ class UltraForceWindowManager {
         switch (result.type) {
           case 'ApexClass':
           case 'ApexTrigger':
+          case 'ApexPage':
+          case 'ApexComponent':
+          case 'LightningComponentBundle':
+          case 'AuraDefinitionBundle':
           case 'User':
           case 'PermissionSet':
           case 'Profile':
@@ -664,12 +680,31 @@ class UltraForceWindowManager {
     this.log(`Action clicked: ${action} for ${result.name}`)
     this.emit('actionClick', { result, action })
 
-    if (!this.state.sfHost || !result.metadata?.DurableId) {
-      this.log('Missing sfHost or DurableId for action navigation')
+    if (!this.state.sfHost) {
+      this.log('Missing sfHost for action navigation')
       return
     }
 
     const baseUrl = `https://${this.state.sfHost}`
+
+    // Handle preview action for ApexPage
+    if (action === 'preview' && result.type === 'ApexPage') {
+      const pageName = result.namespace
+        ? `${result.namespace}__${result.name}`
+        : result.name
+      const previewUrl = `${baseUrl}/apex/${pageName}`
+      window.open(previewUrl, '_blank')
+      if (this.state.closeOnNavigate) {
+        this.hide()
+      }
+      return
+    }
+
+    if (!result.metadata?.DurableId) {
+      this.log('Missing DurableId for action navigation')
+      return
+    }
+
     const objectId = result.metadata.DurableId
     const objectApiName = result.metadata.QualifiedApiName
     const useLightning = shouldUseLightning(this.state.navigationMode)

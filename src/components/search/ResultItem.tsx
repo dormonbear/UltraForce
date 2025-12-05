@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { SearchResult } from '~types'
 
-export type ObjectAction = 'list' | 'fields' | 'layouts' | 'details'
+export type ObjectAction = 'list' | 'fields' | 'layouts' | 'details' | 'preview'
 
 interface ResultItemProps {
   result: SearchResult
@@ -54,6 +54,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
   const isCustomObject = result.type === 'CustomObject'
   const isCustomField = result.type === 'CustomField'
   const isApex = result.type === 'ApexClass' || result.type === 'ApexTrigger'
+  const isApexPage = result.type === 'ApexPage'
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return ''
@@ -89,6 +90,22 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
           <div className="result-meta">
             {lastModifiedBy && <span className="meta-user">{lastModifiedBy}</span>}
             <span className="meta-date">{formatDate(lastModifiedDate)}</span>
+          </div>
+        )}
+
+        {isApexPage && (
+          <div className="object-actions">
+            <ActionButton
+              title="Preview"
+              onClick={handleActionClick('preview')}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              }
+            />
           </div>
         )}
 

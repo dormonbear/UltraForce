@@ -27,6 +27,8 @@ interface SettingsPanelProps {
 
 const METADATA_TYPES = [
   { value: 'ApexClass,ApexTrigger', label: 'Apex Classes & Triggers' },
+  { value: 'ApexPage,ApexComponent', label: 'Visualforce Pages & Components' },
+  { value: 'AuraDefinitionBundle,LightningComponentBundle', label: 'Aura & Lightning Web Components' },
   { value: 'CustomObject,CustomField', label: 'Objects & Fields' },
   { value: 'Flow', label: 'Flows' },
   { value: 'CustomLabel', label: 'Custom Labels' },
