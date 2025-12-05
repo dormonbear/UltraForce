@@ -3,6 +3,8 @@ import type { SearchCommand, BuiltinCommand, CustomCommand, isCustomCommand } fr
 export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
   c: { key: 'c', types: ['ApexClass', 'ApexTrigger'], description: 'Apex', isBuiltin: true },
+  v: { key: 'v', types: ['ApexPage', 'ApexComponent'], description: 'Visualforce', isBuiltin: true },
+  a: { key: 'a', types: ['AuraDefinitionBundle', 'LightningComponentBundle'], description: 'Aura & LWC', isBuiltin: true },
   w: { key: 'w', types: ['Flow'], description: 'Flows', isBuiltin: true },
   u: { key: 'u', types: ['User'], description: 'Users', isBuiltin: true },
   p: { key: 'p', types: ['PermissionSet'], description: 'Permission Sets', isBuiltin: true },

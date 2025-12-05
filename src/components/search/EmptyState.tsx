@@ -23,6 +23,10 @@ const SEARCH_HINTS = [
 const TYPE_LABELS: Record<string, string> = {
   ApexClass: 'Apex Classes',
   ApexTrigger: 'Apex Triggers',
+  ApexPage: 'Visualforce Pages',
+  ApexComponent: 'Visualforce Components',
+  LightningComponentBundle: 'Lightning Web Components',
+  AuraDefinitionBundle: 'Aura Components',
   CustomObject: 'Objects',
   CustomField: 'Fields',
   Flow: 'Flows',
