@@ -1,21 +1,27 @@
-import type { SearchCommand } from '~types'
+import type { SearchCommand, BuiltinCommand, CustomCommand, isCustomCommand } from '~types'
 
-export const DEFAULT_COMMANDS: Record<string, SearchCommand> = {
-  o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields' },
-  c: { key: 'c', types: ['ApexClass', 'ApexTrigger'], description: 'Apex' },
-  w: { key: 'w', types: ['Flow'], description: 'Flows' },
-  u: { key: 'u', types: ['User'], description: 'Users' },
-  p: { key: 'p', types: ['PermissionSet'], description: 'Permission Sets' },
-  r: { key: 'r', types: ['Profile'], description: 'Profiles' },
-  l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels' },
-  s: { key: 's', types: ['CustomSetting'], description: 'Custom Settings' }
+export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
+  o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
+  c: { key: 'c', types: ['ApexClass', 'ApexTrigger'], description: 'Apex', isBuiltin: true },
+  v: { key: 'v', types: ['ApexPage', 'ApexComponent'], description: 'Visualforce', isBuiltin: true },
+  a: { key: 'a', types: ['AuraDefinitionBundle', 'LightningComponentBundle'], description: 'Aura & LWC', isBuiltin: true },
+  w: { key: 'w', types: ['Flow'], description: 'Flows', isBuiltin: true },
+  u: { key: 'u', types: ['User'], description: 'Users', isBuiltin: true },
+  p: { key: 'p', types: ['PermissionSet'], description: 'Permission Sets', isBuiltin: true },
+  r: { key: 'r', types: ['Profile'], description: 'Profiles', isBuiltin: true },
+  l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels', isBuiltin: true },
+  s: { key: 's', types: ['CustomSetting'], description: 'Custom Settings', isBuiltin: true },
+  m: { key: 'm', types: ['CustomMetadataType'], description: 'Custom Metadata Types', isBuiltin: true }
 }
+
+export const DEFAULT_COMMANDS: Record<string, SearchCommand> = { ...BUILTIN_COMMANDS }
 
 export interface ParsedCommand {
   isCommand: boolean
   commandKey: string | null
   query: string
   types: string[] | null
+  command: SearchCommand | null
 }
 
 export function parseCommand(
@@ -29,7 +35,8 @@ export function parseCommand(
       isCommand: false,
       commandKey: null,
       query: trimmed,
-      types: null
+      types: null,
+      command: null
     }
   }
 
@@ -38,24 +45,26 @@ export function parseCommand(
 
   if (spaceIndex === -1) {
     const commandKey = withoutPrefix.toLowerCase()
-    const command = commands[commandKey]
+    const command = commands[commandKey] || null
     return {
       isCommand: true,
       commandKey,
       query: '',
-      types: command?.types || null
+      types: command && 'types' in command ? command.types : null,
+      command
     }
   }
 
   const commandKey = withoutPrefix.slice(0, spaceIndex).toLowerCase()
   const query = withoutPrefix.slice(spaceIndex + 1).trim()
-  const command = commands[commandKey]
+  const command = commands[commandKey] || null
 
   return {
     isCommand: true,
     commandKey,
     query,
-    types: command?.types || null
+    types: command && 'types' in command ? command.types : null,
+    command
   }
 }
 
@@ -75,4 +84,35 @@ export function getMatchingCommands(
       cmd.key.toLowerCase().startsWith(partial) ||
       cmd.description.toLowerCase().includes(partial)
   )
+}
+
+export function isKeyUnique(
+  key: string,
+  commands: Record<string, SearchCommand>,
+  excludeKey?: string
+): boolean {
+  const normalizedKey = key.toLowerCase()
+  if (excludeKey && normalizedKey === excludeKey.toLowerCase()) {
+    return true
+  }
+  return !commands[normalizedKey]
+}
+
+export function validateCommandKey(key: string): { valid: boolean; error?: string } {
+  if (!key || key.trim() === '') {
+    return { valid: false, error: 'Command is required' }
+  }
+  if (key.length > 10) {
+    return { valid: false, error: 'Command must be 10 characters or less' }
+  }
+  if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(key)) {
+    return { valid: false, error: 'Command must start with a letter and contain only letters and numbers' }
+  }
+  return { valid: true }
+}
+
+export function mergeCommands(
+  customCommands: Record<string, CustomCommand>
+): Record<string, SearchCommand> {
+  return { ...BUILTIN_COMMANDS, ...customCommands }
 }
