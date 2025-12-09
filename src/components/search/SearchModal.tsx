@@ -16,6 +16,7 @@ interface SearchModalProps {
   onClose: () => void
   onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
   onCustomSearch?: (soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]) => void
+  onSetupSearch?: (query: string) => void
   onResultClick: (result: SearchResult) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   onClearResults?: () => void
@@ -35,6 +36,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onClose,
   onSearch,
   onCustomSearch,
+  onSetupSearch,
   onResultClick,
   onActionClick,
   onClearResults,
@@ -187,9 +189,21 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const onCustomSearchRef = React.useRef(onCustomSearch)
   onCustomSearchRef.current = onCustomSearch
 
+  // Ref for setup shortcut search callback
+  const onSetupSearchRef = React.useRef(onSetupSearch)
+  onSetupSearchRef.current = onSetupSearch
+
   useEffect(() => {
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
+    const isSetupCommand = parsedCommand.isCommand && parsedCommand.command?.key === 'g'
 
+    // Setup shortcuts command (local, no API) - allow empty query and no session check
+    if (isSetupCommand) {
+      onSetupSearchRef.current?.(searchQuery)
+      return
+    }
+
+    // Other commands require query and session
     if (!searchQuery.trim() || !hasSession) {
       return
     }
