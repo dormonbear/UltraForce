@@ -6,7 +6,6 @@ import SearchResults from './SearchResults'
 import SettingsPanel, { type NavigationMode } from './SettingsPanel'
 import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
-import SOQLQueryPanel from './SOQLQueryPanel'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { parseCommand, getMatchingCommands, mergeCommands, BUILTIN_COMMANDS } from '~lib/command-parser'
 
@@ -194,9 +193,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const onSetupSearchRef = React.useRef(onSetupSearch)
   onSetupSearchRef.current = onSetupSearch
 
-  // Check if SOQL mode is active
-  const isSOQLMode = parsedCommand.isCommand && parsedCommand.command?.key === 's'
-
   useEffect(() => {
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
     const isSetupCommand = parsedCommand.isCommand && parsedCommand.command?.key === 'g'
@@ -204,11 +200,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
     // Setup shortcuts command (local, no API) - allow empty query and no session check
     if (isSetupCommand) {
       onSetupSearchRef.current?.(searchQuery)
-      return
-    }
-
-    // SOQL command handled by SOQLQueryPanel, skip search
-    if (isSOQLMode) {
       return
     }
 
@@ -402,16 +393,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
             customCommands={customCommands}
             onCustomCommandsChange={setCustomCommands}
           />
-        ) : isSOQLMode ? (
-          <>
-            <div className="search-container">
-              <SOQLQueryPanel
-                sfHost={sfHost}
-                initialQuery={parsedCommand.query ? `SELECT ${parsedCommand.query}` : 'SELECT '}
-                onClose={onClose}
-              />
-            </div>
-          </>
         ) : (
           <>
             <div className="search-container">

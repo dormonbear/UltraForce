@@ -8,8 +8,7 @@ export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   p: { key: 'p', types: ['Profile', 'PermissionSet', 'PermissionSetGroup', 'CustomPermission'], description: 'Profiles & Permissions', isBuiltin: true },
   l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels', isBuiltin: true },
   m: { key: 'm', types: ['CustomMetadataType', 'CustomSetting'], description: 'Custom Metadata & Settings', isBuiltin: true },
-  g: { key: 'g', types: [], description: 'Go to Setup', isBuiltin: true },
-  s: { key: 's', types: [], description: 'SOQL Query', isBuiltin: true }
+  g: { key: 'g', types: [], description: 'Go to Setup', isBuiltin: true }
 }
 
 export const DEFAULT_COMMANDS: Record<string, SearchCommand> = { ...BUILTIN_COMMANDS }
