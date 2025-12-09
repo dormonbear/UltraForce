@@ -1043,4 +1043,292 @@ export const SEARCH_MODAL_STYLES = `
   .command-info .command-desc {
     flex: 1;
   }
+
+  /* SOQL Query Panel Styles */
+  .soql-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .soql-input-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .soql-input {
+    width: 100%;
+    min-height: 80px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 12px;
+    color: #fff;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+  }
+
+  .soql-input:focus {
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .soql-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+  }
+
+  .soql-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .soql-run-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .soql-run-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  }
+
+  .soql-run-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .shortcut-hint {
+    font-size: 10px;
+    opacity: 0.7;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .soql-suggestions {
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(30, 30, 35, 0.98);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .suggestions-header {
+    padding: 8px 20px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+
+  .suggestion-item:hover,
+  .suggestion-item.selected {
+    background: rgba(59, 130, 246, 0.15);
+  }
+
+  .suggestion-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .suggestion-icon.type-field {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+  }
+
+  .suggestion-icon.type-object {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c084fc;
+  }
+
+  .suggestion-icon.type-relationship {
+    background: rgba(34, 197, 94, 0.2);
+    color: #4ade80;
+  }
+
+  .suggestion-icon.type-keyword {
+    background: rgba(249, 115, 22, 0.2);
+    color: #fb923c;
+  }
+
+  .suggestion-icon.type-function {
+    background: rgba(236, 72, 153, 0.2);
+    color: #f472b6;
+  }
+
+  .suggestion-value {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .suggestion-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .suggestion-type {
+    margin-left: auto;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: lowercase;
+  }
+
+  .soql-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 20px;
+    background: rgba(239, 68, 68, 0.1);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .soql-error .error-icon {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border-radius: 50%;
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .soql-error .error-message {
+    font-size: 12px;
+    color: #fca5a5;
+    line-height: 1.4;
+    word-break: break-word;
+    max-width: none;
+    background: none;
+    padding: 0;
+    border: none;
+  }
+
+  .soql-results {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+  }
+
+  .results-count {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .export-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .export-success {
+    font-size: 11px;
+    color: #4ade80;
+    padding: 4px 8px;
+    background: rgba(34, 197, 94, 0.15);
+    border-radius: 4px;
+  }
+
+  .export-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .export-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #60a5fa;
+  }
+
+  .results-table-container {
+    flex: 1;
+    overflow: auto;
+  }
+
+  .results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .results-table th {
+    position: sticky;
+    top: 0;
+    background: rgba(30, 30, 35, 0.98);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+  }
+
+  .results-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.8);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .results-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+  }
 `
