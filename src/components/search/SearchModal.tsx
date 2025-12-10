@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { SearchResult, CustomCommand } from '~types'
+import type { SOQLSuggestion, SOQLQueryResult, ExportFormat } from '~types/soql'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
@@ -8,6 +9,7 @@ import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { parseCommand, getMatchingCommands, mergeCommands, BUILTIN_COMMANDS } from '~lib/command-parser'
+import { getSOQLSuggestions, applySuggestion, executeSOQLQuery, exportResults, copyToClipboard } from '~lib/soql-helper'
 
 import type { ObjectAction } from './ResultItem'
 
@@ -65,6 +67,16 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [visibleItemCount, setVisibleItemCount] = useState(0)
   const [customCommands, setCustomCommands] = useState<Record<string, CustomCommand>>({})
   const [showCommandHints, setShowCommandHints] = useState(false)
+
+  // SOQL state
+  const [soqlSuggestions, setSoqlSuggestions] = useState<SOQLSuggestion[]>([])
+  const [soqlSelectedIndex, setSoqlSelectedIndex] = useState(0)
+  const [soqlResult, setSoqlResult] = useState<SOQLQueryResult | null>(null)
+  const [soqlError, setSoqlError] = useState<string | null>(null)
+  const [soqlLoading, setSoqlLoading] = useState(false)
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
+  const [soqlCursorPos, setSoqlCursorPos] = useState(0)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -167,6 +179,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands), [query, allCommands])
 
+  // Check if SOQL mode
+  const isSOQLMode = parsedCommand.isCommand && parsedCommand.command?.key === 's'
+  const soqlQuery = isSOQLMode ? parsedCommand.query : ''
+
   // Show/hide command hints
   useEffect(() => {
     const shouldShow = query === ':' && matchingCommands.length > 0
@@ -181,6 +197,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
       prevCommandKeyRef.current = currentKey
       if (currentKey !== null) {
         onClearResults?.()
+        // Reset SOQL state when switching commands
+        setSoqlSuggestions([])
+        setSoqlResult(null)
+        setSoqlError(null)
       }
     }
   }, [parsedCommand.isCommand, parsedCommand.commandKey, onClearResults])
@@ -193,6 +213,28 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const onSetupSearchRef = React.useRef(onSetupSearch)
   onSetupSearchRef.current = onSetupSearch
 
+  // Fetch SOQL suggestions based on cursor position
+  useEffect(() => {
+    if (!isSOQLMode || !sfHost || !soqlQuery) {
+      setSoqlSuggestions([])
+      return
+    }
+
+    // Use actual cursor position within the SOQL query
+    const cursorPos = Math.min(soqlCursorPos, soqlQuery.length)
+    const timer = setTimeout(async () => {
+      try {
+        const suggestions = await getSOQLSuggestions(sfHost, soqlQuery, cursorPos)
+        setSoqlSuggestions(suggestions)
+        setSoqlSelectedIndex(0)
+      } catch {
+        setSoqlSuggestions([])
+      }
+    }, 150)
+
+    return () => clearTimeout(timer)
+  }, [isSOQLMode, sfHost, soqlQuery, soqlCursorPos])
+
   useEffect(() => {
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
     const isSetupCommand = parsedCommand.isCommand && parsedCommand.command?.key === 'g'
@@ -200,6 +242,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
     // Setup shortcuts command (local, no API) - allow empty query and no session check
     if (isSetupCommand) {
       onSetupSearchRef.current?.(searchQuery)
+      return
+    }
+
+    // SOQL mode is handled separately
+    if (isSOQLMode) {
       return
     }
 
@@ -228,7 +275,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage])
+  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, isSOQLMode])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -259,7 +306,89 @@ const SearchModal: React.FC<SearchModalProps> = ({
     setVisibleItemCount(count)
   }, [])
 
+  // Execute SOQL query
+  const executeQuery = useCallback(async () => {
+    if (!sfHost || !soqlQuery.trim()) return
+
+    setSoqlLoading(true)
+    setSoqlError(null)
+    setSoqlResult(null)
+
+    try {
+      const result = await executeSOQLQuery(sfHost, soqlQuery)
+      setSoqlResult(result)
+      setSoqlSuggestions([])
+    } catch (err: any) {
+      setSoqlError(err.message || 'Query execution failed')
+    } finally {
+      setSoqlLoading(false)
+    }
+  }, [sfHost, soqlQuery])
+
+  // Handle export
+  const handleExport = useCallback(async (format: ExportFormat) => {
+    if (!soqlResult?.records?.length) return
+
+    const content = exportResults(soqlResult.records, format)
+    const success = await copyToClipboard(content)
+
+    if (success) {
+      setExportMessage(`Copied as ${format.toUpperCase()}`)
+      setTimeout(() => setExportMessage(null), 2000)
+    }
+  }, [soqlResult])
+
+  // Apply SOQL suggestion at current cursor position
+  const applySoqlSuggestion = useCallback((suggestion: SOQLSuggestion) => {
+    const cursorPos = Math.min(soqlCursorPos, soqlQuery.length)
+    const { newQuery, newCursorPos } = applySuggestion(soqlQuery, cursorPos, suggestion)
+    setQuery(`:s ${newQuery}`)
+    setSoqlSuggestions([])
+
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+        const fullPos = 3 + newCursorPos // ":s " prefix
+        inputRef.current.setSelectionRange(fullPos, fullPos)
+        setSoqlCursorPos(newCursorPos)
+      }
+    }, 0)
+  }, [soqlQuery, soqlCursorPos])
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    // SOQL mode key handling
+    if (isSOQLMode) {
+      if (soqlSuggestions.length > 0) {
+        switch (event.key) {
+          case 'ArrowDown':
+            event.preventDefault()
+            setSoqlSelectedIndex(prev => Math.min(prev + 1, soqlSuggestions.length - 1))
+            return
+          case 'ArrowUp':
+            event.preventDefault()
+            setSoqlSelectedIndex(prev => Math.max(prev - 1, 0))
+            return
+          case 'Tab':
+            event.preventDefault()
+            if (soqlSuggestions[soqlSelectedIndex]) {
+              applySoqlSuggestion(soqlSuggestions[soqlSelectedIndex])
+            }
+            return
+          case 'Escape':
+            event.preventDefault()
+            setSoqlSuggestions([])
+            return
+        }
+      }
+      // Enter always executes query (regardless of suggestions)
+      if (event.key === 'Enter' && soqlQuery.trim()) {
+        event.preventDefault()
+        setSoqlSuggestions([])
+        executeQuery()
+        return
+      }
+    }
+
     switch (event.key) {
       case 'Escape':
         event.preventDefault()
@@ -303,11 +432,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
             }
           } else if (selectedResult.type === 'CustomMetadataType') {
             if (selectedResult.metadata?._isTypeDefinition) {
-              // Type definition: autocomplete to "Type__mdt." to search records
               const cmdtApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
               setQuery(`${cmdtApiName}.`)
             } else {
-              // Record: autocomplete to "ParentType__mdt.RecordName"
               const parentType = selectedResult.metadata?._parentType
               const recordName = selectedResult.metadata?.DeveloperName || selectedResult.name
               if (parentType) {
@@ -316,11 +443,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
             }
           } else if (selectedResult.type === 'CustomSetting') {
             if (selectedResult.metadata?._isSettingDefinition) {
-              // Setting definition: autocomplete to "Setting__c." to search records
               const settingApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
               setQuery(`${settingApiName}.`)
             } else {
-              // Record: autocomplete to "ParentSetting__c.RecordName"
               const parentType = selectedResult.metadata?._parentType
               const recordName = selectedResult.metadata?.Name || selectedResult.name
               if (parentType) {
@@ -361,12 +486,37 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const hasResults = visibleResults.length > 0 || Object.values(searchResults).some(arr => arr.length > 0)
 
+  // Get SOQL result columns
+  const soqlColumns = soqlResult?.records?.[0]
+    ? Object.keys(soqlResult.records[0]).filter(k => k !== 'attributes')
+    : []
+
+  const formatCellValue = (value: unknown): string => {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'object') {
+      if ('attributes' in (value as any)) {
+        const obj = value as Record<string, unknown>
+        const copy = { ...obj }
+        delete copy.attributes
+        return JSON.stringify(copy)
+      }
+      return JSON.stringify(value)
+    }
+    return String(value)
+  }
+
+  const modalClassName = [
+    'ultraforce-search-modal',
+    isSOQLMode ? 'ultraforce-search-modal--soql' : '',
+    isSOQLMode && soqlResult ? 'ultraforce-search-modal--soql-result' : ''
+  ].filter(Boolean).join(' ')
+
   return (
     <>
       <style>{SEARCH_MODAL_STYLES}</style>
       <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
         <div
-          className="ultraforce-search-modal"
+          className={modalClassName}
           ref={modalRef}
           tabIndex={-1}
           onKeyDown={handleKeyDown}
@@ -406,6 +556,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     handleKeyDown(e)
                   }
                 }}
+                onCursorChange={(pos) => {
+                  // Convert full query cursor position to SOQL query cursor position
+                  // Full query format: ":s SELECT..." where SOQL starts at position 3
+                  if (isSOQLMode && pos >= 3) {
+                    setSoqlCursorPos(pos - 3)
+                  }
+                }}
                 sfHost={sfHost}
               />
 
@@ -413,52 +570,171 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 <CommandHints commands={matchingCommands} />
               )}
 
-              {!hasSession ? (
-                <EmptyState type="no-session" />
-              ) : isLoading ? (
-                <EmptyState type="loading" />
-              ) : searchError ? (
-                <EmptyState
-                  type="error"
-                  errorMessage={searchError}
-                />
-              ) : !query.trim() ? (
-                <EmptyState type="start" selectedTypes={selectedTypes} />
-              ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
-                <EmptyState
-                  type="command"
-                  commandTypes={parsedCommand.types || []}
-                  commandDescription={parsedCommand.command.description}
-                />
-              ) : !hasResults ? (
-                <EmptyState type="empty" query={query} />
+              {/* SOQL Mode */}
+              {isSOQLMode ? (
+                <>
+                  {/* SOQL Suggestions */}
+                  {soqlSuggestions.length > 0 && (
+                    <div className="soql-suggestions">
+                      {soqlSuggestions.map((suggestion, index) => (
+                        <div
+                          key={`${suggestion.value}-${index}`}
+                          className={`soql-suggestion-item ${index === soqlSelectedIndex ? 'selected' : ''}`}
+                          onClick={() => applySoqlSuggestion(suggestion)}
+                          onMouseEnter={() => setSoqlSelectedIndex(index)}
+                        >
+                          <span className={`soql-suggestion-type type-${suggestion.type}`}>
+                            {suggestion.type === 'keyword' && 'K'}
+                            {suggestion.type === 'object' && 'O'}
+                            {suggestion.type === 'field' && 'F'}
+                            {suggestion.type === 'function' && 'fn'}
+                            {suggestion.type === 'operator' && 'op'}
+                          </span>
+                          <span className="soql-suggestion-value">{suggestion.value}</span>
+                          {suggestion.label !== suggestion.value && (
+                            <span className="soql-suggestion-label">{suggestion.label}</span>
+                          )}
+                          {suggestion.detail && (
+                            <span className="soql-suggestion-detail">{suggestion.detail}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* SOQL Loading */}
+                  {soqlLoading && (
+                    <div className="loading-container">
+                      <div className="spinner"></div>
+                      <span>Executing query...</span>
+                    </div>
+                  )}
+
+                  {/* SOQL Error */}
+                  {soqlError && (
+                    <div className="soql-error">
+                      <span className="error-icon">!</span>
+                      <span className="error-message">{soqlError}</span>
+                    </div>
+                  )}
+
+                  {/* SOQL Results */}
+                  {soqlResult && !soqlLoading && (
+                    <div className="soql-results">
+                      <div className="soql-results-header">
+                        <span className="results-count">
+                          {soqlResult.totalSize} record{soqlResult.totalSize !== 1 ? 's' : ''}
+                          {!soqlResult.done && ' (partial)'}
+                        </span>
+                        <div className="export-buttons">
+                          {exportMessage && <span className="export-success">{exportMessage}</span>}
+                          <button className="export-btn" onClick={() => handleExport('csv')} title="Copy as CSV">CSV</button>
+                          <button className="export-btn" onClick={() => handleExport('json')} title="Copy as JSON">JSON</button>
+                          <button className="export-btn" onClick={() => handleExport('excel')} title="Copy as Excel (TSV)">Excel</button>
+                        </div>
+                      </div>
+
+                      {soqlResult.records.length > 0 && (
+                        <div className="soql-table-container">
+                          <table className="soql-table">
+                            <thead>
+                              <tr>
+                                {soqlColumns.map(col => (
+                                  <th key={col}>{col}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {soqlResult.records.map((record, rowIndex) => (
+                                <tr key={rowIndex}>
+                                  {soqlColumns.map(col => (
+                                    <td key={col}>{formatCellValue(record[col])}</td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SOQL Empty State */}
+                  {!soqlLoading && !soqlError && !soqlResult && soqlSuggestions.length === 0 && (
+                    <EmptyState
+                      type="command"
+                      commandTypes={[]}
+                      commandDescription="Type SOQL query, press Enter to execute"
+                    />
+                  )}
+                </>
               ) : (
-                <SearchResults
-                  results={searchResults}
-                  selectedIndex={selectedIndex}
-                  onResultClick={onResultClick}
-                  onActionClick={onActionClick}
-                  onVisibleCountChange={handleVisibleCountChange}
-                  collapsedGroups={collapsedGroups}
-                  onToggleCollapse={handleToggleCollapse}
-                />
+                <>
+                  {/* Normal search mode */}
+                  {!hasSession ? (
+                    <EmptyState type="no-session" />
+                  ) : isLoading ? (
+                    <EmptyState type="loading" />
+                  ) : searchError ? (
+                    <EmptyState
+                      type="error"
+                      errorMessage={searchError}
+                    />
+                  ) : !query.trim() ? (
+                    <EmptyState type="start" selectedTypes={selectedTypes} />
+                  ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
+                    <EmptyState
+                      type="command"
+                      commandTypes={parsedCommand.types || []}
+                      commandDescription={parsedCommand.command.description}
+                    />
+                  ) : !hasResults ? (
+                    <EmptyState type="empty" query={query} />
+                  ) : (
+                    <SearchResults
+                      results={searchResults}
+                      selectedIndex={selectedIndex}
+                      onResultClick={onResultClick}
+                      onActionClick={onActionClick}
+                      onVisibleCountChange={handleVisibleCountChange}
+                      collapsedGroups={collapsedGroups}
+                      onToggleCollapse={handleToggleCollapse}
+                    />
+                  )}
+                </>
               )}
             </div>
 
             <div className="search-footer">
               <div className="shortcuts">
-                <div className="shortcut-item">
-                  <kbd>Up/Down</kbd> Navigate
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Tab</kbd> Autocomplete
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Enter</kbd> Open
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Esc</kbd> Close
-                </div>
+                {isSOQLMode ? (
+                  <>
+                    <div className="shortcut-item">
+                      <kbd>Tab</kbd> Autocomplete
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Enter</kbd> Execute
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Esc</kbd> Close
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="shortcut-item">
+                      <kbd>Up/Down</kbd> Navigate
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Tab</kbd> Autocomplete
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Enter</kbd> Open
+                    </div>
+                    <div className="shortcut-item">
+                      <kbd>Esc</kbd> Close
+                    </div>
+                  </>
+                )}
               </div>
 
               <button

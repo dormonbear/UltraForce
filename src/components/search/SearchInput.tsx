@@ -6,6 +6,7 @@ interface SearchInputProps {
   query: string
   onQueryChange: (query: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
+  onCursorChange?: (position: number) => void
   sfHost: string | null
 }
 
@@ -49,9 +50,16 @@ function getOrgTypeLabel(orgType: OrgType): string {
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ query, onQueryChange, onKeyDown, sfHost }, ref) => {
+  ({ query, onQueryChange, onKeyDown, onCursorChange, sfHost }, ref) => {
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
+
+    const handleCursorChange = (e: React.SyntheticEvent<HTMLInputElement>) => {
+      const target = e.target as HTMLInputElement
+      if (onCursorChange && target.selectionStart !== null) {
+        onCursorChange(target.selectionStart)
+      }
+    }
 
     return (
       <div className="search-input-section">
@@ -69,8 +77,14 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           ref={ref}
           type="text"
           value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
+          onChange={(e) => {
+            onQueryChange(e.target.value)
+            handleCursorChange(e)
+          }}
           onKeyDown={onKeyDown}
+          onKeyUp={handleCursorChange}
+          onClick={handleCursorChange}
+          onSelect={handleCursorChange}
           placeholder={
             displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'
           }

@@ -31,7 +31,7 @@ const METADATA_TYPES: Record<string, { query: string }> = {
     query: `SELECT Id, DeveloperName, NamespacePrefix, MasterLabel, LastModifiedDate, LastModifiedBy.Name FROM AuraDefinitionBundle ORDER BY DeveloperName ASC LIMIT 10000`
   },
   CustomObject: {
-    query: `SELECT QualifiedApiName, Label, DurableId, KeyPrefix FROM EntityDefinition WHERE IsCustomizable = true AND (NOT QualifiedApiName LIKE '%__mdt') ORDER BY QualifiedApiName ASC LIMIT 10000`
+    query: `SELECT Id, QualifiedApiName, Label, DurableId, KeyPrefix FROM EntityDefinition WHERE IsCustomizable = true AND (NOT QualifiedApiName LIKE '%__mdt') ORDER BY QualifiedApiName ASC LIMIT 10000`
   },
   Flow: {
     query: `SELECT Id, MasterLabel, VersionNumber, Status FROM Flow ORDER BY MasterLabel ASC LIMIT 10000`
@@ -443,7 +443,28 @@ async function listMetadata(
     }
   }
 
-  const freshData = await fetchMetadataFromAPI(metadataType, sfHost, sessionId)
+  let freshData: any[] = []
+
+  try {
+    freshData = await fetchMetadataFromAPI(metadataType, sfHost, sessionId)
+  } catch (error: any) {
+    const message = error?.message || String(error)
+    const lowerMessage = message.toLowerCase()
+    const isUnsupportedType =
+      lowerMessage.includes('invalid_type') ||
+      lowerMessage.includes('is not supported')
+
+    if (isUnsupportedType) {
+      logger.warn('metadata:unsupported-type', {
+        type: metadataType,
+        host: cacheKey,
+        error: message
+      })
+      return { data: [], fromCache: false }
+    }
+
+    throw error
+  }
 
   // Skip caching for real-time types to avoid quota issues
   if (!REALTIME_TYPES.includes(metadataType)) {
