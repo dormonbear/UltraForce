@@ -8,6 +8,7 @@ import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { parseCommand, getMatchingCommands, mergeCommands, BUILTIN_COMMANDS } from '~lib/command-parser'
+import { logger } from '~lib/logger'
 
 import type { ObjectAction } from './ResultItem'
 
@@ -51,7 +52,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   searchError
 }) => {
   const [query, setQuery] = useState('')
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(['ApexClass'])
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(['CustomObject', 'CustomField'])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
@@ -61,12 +62,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [navigationMode, setNavigationMode] = useState<NavigationMode>(externalNavMode || 'auto')
   const [fuzzySearch, setFuzzySearch] = useState<boolean>(externalFuzzySearch ?? true)
   const [hideManagedPackage, setHideManagedPackage] = useState<boolean>(true)
+  const [maxResultsPerType, setMaxResultsPerType] = useState<number>(50)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [visibleItemCount, setVisibleItemCount] = useState(0)
   const [customCommands, setCustomCommands] = useState<Record<string, CustomCommand>>({})
   const [showCommandHints, setShowCommandHints] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
+  const isInitialMount = useRef(true)
 
   // Load settings
   useEffect(() => {
@@ -74,7 +77,29 @@ const SearchModal: React.FC<SearchModalProps> = ({
       try {
         const result = await chrome.storage.local.get(['ultraforce_search_settings'])
         if (result.ultraforce_search_settings?.selectedTypes) {
-          setSelectedTypes(result.ultraforce_search_settings.selectedTypes)
+          // Clean up orphan types that don't belong to complete groups
+          const validGroups = [
+            ['ApexClass', 'ApexTrigger'],
+            ['ApexPage', 'ApexComponent'],
+            ['AuraDefinitionBundle', 'LightningComponentBundle'],
+            ['CustomObject', 'CustomField'],
+            ['Flow'],
+            ['CustomLabel'],
+            ['CustomMetadataType'],
+            ['CustomSetting'],
+            ['PermissionSet'],
+            ['Profile']
+          ]
+          const loadedTypes = result.ultraforce_search_settings.selectedTypes as string[]
+          const cleanedTypes = loadedTypes.filter((type) => {
+            const group = validGroups.find((g) => g.includes(type))
+            if (!group) return false
+            // For single-item groups, always valid
+            if (group.length === 1) return true
+            // For multi-item groups, all items must be present
+            return group.every((t) => loadedTypes.includes(t))
+          })
+          setSelectedTypes(cleanedTypes.length > 0 ? cleanedTypes : ['CustomObject', 'CustomField'])
         }
         if (result.ultraforce_search_settings?.shortcutKey) {
           setShortcutKey(result.ultraforce_search_settings.shortcutKey)
@@ -94,21 +119,28 @@ const SearchModal: React.FC<SearchModalProps> = ({
         if (result.ultraforce_search_settings?.hideManagedPackage !== undefined) {
           setHideManagedPackage(result.ultraforce_search_settings.hideManagedPackage)
         }
+        if (result.ultraforce_search_settings?.maxResultsPerType !== undefined) {
+          setMaxResultsPerType(result.ultraforce_search_settings.maxResultsPerType)
+        }
         if (result.ultraforce_search_settings?.customCommands) {
           setCustomCommands(result.ultraforce_search_settings.customCommands)
         }
         setSettingsLoaded(true)
       } catch (error) {
-        console.error('Failed to load settings:', error)
+        logger.error('settings:load:failed', error)
         setSettingsLoaded(true)
       }
     }
     loadSettings()
   }, [])
 
-  // Save settings
+  // Save settings (skip initial mount to avoid overwriting loaded settings)
   useEffect(() => {
     if (!settingsLoaded) return
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
 
     const saveSettings = async () => {
       try {
@@ -120,17 +152,18 @@ const SearchModal: React.FC<SearchModalProps> = ({
           navigationMode,
           fuzzySearch,
           hideManagedPackage,
+          maxResultsPerType,
           customCommands,
           lastUpdated: Date.now()
         }
         await chrome.storage.local.set({ ultraforce_search_settings: settings })
       } catch (error) {
-        console.error('Failed to save settings:', error)
+        logger.error('settings:save:failed', error)
       }
     }
 
     saveSettings()
-  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, hideManagedPackage, customCommands, settingsLoaded])
+  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, hideManagedPackage, maxResultsPerType, customCommands, settingsLoaded])
 
   // Notify parent when navigationMode changes
   const handleNavigationModeChange = (mode: NavigationMode) => {
@@ -217,6 +250,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return () => clearTimeout(debounceTimer)
     }
 
+    // Wait for settings to be loaded before normal search (to respect user's selected types)
+    if (!settingsLoaded) {
+      return
+    }
+
     // Builtin command or normal search
     const searchTypes = parsedCommand.types || selectedTypes
     if (searchTypes.length === 0) {
@@ -228,7 +266,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage])
+  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsLoaded])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -236,16 +274,25 @@ const SearchModal: React.FC<SearchModalProps> = ({
     setCollapsedGroups({})
   }, [searchResults])
 
+  // Apply maxResultsPerType limit
+  const limitedSearchResults = useMemo(() => {
+    const limited: Record<string, SearchResult[]> = {}
+    Object.entries(searchResults).forEach(([type, typeResults]) => {
+      limited[type] = typeResults.slice(0, maxResultsPerType)
+    })
+    return limited
+  }, [searchResults, maxResultsPerType])
+
   const visibleResults = useMemo(() => {
     const items: SearchResult[] = []
-    Object.entries(searchResults).forEach(([type, typeResults]) => {
+    Object.entries(limitedSearchResults).forEach(([type, typeResults]) => {
       if (typeResults.length === 0) return
       if (!collapsedGroups[type]) {
         items.push(...typeResults)
       }
     })
     return items
-  }, [searchResults, collapsedGroups])
+  }, [limitedSearchResults, collapsedGroups])
 
   const handleToggleCollapse = useCallback((type: string) => {
     setCollapsedGroups(prev => {
@@ -345,9 +392,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }
 
   const handleTypeToggle = (type: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    )
+    setSelectedTypes((prev) => {
+      if (prev.includes(type)) {
+        const newTypes = prev.filter((t) => t !== type)
+        // Prevent removing all types - keep at least one
+        return newTypes.length > 0 ? newTypes : prev
+      }
+      return [...prev, type]
+    })
     setSelectedIndex(0)
   }
 
@@ -359,7 +411,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   if (!isVisible) return null
 
-  const hasResults = visibleResults.length > 0 || Object.values(searchResults).some(arr => arr.length > 0)
+  const hasResults = visibleResults.length > 0 || Object.values(limitedSearchResults).some(arr => arr.length > 0)
 
   return (
     <>
@@ -387,6 +439,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
             onFuzzySearchChange={handleFuzzySearchChange}
             hideManagedPackage={hideManagedPackage}
             onHideManagedPackageChange={setHideManagedPackage}
+            maxResultsPerType={maxResultsPerType}
+            onMaxResultsPerTypeChange={setMaxResultsPerType}
             navigationMode={navigationMode}
             onNavigationModeChange={handleNavigationModeChange}
             sfHost={sfHost}
@@ -434,7 +488,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 <EmptyState type="empty" query={query} />
               ) : (
                 <SearchResults
-                  results={searchResults}
+                  results={limitedSearchResults}
                   selectedIndex={selectedIndex}
                   onResultClick={onResultClick}
                   onActionClick={onActionClick}
