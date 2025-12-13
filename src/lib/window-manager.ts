@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
-import { getSfHost, getSession } from '~lib/auth'
+import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
 import { logger } from '~lib/logger'
 import type { SearchResult } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
@@ -32,6 +32,104 @@ interface WindowManagerOptions {
 const CONTAINER_PREFIX = 'ultraforce-modal'
 const CLEANUP_DELAY = 100
 const MAX_CLEANUP_ATTEMPTS = 3
+const GLOBAL_DESCRIBE_CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+type SetupShortcut = {
+  id: string
+  name: string
+  description: string
+  path: string
+}
+
+// Common standard object key prefixes for Classic record URLs
+const KEY_PREFIX_MAP: Record<string, string> = {
+  '001': 'Account',
+  '003': 'Contact',
+  '005': 'User',
+  '006': 'Opportunity',
+  '00Q': 'Lead',
+  '00T': 'Task',
+  '00U': 'Event',
+  '00O': 'Report',
+  '00a': 'Asset',
+  '00e': 'UserProfileFeed',
+  '00l': 'EmailTemplate',
+  '00N': 'CustomField',
+  '00P': 'Document',
+  '00S': 'Solution',
+  '012': 'RecordType',
+  '500': 'Case',
+  '701': 'Campaign',
+  '800': 'Order',
+  '801': 'OrderItem'
+}
+
+const SETUP_SHORTCUTS: SetupShortcut[] = [
+  { id: 'approval-processes', name: 'Approval Processes', description: 'Process Automation', path: '/lightning/setup/ApprovalProcesses/home' },
+  { id: 'session-settings', name: 'Session Settings', description: 'Security > Session', path: '/lightning/setup/SessionSettings/home' },
+  { id: 'company-information', name: 'Company Information', description: 'Company Settings', path: '/lightning/setup/CompanyProfileInfo/home' },
+  { id: 'password-policies', name: 'Password Policies', description: 'Security > Password Policies', path: '/lightning/setup/PasswordPolicies/home' },
+  { id: 'login-history', name: 'Login History', description: 'Security > Login History', path: '/lightning/setup/SessionManagement/home' },
+  { id: 'users', name: 'Users', description: 'User Management', path: '/lightning/setup/ManageUsers/home' },
+  { id: 'permission-sets', name: 'Permission Sets', description: 'User Access', path: '/lightning/setup/PermSets/home' },
+  { id: 'permission-set-groups', name: 'Permission Set Groups', description: 'User Access', path: '/lightning/setup/PermSetGroups/home' },
+  { id: 'profiles', name: 'Profiles', description: 'User Access', path: '/lightning/setup/Profiles/home' },
+  { id: 'roles', name: 'Roles', description: 'User Access', path: '/lightning/setup/Roles/home' },
+  { id: 'sharing-settings', name: 'Sharing Settings', description: 'Security > Sharing', path: '/lightning/setup/SecuritySharing/home' },
+  { id: 'connected-apps', name: 'Connected Apps', description: 'Apps > App Manager', path: '/lightning/setup/ConnectedApplication/home' },
+  { id: 'apex-classes', name: 'Apex Classes', description: 'Development', path: '/lightning/setup/ApexClasses/home' },
+  { id: 'apex-triggers', name: 'Apex Triggers', description: 'Development', path: '/lightning/setup/ApexTriggers/home' },
+  { id: 'visualforce-pages', name: 'Visualforce Pages', description: 'Development', path: '/lightning/setup/ApexPages/home' },
+  { id: 'visualforce-components', name: 'Visualforce Components', description: 'Development', path: '/lightning/setup/ApexComponents/home' },
+  { id: 'remote-site-settings', name: 'Remote Site Settings', description: 'Security', path: '/lightning/setup/SecurityRemoteProxy/home' },
+  { id: 'named-credentials', name: 'Named Credentials', description: 'Security', path: '/lightning/setup/NamedCredential/home' },
+  { id: 'email-deliverability', name: 'Email Deliverability', description: 'Email', path: '/lightning/setup/OrgEmailSettings/home' },
+  { id: 'queues', name: 'Queues', description: 'User Management', path: '/lightning/setup/Queues/home' },
+  { id: 'public-groups', name: 'Public Groups', description: 'User Management', path: '/lightning/setup/PublicGroups/home' },
+  { id: 'debug-logs', name: 'Debug Logs', description: 'Logs & Monitoring', path: '/lightning/setup/DebugLogs/home' },
+  { id: 'apex-jobs', name: 'Apex Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/ApexJobs/home' },
+  { id: 'scheduled-jobs', name: 'Scheduled Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/ScheduledJobs/home' },
+  { id: 'email-templates', name: 'Email Templates', description: 'Communication', path: '/lightning/setup/CommunicationTemplatesEmail/home' },
+  { id: 'lead-assignment-rules', name: 'Lead Assignment Rules', description: 'Automation', path: '/lightning/setup/LeadRules/home' },
+  { id: 'case-assignment-rules', name: 'Case Assignment Rules', description: 'Automation', path: '/lightning/setup/CaseRules/home' }
+]
+
+function getSetupHost(sfHost: string | null): string | null {
+  if (!sfHost) return null
+  return sfHost
+    .replace('.my.salesforce.com', '.my.salesforce-setup.com')
+    .replace('.lightning.force.com', '.my.salesforce-setup.com')
+    .replace('.my.sfcrmproducts.cn', '.setup.sfcrmproducts.cn')
+    .replace('.my.sfcrmapps.cn', '.setup.sfcrmapps.cn')
+    .replace('.lightning.sfcrmproducts.cn', '.setup.sfcrmproducts.cn')
+    .replace('.lightning.sfcrmapps.cn', '.setup.sfcrmapps.cn')
+    .replace('.sandbox.my.sfcrmproducts.cn', '.sandbox.setup.sfcrmproducts.cn')
+    .replace('.sandbox.my.sfcrmapps.cn', '.sandbox.setup.sfcrmapps.cn')
+}
+
+function buildSetupUrl(sfHost: string | null, path: string): string | null {
+  const setupHost = getSetupHost(sfHost)
+  if (!setupHost) return null
+  return `https://${setupHost}${path}`
+}
+
+function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: string | null } {
+  const path = window.location.pathname
+
+  // Lightning record URL: /lightning/r/ObjectApiName/recordId/view
+  const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})\/(?:view|edit|related)/)
+  if (lightningMatch && lightningMatch[1] && lightningMatch[2]) {
+    return { objectApiName: lightningMatch[1], recordId: lightningMatch[2] }
+  }
+
+  // Classic record URL: /001xxxxxxxxxxxxxx or /001xxxxxxxxxxxxxx?...
+  const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})/)
+  if (classicMatch && classicMatch[1]) {
+    return { objectApiName: null, recordId: classicMatch[1] }
+  }
+
+  return { objectApiName: null, recordId: null }
+}
 
 /**
  * Detect if should use Lightning URLs based on mode setting
@@ -125,6 +223,10 @@ class UltraForceWindowManager {
   }
 
   private eventHandlers = new Map<string, Set<Function>>()
+  // Cache keyed by sfHost for multi-org support
+  private sobjectPrefixCache: Record<string, Record<string, string>> = {}
+  private sobjectCacheTimestamp: Record<string, number> = {}
+  private currentUserProfileId: Record<string, string> = {}
 
   private constructor(options: WindowManagerOptions = {}) {
     this.options = { ...this.options, ...options }
@@ -384,6 +486,7 @@ class UltraForceWindowManager {
           onClose: this.hide,
           onSearch: this.handleSearch.bind(this),
           onCustomSearch: this.handleCustomSearch.bind(this),
+          onSetupSearch: this.handleSetupShortcutSearch.bind(this),
           onResultClick: this.handleResultClick.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onClearResults: this.handleClearResults.bind(this),
@@ -494,6 +597,192 @@ class UltraForceWindowManager {
     }
   }
 
+  private async handleSetupShortcutSearch(query: string): Promise<void> {
+    const normalized = query.trim().toLowerCase()
+    const searchTerms = normalized.split(/\s+/).filter(Boolean)
+
+    // Helper to check if all search terms match the target text
+    const matchesAllTerms = (text: string): boolean => {
+      if (searchTerms.length === 0) return true
+      const lowerText = text.toLowerCase()
+      return searchTerms.every((term) => lowerText.includes(term))
+    }
+
+    if (!buildSetupUrl(this.state.sfHost, '')) {
+      this.state.searchResults = { SetupShortcut: [] }
+      this.state.searchError = 'Open a Salesforce tab to use setup shortcuts.'
+      this.state.isLoading = false
+      await this.renderComponent()
+      return
+    }
+
+    const results: SearchResult[] = []
+
+    const currentLayout = await this.getCurrentRecordLayoutUrl()
+    if (currentLayout) {
+      const name = `${currentLayout.objectApiName} Page Layout`
+      const desc = 'Open page layout used by current record'
+      const combinedText = `${name} ${desc} current`
+      if (matchesAllTerms(combinedText)) {
+        results.push({
+          id: 'current-record-layout',
+          name,
+          type: 'SetupShortcut',
+          description: desc,
+          url: currentLayout.url
+        })
+      }
+    }
+
+    const shortcuts = [...SETUP_SHORTCUTS]
+
+    const listResults = shortcuts
+      .filter((shortcut) => {
+        const combinedText = `${shortcut.name} ${shortcut.description}`
+        return matchesAllTerms(combinedText)
+      })
+      .map((shortcut) => {
+        const url = buildSetupUrl(this.state.sfHost, shortcut.path)
+        return {
+          id: shortcut.id,
+          name: shortcut.name,
+          type: 'SetupShortcut',
+          description: shortcut.description,
+          url: url || undefined
+        } as SearchResult
+      })
+
+    this.state.searchResults = { SetupShortcut: [...results, ...listResults] }
+    this.state.searchError = null
+    this.state.isLoading = false
+
+    // Render immediately to show results
+    await this.renderComponent()
+  }
+
+  private async getCurrentRecordLayoutUrl(): Promise<{ url: string; objectApiName: string } | null> {
+    const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
+    const objectApiName = fromUrlObject || (recordId ? await this.resolveObjectApiNameFromRecord(recordId) : null)
+
+    if (!this.state.sfHost || !objectApiName || !recordId) {
+      return null
+    }
+
+    try {
+      const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
+      const recordTypeId = record?.RecordTypeId || null
+
+      const profileId = await this.getCurrentUserProfileId()
+      if (!profileId) {
+        return null
+      }
+
+      const layoutId = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
+      if (!layoutId) {
+        return null
+      }
+
+      const url = buildSetupUrl(this.state.sfHost, `/lightning/setup/ObjectManager/${objectApiName}/PageLayouts/${layoutId}/view`)
+      return url ? { url, objectApiName } : null
+    } catch (error) {
+      logger.warn('Failed to resolve current record layout:', error)
+      return null
+    }
+  }
+
+  private async resolveObjectApiNameFromRecord(recordId: string): Promise<string | null> {
+    const prefix = recordId.slice(0, 3)
+    if (KEY_PREFIX_MAP[prefix]) {
+      return KEY_PREFIX_MAP[prefix]
+    }
+
+    if (!this.state.sfHost) {
+      return null
+    }
+
+    const hostKey = this.state.sfHost
+    const hostCache = this.sobjectPrefixCache[hostKey] || {}
+    const cacheTs = this.sobjectCacheTimestamp[hostKey] || 0
+
+    if (hostCache[prefix] && Date.now() - cacheTs < GLOBAL_DESCRIBE_CACHE_DURATION) {
+      return hostCache[prefix]
+    }
+
+    try {
+      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/`)
+      if (resp?.sobjects) {
+        if (!this.sobjectPrefixCache[hostKey]) {
+          this.sobjectPrefixCache[hostKey] = {}
+        }
+        resp.sobjects.forEach((obj: any) => {
+          if (obj.keyPrefix && obj.name) {
+            this.sobjectPrefixCache[hostKey][obj.keyPrefix] = obj.name
+          }
+        })
+        this.sobjectCacheTimestamp[hostKey] = Date.now()
+      }
+      return this.sobjectPrefixCache[hostKey]?.[prefix] || null
+    } catch (error) {
+      logger.warn('Failed to resolve object from key prefix:', error)
+      return null
+    }
+  }
+
+  private async getCurrentUserProfileId(): Promise<string | null> {
+    if (!this.state.sfHost) {
+      return null
+    }
+
+    const hostKey = this.state.sfHost
+    if (this.currentUserProfileId[hostKey]) {
+      return this.currentUserProfileId[hostKey]
+    }
+
+    try {
+      // Use Chatter API to get current user info
+      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
+      const userId = userInfo?.id
+      if (!userId) {
+        return null
+      }
+      // Query ProfileId using the actual user ID
+      const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
+      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+      const profileId = resp?.records?.[0]?.ProfileId
+      if (profileId) {
+        this.currentUserProfileId[hostKey] = profileId
+        return profileId
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch current user profile:', error)
+    }
+    return null
+  }
+
+  private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<string | null> {
+    if (!this.state.sfHost) return null
+
+    // Prefer matching record type; if not found, fallback to default (RecordTypeId = null)
+    const queries = [
+      recordTypeId ? `SELECT LayoutId FROM LayoutAssignment WHERE TableEnumOrId='${objectApiName}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
+      `SELECT LayoutId FROM LayoutAssignment WHERE TableEnumOrId='${objectApiName}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
+    ].filter(Boolean) as string[]
+
+    for (const q of queries) {
+      try {
+        const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(q)}`)
+        const layoutId = resp?.records?.[0]?.LayoutId
+        if (layoutId) {
+          return layoutId
+        }
+      } catch (error) {
+        logger.warn('Layout assignment query failed:', error)
+      }
+    }
+
+    return null
+  }
+
   private handleNavigationModeChange(mode: NavigationMode): void {
     this.state.navigationMode = mode
     this.log(`Navigation mode changed to: ${mode}`)
@@ -513,6 +802,15 @@ class UltraForceWindowManager {
   private handleResultClick(result: SearchResult): void {
     this.log(`Result clicked: ${result.name} (${result.type})`)
     this.emit('resultClick', result)
+
+    // Setup shortcuts are absolute URLs
+    if (result.type === 'SetupShortcut' && result.url) {
+      window.open(result.url, '_blank')
+      if (this.state.closeOnNavigate) {
+        this.hide()
+      }
+      return
+    }
 
     // Navigate to the result
     if (this.state.sfHost && result.id) {

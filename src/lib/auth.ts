@@ -20,19 +20,21 @@ export interface SessionInfo {
   isSandbox: boolean
 }
 
-/**
- * Normalize Salesforce domain
- * Converts various subdomains to my domains for API access
- */
 function normalizeHost(host: string): string {
   if (!host) return host
-  return host
-    // Standard Salesforce
-    .replace(/\.lightning\.force\./, '.my.salesforce.')
-    // China regions - convert all non-API subdomains to .my.
-    .replace(/\.(lightning|file|content|c|setup)\.sfcrmproducts\./, '.my.sfcrmproducts.')
-    .replace(/\.(lightning|file|content|c|setup)\.sfcrmapps\./, '.my.sfcrmapps.')
-    .replace(/\.mcas\.ms$/, '')
+  let normalized = host.replace(/^\./, '')
+
+  normalized = normalized.replace(/\.lightning\.force\./, '.my.salesforce.')
+
+  // China: .sandbox.setup. -> .sandbox.my., .setup. -> .my.
+  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\./, '.sandbox.my.sfcrmproducts.')
+  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\./, '.sandbox.my.sfcrmapps.')
+  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmproducts\./, '.my.sfcrmproducts.')
+  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmapps\./, '.my.sfcrmapps.')
+
+  normalized = normalized.replace(/\.mcas\.ms$/, '')
+
+  return normalized
 }
 
 /**

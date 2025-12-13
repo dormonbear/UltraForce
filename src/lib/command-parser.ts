@@ -2,16 +2,13 @@ import type { SearchCommand, BuiltinCommand, CustomCommand, isCustomCommand } fr
 
 export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
-  c: { key: 'c', types: ['ApexClass', 'ApexTrigger'], description: 'Apex', isBuiltin: true },
-  v: { key: 'v', types: ['ApexPage', 'ApexComponent'], description: 'Visualforce', isBuiltin: true },
-  a: { key: 'a', types: ['AuraDefinitionBundle', 'LightningComponentBundle'], description: 'Aura & LWC', isBuiltin: true },
-  w: { key: 'w', types: ['Flow'], description: 'Flows', isBuiltin: true },
+  c: { key: 'c', types: ['ApexClass', 'ApexTrigger', 'ApexPage', 'ApexComponent', 'AuraDefinitionBundle', 'LightningComponentBundle'], description: 'Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)', isBuiltin: true },
+  f: { key: 'f', types: ['Flow'], description: 'Flows', isBuiltin: true },
   u: { key: 'u', types: ['User'], description: 'Users', isBuiltin: true },
-  p: { key: 'p', types: ['PermissionSet'], description: 'Permission Sets', isBuiltin: true },
-  r: { key: 'r', types: ['Profile'], description: 'Profiles', isBuiltin: true },
+  p: { key: 'p', types: ['Profile', 'PermissionSet', 'PermissionSetGroup', 'CustomPermission'], description: 'Profiles & Permissions', isBuiltin: true },
   l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels', isBuiltin: true },
-  s: { key: 's', types: ['CustomSetting'], description: 'Custom Settings', isBuiltin: true },
-  m: { key: 'm', types: ['CustomMetadataType'], description: 'Custom Metadata Types', isBuiltin: true }
+  m: { key: 'm', types: ['CustomMetadataType', 'CustomSetting'], description: 'Custom Metadata & Settings', isBuiltin: true },
+  g: { key: 'g', types: [], description: 'Go to Setup', isBuiltin: true }
 }
 
 export const DEFAULT_COMMANDS: Record<string, SearchCommand> = { ...BUILTIN_COMMANDS }
