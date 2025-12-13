@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 
 interface EmptyStateProps {
-  type: 'loading' | 'empty' | 'no-session' | 'start' | 'command' | 'error'
+  type: 'loading' | 'empty' | 'no-session' | 'start' | 'command' | 'error' | 'id-navigation'
   query?: string
   commandTypes?: string[]
   commandDescription?: string
@@ -81,10 +81,20 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
     )
   }
 
+  if (type === 'id-navigation') {
+    return (
+      <div className="search-empty">
+        <div className="empty-title">Salesforce Record ID</div>
+        <div className="empty-desc">
+          Press <kbd style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px' }}>Enter</kbd> to open record {query}
+        </div>
+      </div>
+    )
+  }
+
   if (type === 'empty') {
     return (
       <div className="search-empty">
-        <div className="empty-icon">📭</div>
         <div className="empty-title">No Results Found</div>
         <div className="empty-desc">We couldn't find anything matching "{query}"</div>
       </div>

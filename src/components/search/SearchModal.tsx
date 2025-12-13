@@ -12,6 +12,12 @@ import { logger } from '~lib/logger'
 
 import type { ObjectAction } from './ResultItem'
 
+// Salesforce ID validation: 15 or 18 alphanumeric characters
+function isSalesforceId(str: string): boolean {
+  const trimmed = str.trim()
+  return /^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$/.test(trimmed)
+}
+
 interface SearchModalProps {
   isVisible: boolean
   onClose: () => void
@@ -19,6 +25,7 @@ interface SearchModalProps {
   onCustomSearch?: (soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]) => void
   onSetupSearch?: (query: string) => void
   onResultClick: (result: SearchResult) => void
+  onIdNavigate?: (id: string) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   onClearResults?: () => void
   searchResults: Record<string, SearchResult[]>
@@ -39,6 +46,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onCustomSearch,
   onSetupSearch,
   onResultClick,
+  onIdNavigate,
   onActionClick,
   onClearResults,
   searchResults,
@@ -330,7 +338,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
       case 'Enter':
         event.preventDefault()
-        if (visibleResults[selectedIndex]) {
+        // Check if query is a Salesforce ID - navigate directly
+        if (isSalesforceId(query) && onIdNavigate) {
+          onIdNavigate(query.trim())
+        } else if (visibleResults[selectedIndex]) {
           onResultClick(visibleResults[selectedIndex])
         }
         break
@@ -484,6 +495,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   commandTypes={parsedCommand.types || []}
                   commandDescription={parsedCommand.command.description}
                 />
+              ) : !hasResults && isSalesforceId(query) ? (
+                <EmptyState type="id-navigation" query={query.trim()} />
               ) : !hasResults ? (
                 <EmptyState type="empty" query={query} />
               ) : (

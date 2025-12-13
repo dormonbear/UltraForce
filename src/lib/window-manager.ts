@@ -489,6 +489,7 @@ class UltraForceWindowManager {
           onCustomSearch: this.handleCustomSearch.bind(this),
           onSetupSearch: this.handleSetupShortcutSearch.bind(this),
           onResultClick: this.handleResultClick.bind(this),
+          onIdNavigate: this.handleIdNavigate.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onClearResults: this.handleClearResults.bind(this),
           searchResults: this.state.searchResults,
@@ -970,6 +971,17 @@ class UltraForceWindowManager {
       window.open(targetUrl, '_blank')
     }
 
+    if (this.state.closeOnNavigate) {
+      this.hide()
+    }
+  }
+
+  private handleIdNavigate(id: string): void {
+    this.log(`Direct ID navigation: ${id}`)
+    if (this.state.sfHost) {
+      const baseUrl = `https://${this.state.sfHost}`
+      window.open(`${baseUrl}/${id}`, '_blank')
+    }
     if (this.state.closeOnNavigate) {
       this.hide()
     }
