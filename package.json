@@ -1,13 +1,14 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.0.5",
+  "version": "0.0.8",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
   "author": "UltraForce Team",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "build:package": "pnpm build && pnpm package"
   },
   "keywords": [
     "salesforce",
@@ -17,6 +18,15 @@
   ],
   "license": "MIT",
   "manifest": {
+    "commands": {
+      "toggle-search": {
+        "suggested_key": {
+          "default": "Ctrl+B",
+          "mac": "Command+B"
+        },
+        "description": "Toggle UltraForce Search"
+      }
+    },
     "permissions": [
       "storage",
       "activeTab",
