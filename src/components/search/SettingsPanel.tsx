@@ -44,6 +44,9 @@ const NAVIGATION_MODES = [
   { value: 'classic', label: 'Salesforce Classic' }
 ]
 
+const APP_VERSION = '0.0.7'
+const PRIVACY_URL = 'https://gist.github.com/dormonbear/14242e4e5effbf0c7159c0e2bc14bbda'
+
 interface CommandFormState {
   key: string
   description: string
@@ -312,17 +315,49 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div className="setting-section">
           <h3 className="section-title">Keyboard Shortcut</h3>
+          <p className="section-desc">
+            Global shortcut: <strong>Ctrl/Cmd + B</strong> (works everywhere).
+            <br />
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
+              Customize at chrome://extensions/shortcuts
+            </span>
+          </p>
           <div className="shortcut-config">
             <div className="shortcut-display">
-              <span>Cmd/Ctrl</span>
-              <span>+</span>
+              {shortcutKey === 'escape' ? (
+                <span>ESC</span>
+              ) : shortcutKey.startsWith('alt+') ? (
+                <>
+                  <span>Alt</span>
+                  <span>+</span>
+                </>
+              ) : (
+                <>
+                  <span>Cmd/Ctrl</span>
+                  <span>+</span>
+                </>
+              )}
               <select value={shortcutKey} onChange={(e) => onShortcutChange(e.target.value)} className="shortcut-key-select">
-                {Array.from('abcdefghijklmnopqrstuvwxyz').map((letter) => (
-                  <option key={letter} value={letter}>{letter.toUpperCase()}</option>
-                ))}
+                <option value="escape">ESC</option>
+                <optgroup label="Ctrl/Cmd +">
+                  <option value="b">B</option>
+                  <option value="i">I</option>
+                  <option value="m">M</option>
+                </optgroup>
+                <optgroup label="Alt +">
+                  <option value="alt+b">B</option>
+                  <option value="alt+i">I</option>
+                  <option value="alt+m">M</option>
+                  <option value="alt+s">S</option>
+                  <option value="alt+z">Z</option>
+                </optgroup>
               </select>
             </div>
           </div>
+          <p className="section-hint" style={{ marginTop: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+            This shortcut may not work on some pages (e.g. Visualforce, iframes).
+            Use the global shortcut for reliable access.
+          </p>
         </div>
 
         <div className="setting-section">
@@ -438,6 +473,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
         )}
+
+        <div className="settings-meta">
+          <span className="meta-item">UltraForce v{APP_VERSION}</span>
+          <a
+            className="meta-link"
+            href={PRIVACY_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Privacy
+          </a>
+        </div>
       </div>
     </>
   )
