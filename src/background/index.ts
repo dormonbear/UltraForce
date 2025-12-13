@@ -263,7 +263,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 })
 
 chrome.commands?.onCommand.addListener((command) => {
-  if (command === 'toggle-modal') {
+  if (command === 'toggle-search') {
     chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
       const tab = tabs[0]
       if (tab?.id && tab.url && isSalesforceTab(tab.url)) {

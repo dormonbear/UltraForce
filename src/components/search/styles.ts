@@ -599,6 +599,32 @@ export const SEARCH_MODAL_STYLES = `
     margin-bottom: 32px;
   }
 
+  .settings-meta {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+  }
+
+  .settings-meta .meta-item {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .settings-meta .meta-link {
+    color: #60a5fa;
+    text-decoration: none;
+  }
+
+  .settings-meta .meta-link:hover {
+    text-decoration: underline;
+  }
+
   .section-title {
     font-size: 13px;
     font-weight: 600;
