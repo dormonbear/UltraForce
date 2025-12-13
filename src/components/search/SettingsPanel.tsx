@@ -18,6 +18,8 @@ interface SettingsPanelProps {
   onFuzzySearchChange: (value: boolean) => void
   hideManagedPackage: boolean
   onHideManagedPackageChange: (value: boolean) => void
+  maxResultsPerType: number
+  onMaxResultsPerTypeChange: (value: number) => void
   navigationMode: NavigationMode
   onNavigationModeChange: (mode: NavigationMode) => void
   sfHost: string | null
@@ -68,13 +70,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onAutoLoadFieldsChange,
   fuzzySearch,
   onFuzzySearchChange,
+  hideManagedPackage,
+  onHideManagedPackageChange,
+  maxResultsPerType,
+  onMaxResultsPerTypeChange,
   navigationMode,
   onNavigationModeChange,
   sfHost,
   customCommands,
-  onCustomCommandsChange,
-  hideManagedPackage,
-  onHideManagedPackageChange
+  onCustomCommandsChange
 }) => {
   const displayName = sfHost ? sfHost.split('.')[0] : null
   const [editingKey, setEditingKey] = useState<string | null>(null)
@@ -378,6 +382,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <input type="checkbox" checked={hideManagedPackage} onChange={(e) => onHideManagedPackageChange(e.target.checked)} className="toggle-checkbox" />
             <span className="toggle-label">Hide managed package items</span>
           </label>
+          <div className="toggle-option">
+            <span className="toggle-label">Max results per type</span>
+            <select
+              value={maxResultsPerType}
+              onChange={(e) => onMaxResultsPerTypeChange(Number(e.target.value))}
+              className="shortcut-key-select"
+              style={{ marginLeft: 'auto', width: 'auto' }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value={500}>500</option>
+            </select>
+          </div>
         </div>
 
         <div className="setting-section">
