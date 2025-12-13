@@ -25,19 +25,19 @@
     "baseUrl": ".",
     "paths": {
       "~*": [
-        "./*"
+        "./src/*"
       ],
       "~types": [
-        "./types"
+        "./src/types"
       ],
       "~lib/*": [
-        "./lib/*"
+        "./src/lib/*"
       ],
       "~components/*": [
-        "./components/*"
+        "./src/components/*"
       ],
       "~contents/*": [
-        "./contents/*"
+        "./src/contents/*"
       ]
     }
   },

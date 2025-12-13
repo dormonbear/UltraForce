@@ -63,12 +63,19 @@ export interface SearchOptions {
 
 function normalizeHost(host: string): string {
   if (!host) return host
-  return host
-    .replace(/^https?:\/\//, '')
-    .replace(/\.lightning\.force\./, '.my.salesforce.')
-    .replace(/\.(lightning|file|content|c)\.sfcrmproducts\./, '.my.sfcrmproducts.')
-    .replace(/\.(lightning|file|content|c)\.sfcrmapps\./, '.my.sfcrmapps.')
-    .replace(/\.mcas\.ms$/, '')
+  let normalized = host.replace(/^\./, '').replace(/^https?:\/\//, '')
+
+  normalized = normalized.replace(/\.lightning\.force\./, '.my.salesforce.')
+
+  // China: .sandbox.setup. -> .sandbox.my., .setup. -> .my.
+  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\./, '.sandbox.my.sfcrmproducts.')
+  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\./, '.sandbox.my.sfcrmapps.')
+  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmproducts\./, '.my.sfcrmproducts.')
+  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmapps\./, '.my.sfcrmapps.')
+
+  normalized = normalized.replace(/\.mcas\.ms$/, '')
+
+  return normalized
 }
 
 interface DotNotationResult {
@@ -114,7 +121,7 @@ export async function searchSalesforceMetadata(
     return {}
   }
 
-  const apiHost = normalizeHost(sfHost)
+  const apiHost = normalizeHost(session.hostname)
   const results: Record<string, SearchResult[]> = {}
   const dotNotation = parseDotNotation(query)
 
@@ -792,7 +799,7 @@ export async function executeCustomCommand(
     return []
   }
 
-  const apiHost = normalizeHost(sfHost)
+  const apiHost = normalizeHost(session.hostname)
   const start = Date.now()
 
   // Parse query for exact match and filter
