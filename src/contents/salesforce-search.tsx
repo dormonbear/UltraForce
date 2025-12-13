@@ -50,21 +50,15 @@ class UltraForceContentScript {
 
   private async initialize(): Promise<void> {
     try {
-      // Initialize WindowManager
       this.windowManager = await UltraForceWindowManager.getInstance({
         debugMode: false,
         useShadowDOM: true
       })
 
-      // Load shortcut key settings
       await this.loadShortcutSettings()
-
-      // Set up event listeners
       this.setupKeyboardShortcuts()
       this.setupStorageListener()
       this.setupMessageListener()
-
-      // Check session and warmup cache
       await this.initializeSession()
 
       this.isInitialized = true
@@ -87,10 +81,39 @@ class UltraForceContentScript {
 
   private setupKeyboardShortcuts(): void {
     if (this.keyboardHandler) {
-      document.removeEventListener('keydown', this.keyboardHandler, { capture: true })
+      document.removeEventListener('keydown', this.keyboardHandler, true)
     }
 
     this.keyboardHandler = (event: KeyboardEvent) => {
+      // ESC to close modal (only when modal is visible)
+      if (event.key === 'Escape') {
+        if (this.windowManager?.isVisible()) {
+          event.preventDefault()
+          event.stopPropagation()
+          this.windowManager?.hide()
+          return
+        }
+        // ESC to open modal (if configured)
+        if (this.shortcutKey.toLowerCase() === 'escape') {
+          event.preventDefault()
+          event.stopPropagation()
+          this.toggleModal()
+          return
+        }
+      }
+
+      // Alt + key shortcuts (e.g., alt+b, alt+s)
+      if (this.shortcutKey.startsWith('alt+')) {
+        const key = this.shortcutKey.slice(4)
+        if (event.altKey && event.key.toLowerCase() === key) {
+          event.preventDefault()
+          event.stopPropagation()
+          this.toggleModal()
+          return
+        }
+      }
+
+      // Ctrl/Cmd + shortcutKey to toggle modal
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === this.shortcutKey.toLowerCase()
@@ -98,13 +121,6 @@ class UltraForceContentScript {
         event.preventDefault()
         event.stopPropagation()
         this.toggleModal()
-        return
-      }
-
-      if (event.key === 'Escape' && this.windowManager?.isVisible()) {
-        event.preventDefault()
-        event.stopPropagation()
-        this.windowManager?.hide()
         return
       }
     }
@@ -186,7 +202,6 @@ class UltraForceContentScript {
         return
       }
 
-      // Validate session and warmup cache
       const isValid = await validateSalesforceSession(sfHost)
       if (isValid) {
         setTimeout(() => {
@@ -217,7 +232,7 @@ class UltraForceContentScript {
   public async destroy(): Promise<void> {
     try {
       if (this.keyboardHandler) {
-        document.removeEventListener('keydown', this.keyboardHandler, { capture: true })
+        document.removeEventListener('keydown', this.keyboardHandler, true)
         this.keyboardHandler = null
       }
 

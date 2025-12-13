@@ -91,7 +91,9 @@ const SETUP_SHORTCUTS: SetupShortcut[] = [
   { id: 'scheduled-jobs', name: 'Scheduled Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/ScheduledJobs/home' },
   { id: 'email-templates', name: 'Email Templates', description: 'Communication', path: '/lightning/setup/CommunicationTemplatesEmail/home' },
   { id: 'lead-assignment-rules', name: 'Lead Assignment Rules', description: 'Automation', path: '/lightning/setup/LeadRules/home' },
-  { id: 'case-assignment-rules', name: 'Case Assignment Rules', description: 'Automation', path: '/lightning/setup/CaseRules/home' }
+  { id: 'case-assignment-rules', name: 'Case Assignment Rules', description: 'Automation', path: '/lightning/setup/CaseRules/home' },
+  { id: 'deployment-status', name: 'Deployment Status', description: 'Deploy', path: '/lightning/setup/DeployStatus/home' },
+  { id: 'sandboxes', name: 'Sandboxes', description: 'Environments', path: '/lightning/setup/DataManagementCreateTestInstance/home' }
 ]
 
 function getSetupHost(sfHost: string | null): string | null {
@@ -435,7 +437,6 @@ class UltraForceWindowManager {
       return
     }
 
-    // Refresh session state before showing
     await this.loadState()
 
     this.state.isVisible = true
@@ -926,7 +927,7 @@ class UltraForceWindowManager {
           case 'CustomObject': {
             const keyPrefix = result.metadata?.KeyPrefix
             if (keyPrefix) {
-              targetUrl = `${baseUrl}/${keyPrefix}/o`
+              targetUrl = `${baseUrl}/${keyPrefix}`
             } else {
               targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
             }
@@ -1029,7 +1030,7 @@ class UltraForceWindowManager {
       switch (action) {
         case 'list':
           const keyPrefix = result.metadata?.KeyPrefix
-          targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}/o` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+          targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
           break
         case 'fields':
           targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
