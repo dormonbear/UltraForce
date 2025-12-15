@@ -320,7 +320,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="setting-section">
           <h3 className="section-title">Keyboard Shortcut</h3>
           <p className="section-desc">
-            Global shortcut: <strong>Ctrl/Cmd + B</strong> (works everywhere).
+            You can set a custom keyboard shortcut for UltraForce in Chrome Extension Keyboard Shortcuts (default: <strong>Ctrl/Cmd + B</strong>).
             <br />
             <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
               Customize at chrome://extensions/shortcuts
