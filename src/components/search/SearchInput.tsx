@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react'
+import React, { forwardRef, useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 type OrgType = 'production' | 'sandbox' | 'scratch' | 'developer' | 'unknown'
 
@@ -49,20 +49,68 @@ function getOrgTypeLabel(orgType: OrgType): string {
   }
 }
 
-const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
+const MAX_TEXTAREA_HEIGHT_PX = 120
+
+const SearchInput = forwardRef<HTMLTextAreaElement, SearchInputProps>(
   ({ query, onQueryChange, onKeyDown, onCursorChange, sfHost }, ref) => {
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
+    const [isMultiline, setIsMultiline] = useState(false)
 
-    const handleCursorChange = (e: React.SyntheticEvent<HTMLInputElement>) => {
-      const target = e.target as HTMLInputElement
+    const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
+    const singleLineHeightPxRef = useRef<number | null>(null)
+
+    const setRefs = useCallback(
+      (node: HTMLTextAreaElement | null) => {
+        textAreaRef.current = node
+        if (!ref) return
+        if (typeof ref === 'function') {
+          ref(node)
+        } else {
+          ref.current = node
+        }
+      },
+      [ref]
+    )
+
+    const getSingleLineHeightPx = (el: HTMLTextAreaElement): number => {
+      const style = window.getComputedStyle(el)
+      const fontSizePx = Number.parseFloat(style.fontSize || '16') || 16
+      const lineHeightRaw = Number.parseFloat(style.lineHeight)
+      const lineHeightPx = Number.isFinite(lineHeightRaw) && lineHeightRaw > 0 ? lineHeightRaw : fontSizePx * 1.25
+      const paddingTopPx = Number.parseFloat(style.paddingTop || '0') || 0
+      const paddingBottomPx = Number.parseFloat(style.paddingBottom || '0') || 0
+      return lineHeightPx + paddingTopPx + paddingBottomPx
+    }
+
+    const resize = useCallback(() => {
+      const el = textAreaRef.current
+      if (!el) return
+      if (singleLineHeightPxRef.current === null) {
+        singleLineHeightPxRef.current = getSingleLineHeightPx(el)
+      }
+      el.style.height = 'auto'
+      const nextHeight = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT_PX)
+      el.style.height = `${nextHeight}px`
+      el.style.overflowY = el.scrollHeight > MAX_TEXTAREA_HEIGHT_PX ? 'auto' : 'hidden'
+
+      const singleLineHeightPx = singleLineHeightPxRef.current ?? getSingleLineHeightPx(el)
+      setIsMultiline(el.scrollHeight > singleLineHeightPx + 1)
+    }, [])
+
+    useLayoutEffect(() => {
+      resize()
+    }, [resize, query])
+
+    const handleCursorChange = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+      const target = e.target as HTMLTextAreaElement
       if (onCursorChange && target.selectionStart !== null) {
         onCursorChange(target.selectionStart)
       }
     }
 
     return (
-      <div className="search-input-section">
+      <div className={`search-input-section ${isMultiline ? 'search-input-section--multiline' : ''}`}>
         <svg
           className="search-icon"
           viewBox="0 0 24 24"
@@ -73,9 +121,8 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <input
-          ref={ref}
-          type="text"
+        <textarea
+          ref={setRefs}
           value={query}
           onChange={(e) => {
             onQueryChange(e.target.value)
@@ -90,6 +137,9 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           }
           className="search-input"
           autoFocus
+          rows={1}
+          wrap="soft"
+          spellCheck={false}
         />
         {displayName && (
           <div className={`org-badge org-badge-${orgType}`} title={sfHost || ''}>

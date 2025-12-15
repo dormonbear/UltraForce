@@ -87,8 +87,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [soqlCursorPos, setSoqlCursorPos] = useState(0)
 
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
+  const soqlSuggestionsRef = useRef<HTMLDivElement>(null)
   const isInitialMount = useRef(true)
 
   // Load settings
@@ -222,7 +223,16 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   // Check if SOQL mode
   const isSOQLMode = parsedCommand.isCommand && parsedCommand.command?.key === 's'
-  const soqlQuery = isSOQLMode ? parsedCommand.query : ''
+  const soqlStartIndex = useMemo(() => {
+    if (!isSOQLMode) return null
+    const match = query.match(/^\s*:\s*s\s+/i)
+    return match ? match[0].length : null
+  }, [isSOQLMode, query])
+
+  const soqlQuery = useMemo(() => {
+    if (!isSOQLMode || soqlStartIndex === null) return ''
+    return query.slice(soqlStartIndex)
+  }, [isSOQLMode, query, soqlStartIndex])
 
   // Show/hide command hints
   useEffect(() => {
@@ -265,7 +275,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     const cursorPos = Math.min(soqlCursorPos, soqlQuery.length)
     const timer = setTimeout(async () => {
       try {
-        const suggestions = await getSOQLSuggestions(sfHost, soqlQuery, cursorPos)
+        const suggestions = await getSOQLSuggestions(sfHost, soqlQuery, cursorPos, fuzzySearch)
         setSoqlSuggestions(suggestions)
         setSoqlSelectedIndex(0)
       } catch {
@@ -275,6 +285,15 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
     return () => clearTimeout(timer)
   }, [isSOQLMode, sfHost, soqlQuery, soqlCursorPos])
+
+  // Keep the selected SOQL suggestion visible when navigating via keyboard
+  useEffect(() => {
+    if (!isSOQLMode || soqlSuggestions.length === 0) return
+    const container = soqlSuggestionsRef.current
+    if (!container) return
+    const el = container.querySelector<HTMLElement>(`[data-soql-index="${soqlSelectedIndex}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [isSOQLMode, soqlSuggestions.length, soqlSelectedIndex])
 
   useEffect(() => {
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
@@ -622,10 +641,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   }
                 }}
                 onCursorChange={(pos) => {
-                  // Convert full query cursor position to SOQL query cursor position
-                  // Full query format: ":s SELECT..." where SOQL starts at position 3
-                  if (isSOQLMode && pos >= 3) {
-                    setSoqlCursorPos(pos - 3)
+                  if (!isSOQLMode) return
+                  if (soqlStartIndex === null) {
+                    setSoqlCursorPos(0)
+                    return
+                  }
+                  if (pos >= soqlStartIndex) {
+                    setSoqlCursorPos(pos - soqlStartIndex)
                   }
                 }}
                 sfHost={sfHost}
@@ -640,13 +662,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 <>
                   {/* SOQL Suggestions */}
                   {soqlSuggestions.length > 0 && (
-                    <div className="soql-suggestions">
+                    <div className="soql-suggestions" ref={soqlSuggestionsRef}>
                       {soqlSuggestions.map((suggestion, index) => (
                         <div
                           key={`${suggestion.value}-${index}`}
+                          data-soql-index={index}
                           className={`soql-suggestion-item ${index === soqlSelectedIndex ? 'selected' : ''}`}
                           onClick={() => applySoqlSuggestion(suggestion)}
-                          onMouseEnter={() => setSoqlSelectedIndex(index)}
                         >
                           <span className={`soql-suggestion-type type-${suggestion.type}`}>
                             {suggestion.type === 'keyword' && 'K'}

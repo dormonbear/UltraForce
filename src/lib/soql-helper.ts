@@ -58,8 +58,10 @@ async function getSObjectDescribe(sfHost: string, sobjectName: string): Promise<
   }
 }
 
+type SOQLContext = 'keyword' | 'object' | 'field' | 'operator' | 'value' | 'logical' | 'unknown'
+
 function parseSOQLContext(query: string, cursorPos: number): {
-  context: 'keyword' | 'object' | 'field' | 'value' | 'unknown'
+  context: SOQLContext
   currentWord: string
   fromObject: string | null
 } {
@@ -96,10 +98,17 @@ function parseSOQLContext(query: string, cursorPos: number): {
   const whereIndex = beforeCursor.indexOf('WHERE')
   if (whereIndex !== -1) {
     const afterWhere = beforeCursor.substring(whereIndex)
-    // Check if we're typing a value (after operator like =, !=, <, >, etc.)
-    if (/[=<>!]+\s*[\w']*$/i.test(afterWhere)) {
+    const tail = query.substring(Math.max(0, cursorPos - 120), cursorPos)
+    const tailUpper = tail.toUpperCase()
+
+    // Operator -> value (includes LIKE/IN/etc)
+    if (/(?:=|!=|<=|>=|<|>)\s*$/i.test(tailUpper) || /\b(?:LIKE|INCLUDES|EXCLUDES|IN|NOT\s+IN)\s*$/i.test(tailUpper)) {
       return { context: 'value', currentWord, fromObject }
     }
+    if (/(?:=|!=|<=|>=|<|>|\bLIKE\b|\bINCLUDES\b|\bEXCLUDES\b|\bIN\b|\bNOT\s+IN\b)\s+[\w'()]*$/i.test(tailUpper)) {
+      return { context: 'value', currentWord, fromObject }
+    }
+
     // Check if we're right after AND/OR - need field
     if (/\b(AND|OR)\s+[\w]*$/i.test(afterWhere)) {
       return { context: 'field', currentWord, fromObject }
@@ -107,6 +116,14 @@ function parseSOQLContext(query: string, cursorPos: number): {
     // Check if we're typing field name after WHERE or after a comma
     if (/WHERE\s+[\w]*$/i.test(afterWhere) || /,\s*[\w]*$/i.test(afterWhere)) {
       return { context: 'field', currentWord, fromObject }
+    }
+    // Field -> operator
+    if (/[\w.]+\s+$/i.test(tailUpper)) {
+      return { context: 'operator', currentWord, fromObject }
+    }
+    // Completed value -> logical operator
+    if (/(?:'[^']*'|\)|\bTRUE\b|\bFALSE\b|\bNULL\b|\d+)\s+$/i.test(tailUpper)) {
+      return { context: 'logical', currentWord, fromObject }
     }
     // Default to field context in WHERE clause when typing a new condition
     if (/\s[\w]*$/i.test(afterWhere) && !/[=<>!]/.test(afterWhere.slice(-20))) {
@@ -127,21 +144,89 @@ function parseSOQLContext(query: string, cursorPos: number): {
   return { context: 'keyword', currentWord, fromObject }
 }
 
+function normalizeForFuzzy(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function fuzzyScore(needleRaw: string, candidateRaw: string): number | null {
+  const needle = normalizeForFuzzy(needleRaw)
+  const candidate = normalizeForFuzzy(candidateRaw)
+
+  if (!needle) return 0
+
+  const substringIndex = candidate.indexOf(needle)
+  if (substringIndex !== -1) return substringIndex
+
+  let needleIndex = 0
+  let startIndex = -1
+  let lastMatchIndex = -1
+  let gaps = 0
+
+  for (let i = 0; i < candidate.length && needleIndex < needle.length; i++) {
+    if (candidate[i] === needle[needleIndex]) {
+      if (startIndex === -1) startIndex = i
+      if (lastMatchIndex !== -1) gaps += i - lastMatchIndex - 1
+      lastMatchIndex = i
+      needleIndex++
+    }
+  }
+
+  if (needleIndex !== needle.length) return null
+
+  return 100 + startIndex + gaps
+}
+
+function isCursorInSelectClause(query: string, cursorPos: number): boolean {
+  const upper = query.toUpperCase()
+  const selectMatch = upper.match(/SELECT\s+/)
+  if (!selectMatch?.index) return false
+
+  const selectEndIndex = selectMatch.index + selectMatch[0].length
+  if (cursorPos < selectEndIndex) return false
+
+  const fromIndex = upper.indexOf('FROM')
+  return fromIndex === -1 || cursorPos <= fromIndex
+}
+
 export async function getSOQLSuggestions(
   sfHost: string,
   query: string,
-  cursorPos: number
+  cursorPos: number,
+  useFuzzy = false
 ): Promise<SOQLSuggestion[]> {
   const { context, currentWord, fromObject } = parseSOQLContext(query, cursorPos)
   const searchTerm = currentWord.toLowerCase()
   const suggestions: SOQLSuggestion[] = []
 
+  const keywordMatches = (candidate: string): boolean =>
+    useFuzzy ? fuzzyScore(searchTerm, candidate) !== null : candidate.toLowerCase().startsWith(searchTerm)
+
   switch (context) {
+    case 'logical': {
+      ;['AND', 'OR', 'NOT'].forEach((k) => {
+        if (keywordMatches(k)) suggestions.push({ value: k, label: k, type: 'keyword' })
+      })
+      break
+    }
+
+    case 'operator': {
+      const operators = SOQL_OPERATORS
+        .map((op) => ({ op, score: useFuzzy ? (fuzzyScore(searchTerm, op) ?? Number.POSITIVE_INFINITY) : 0 }))
+        .filter(({ op, score }) => (useFuzzy ? Number.isFinite(score) : op.toLowerCase().startsWith(searchTerm)))
+        .sort((a, b) => a.score - b.score || a.op.length - b.op.length)
+        .slice(0, 12)
+
+      operators.forEach(({ op }) => suggestions.push({ value: op, label: op, type: 'operator' }))
+      break
+    }
+
     case 'keyword': {
-      const keywords = [...SOQL_KEYWORDS, ...SOQL_FUNCTIONS].filter(k =>
-        k.toLowerCase().startsWith(searchTerm)
-      )
-      keywords.slice(0, 15).forEach(k => {
+      const keywords = [...SOQL_KEYWORDS, ...SOQL_FUNCTIONS]
+        .map((k) => ({ k, score: useFuzzy ? (fuzzyScore(searchTerm, k) ?? Number.POSITIVE_INFINITY) : 0 }))
+        .filter(({ k, score }) => (useFuzzy ? Number.isFinite(score) : k.toLowerCase().startsWith(searchTerm)))
+        .sort((a, b) => a.score - b.score || a.k.length - b.k.length)
+
+      keywords.slice(0, 15).forEach(({ k }) => {
         suggestions.push({ value: k, label: k, type: 'keyword' })
       })
       break
@@ -151,9 +236,22 @@ export async function getSOQLSuggestions(
       try {
         const global = await getGlobalDescribe(sfHost)
         const objects = global.sobjects
-          .filter(o => o.queryable && o.name.toLowerCase().startsWith(searchTerm))
+          .filter((o) => o.queryable)
+          .map((o) => {
+            if (!useFuzzy) return { o, score: 0 }
+            const nameScore = fuzzyScore(searchTerm, o.name)
+            const labelScore = fuzzyScore(searchTerm, o.label)
+            const score = Math.min(
+              nameScore ?? Number.POSITIVE_INFINITY,
+              labelScore === null ? Number.POSITIVE_INFINITY : labelScore + 5
+            )
+            return { o, score }
+          })
+          .filter(({ o, score }) => (useFuzzy ? Number.isFinite(score) : o.name.toLowerCase().startsWith(searchTerm)))
+          .sort((a, b) => a.score - b.score || a.o.name.length - b.o.name.length)
           .slice(0, 15)
-        objects.forEach(o => {
+
+        objects.forEach(({ o }) => {
           suggestions.push({ value: o.name, label: o.label, type: 'object', detail: o.name })
         })
       } catch {
@@ -163,14 +261,51 @@ export async function getSOQLSuggestions(
     }
 
     case 'field': {
+      const isInSelectClause = isCursorInSelectClause(query, cursorPos)
+
+      if (isInSelectClause) {
+        const prioritized: SOQLSuggestion[] = [
+          { value: 'Id', label: 'Id', type: 'field', detail: 'common' },
+          { value: 'COUNT(Id)', label: 'COUNT(Id)', type: 'field', detail: 'aggregate' }
+        ]
+
+        for (const s of prioritized) {
+          const match = useFuzzy ? fuzzyScore(searchTerm, s.value) !== null : s.value.toLowerCase().startsWith(searchTerm)
+          if (match) suggestions.push(s)
+        }
+      }
+
       if (fromObject) {
         try {
           const describe = await getSObjectDescribe(sfHost, fromObject)
           if (describe) {
+            const prioritizedInWhere = !isInSelectClause
+              ? (['Id', 'Name'] as const)
+              : ([] as const)
+
+            if (prioritizedInWhere) {
+              for (const p of prioritizedInWhere) {
+                const match = useFuzzy ? fuzzyScore(searchTerm, p) !== null : p.toLowerCase().startsWith(searchTerm)
+                if (match) suggestions.push({ value: p, label: p, type: 'field', detail: 'common' })
+              }
+            }
+
             const fields = describe.fields
-              .filter(f => f.name.toLowerCase().startsWith(searchTerm))
+              .map((f) => {
+                if (!useFuzzy) return { f, score: 0 }
+                const nameScore = fuzzyScore(searchTerm, f.name)
+                const labelScore = fuzzyScore(searchTerm, f.label)
+                const score = Math.min(
+                  nameScore ?? Number.POSITIVE_INFINITY,
+                  labelScore === null ? Number.POSITIVE_INFINITY : labelScore + 5
+                )
+                return { f, score }
+              })
+              .filter(({ f, score }) => (useFuzzy ? Number.isFinite(score) : f.name.toLowerCase().startsWith(searchTerm)))
+              .sort((a, b) => a.score - b.score || a.f.name.length - b.f.name.length)
               .slice(0, 20)
-            fields.forEach(f => {
+
+            fields.forEach(({ f }) => {
               suggestions.push({
                 value: f.name,
                 label: f.label,
@@ -183,7 +318,7 @@ export async function getSOQLSuggestions(
           // ignore
         }
       }
-      SOQL_FUNCTIONS.filter(f => f.toLowerCase().startsWith(searchTerm))
+      SOQL_FUNCTIONS.filter((f) => keywordMatches(f))
         .slice(0, 5)
         .forEach(f => {
           suggestions.push({ value: f, label: f, type: 'function' })
@@ -192,22 +327,35 @@ export async function getSOQLSuggestions(
     }
 
     case 'value': {
+      const beforeUpper = query.substring(0, cursorPos).toUpperCase()
+      if (/\b(?:IN|NOT\s+IN)\s*$/i.test(beforeUpper)) {
+        suggestions.push({ value: '(', label: '(', type: 'operator' })
+        suggestions.push({ value: '(SELECT Id FROM ', label: '(SELECT Id FROM ...)', type: 'keyword', detail: 'subquery' })
+      }
+
       const dateLiterals = SOQL_FUNCTIONS.filter(f =>
         (f.startsWith('TODAY') || f.startsWith('YESTERDAY') || f.startsWith('LAST_') ||
          f.startsWith('THIS_') || f.startsWith('NEXT_')) &&
-        f.toLowerCase().startsWith(searchTerm)
+        keywordMatches(f)
       )
       dateLiterals.slice(0, 10).forEach(d => {
         suggestions.push({ value: d, label: d, type: 'keyword' })
       })
-      if ('true'.startsWith(searchTerm)) suggestions.push({ value: 'true', label: 'true', type: 'keyword' })
-      if ('false'.startsWith(searchTerm)) suggestions.push({ value: 'false', label: 'false', type: 'keyword' })
-      if ('null'.startsWith(searchTerm)) suggestions.push({ value: 'null', label: 'null', type: 'keyword' })
+      if (keywordMatches('true')) suggestions.push({ value: 'true', label: 'true', type: 'keyword' })
+      if (keywordMatches('false')) suggestions.push({ value: 'false', label: 'false', type: 'keyword' })
+      if (keywordMatches('null')) suggestions.push({ value: 'null', label: 'null', type: 'keyword' })
       break
     }
   }
 
-  return suggestions
+  // De-dupe while preserving order (prioritized suggestions should stay at the top)
+  const seen = new Set<string>()
+  return suggestions.filter((s) => {
+    const key = `${s.type}:${s.value}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export function applySuggestion(query: string, cursorPos: number, suggestion: SOQLSuggestion): { newQuery: string; newCursorPos: number } {
@@ -217,10 +365,13 @@ export function applySuggestion(query: string, cursorPos: number, suggestion: SO
   const wordStart = wordMatch ? cursorPos - wordMatch[0].length : cursorPos
 
   let insertValue = suggestion.value
+  const isInSelectClause = isCursorInSelectClause(query, cursorPos)
   if (suggestion.type === 'object') {
     insertValue += ' '
-  } else if (suggestion.type === 'field') {
-    insertValue += ', '
+  } else if (suggestion.type === 'field' || suggestion.type === 'function') {
+    insertValue += isInSelectClause ? ', ' : ' '
+  } else if (suggestion.type === 'operator') {
+    if (suggestion.value !== '(') insertValue += ' '
   } else if (suggestion.type === 'keyword' && !suggestion.value.includes('(')) {
     insertValue += ' '
   }

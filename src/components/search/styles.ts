@@ -44,9 +44,9 @@ export const SEARCH_MODAL_STYLES = `
   }
 
   .ultraforce-search-modal--soql {
-    top: 2vh;
-    height: 96vh;
-    max-height: 96vh;
+    /* Keep the modal compact while composing a SOQL query; expand only when results are shown. */
+    top: 10%;
+    max-height: 80%;
   }
 
   .ultraforce-search-modal--soql-result {
@@ -87,12 +87,20 @@ export const SEARCH_MODAL_STYLES = `
     gap: 12px;
   }
 
+  .search-input-section--multiline {
+    align-items: flex-start;
+  }
+
   .search-icon {
     color: rgba(255, 255, 255, 0.4);
-    margin-top: 2px;
+    margin-top: 0;
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+  }
+
+  .search-input-section--multiline .search-icon {
+    margin-top: 2px;
   }
 
   .search-input {
@@ -100,15 +108,19 @@ export const SEARCH_MODAL_STYLES = `
     background: none;
     border: none !important;
     color: #ffffff;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 400;
     outline: none !important;
     box-shadow: none !important;
-    line-height: 1.4;
+    line-height: 1.3;
     letter-spacing: -0.01em;
-    padding: 4px 0;
+    padding: 2px 0;
+    margin: 0;
+    resize: none;
+    overflow-x: hidden;
     white-space: pre-wrap;
     word-break: break-word;
+    overflow-wrap: anywhere;
   }
 
   .search-input::placeholder {
@@ -126,6 +138,11 @@ export const SEARCH_MODAL_STYLES = `
     white-space: nowrap;
     transition: all 0.2s ease;
     user-select: none;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .search-input-section--multiline .org-badge {
     align-self: flex-start;
     margin-top: 2px;
   }
@@ -1132,7 +1149,6 @@ export const SEARCH_MODAL_STYLES = `
     transition: background 0.1s ease;
   }
 
-  .soql-suggestion-item:hover,
   .soql-suggestion-item.selected {
     background: rgba(59, 130, 246, 0.15);
   }
