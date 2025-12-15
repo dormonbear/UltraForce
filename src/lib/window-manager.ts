@@ -96,6 +96,16 @@ const SETUP_SHORTCUTS: SetupShortcut[] = [
   { id: 'sandboxes', name: 'Sandboxes', description: 'Environments', path: '/lightning/setup/DataManagementCreateTestInstance/home' }
 ]
 
+function resolveSetupShortcutPath(shortcut: SetupShortcut, sfHost: string | null): string {
+  if (shortcut.id === 'users') {
+    // In .sfcrmproducts.cn / .sfcrmapps.cn environments, "Users" lives under ManageUsersLightning.
+    if (sfHost?.includes('sfcrmproducts.cn') || sfHost?.includes('sfcrmapps.cn')) {
+      return '/lightning/setup/ManageUsersLightning/home'
+    }
+  }
+  return shortcut.path
+}
+
 function getSetupHost(sfHost: string | null): string | null {
   if (!sfHost) return null
   return sfHost
@@ -489,6 +499,7 @@ class UltraForceWindowManager {
           onCustomSearch: this.handleCustomSearch.bind(this),
           onSetupSearch: this.handleSetupShortcutSearch.bind(this),
           onResultClick: this.handleResultClick.bind(this),
+          onIdNavigate: this.handleIdNavigate.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onClearResults: this.handleClearResults.bind(this),
           searchResults: this.state.searchResults,
@@ -643,7 +654,8 @@ class UltraForceWindowManager {
         return matchesAllTerms(combinedText)
       })
       .map((shortcut) => {
-        const url = buildSetupUrl(this.state.sfHost, shortcut.path)
+        const resolvedPath = resolveSetupShortcutPath(shortcut, this.state.sfHost)
+        const url = buildSetupUrl(this.state.sfHost, resolvedPath)
         return {
           id: shortcut.id,
           name: shortcut.name,
@@ -970,6 +982,17 @@ class UltraForceWindowManager {
       window.open(targetUrl, '_blank')
     }
 
+    if (this.state.closeOnNavigate) {
+      this.hide()
+    }
+  }
+
+  private handleIdNavigate(id: string): void {
+    this.log(`Direct ID navigation: ${id}`)
+    if (this.state.sfHost) {
+      const baseUrl = `https://${this.state.sfHost}`
+      window.open(`${baseUrl}/${id}`, '_blank')
+    }
     if (this.state.closeOnNavigate) {
       this.hide()
     }
