@@ -21,6 +21,7 @@ interface WindowManagerState {
   navigationMode: NavigationMode
   fuzzySearch: boolean
   searchError: string | null
+  userLightningPreference: boolean | null
 }
 
 interface WindowManagerOptions {
@@ -144,14 +145,19 @@ function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: st
 }
 
 /**
- * Detect if should use Lightning URLs based on mode setting
+ * Detect if should use Lightning URLs based on mode setting and user preference
  */
-function shouldUseLightning(mode: NavigationMode): boolean {
+function shouldUseLightning(mode: NavigationMode, userPreference: boolean | null = null): boolean {
   // If explicit mode is set, use it
   if (mode === 'lightning') return true
   if (mode === 'classic') return false
 
-  // Auto mode: detect from current page
+  // Auto mode: prefer user's API preference if available
+  if (userPreference !== null) {
+    return userPreference
+  }
+
+  // Fallback: detect from current page URL
   const url = window.location.href
   const hostname = window.location.hostname
   const pathname = window.location.pathname
@@ -225,7 +231,8 @@ class UltraForceWindowManager {
     closeOnNavigate: true,
     navigationMode: 'auto',
     fuzzySearch: true,
-    searchError: null
+    searchError: null,
+    userLightningPreference: null
   }
 
   private options: Required<WindowManagerOptions> = {
@@ -239,6 +246,7 @@ class UltraForceWindowManager {
   private sobjectPrefixCache: Record<string, Record<string, string>> = {}
   private sobjectCacheTimestamp: Record<string, number> = {}
   private currentUserProfileId: Record<string, string> = {}
+  private userLightningPreferenceCache: Record<string, boolean> = {}
 
   private constructor(options: WindowManagerOptions = {}) {
     this.options = { ...this.options, ...options }
@@ -411,6 +419,11 @@ class UltraForceWindowManager {
         const session = await getSession(sfHost)
         this.state.hasSession = session !== null
         this.log('Session status:', this.state.hasSession ? 'Active' : 'None')
+
+        // Fetch user Lightning preference in background (non-blocking)
+        if (this.state.hasSession) {
+          this.getUserLightningPreference().catch(() => {})
+        }
       }
 
       // Load settings
@@ -772,6 +785,34 @@ class UltraForceWindowManager {
     return null
   }
 
+  private async getUserLightningPreference(): Promise<boolean | null> {
+    if (!this.state.sfHost) return null
+
+    const hostKey = this.state.sfHost
+    if (hostKey in this.userLightningPreferenceCache) {
+      return this.userLightningPreferenceCache[hostKey]
+    }
+
+    try {
+      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
+      const userId = userInfo?.id
+      if (!userId) return null
+
+      const soql = encodeURIComponent(`SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`)
+      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+      const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
+
+      if (typeof preference === 'boolean') {
+        this.userLightningPreferenceCache[hostKey] = preference
+        this.state.userLightningPreference = preference
+        return preference
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch user Lightning preference:', error)
+    }
+    return null
+  }
+
   private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<string | null> {
     if (!this.state.sfHost) return null
 
@@ -828,7 +869,7 @@ class UltraForceWindowManager {
     // Navigate to the result
     if (this.state.sfHost && result.id) {
       const baseUrl = `https://${this.state.sfHost}`
-      const useLightning = shouldUseLightning(this.state.navigationMode)
+      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
       let targetUrl = ''
 
       if (useLightning) {
@@ -977,6 +1018,7 @@ class UltraForceWindowManager {
           default:
             targetUrl = `${baseUrl}/${result.id}`
         }
+
       }
 
       window.open(targetUrl, '_blank')
@@ -1031,7 +1073,7 @@ class UltraForceWindowManager {
     const objectEntityId = result.metadata.Id || objectId
     const lightningObjectId = result.metadata.Id || objectId
     const objectApiName = result.metadata.QualifiedApiName
-    const useLightning = shouldUseLightning(this.state.navigationMode)
+    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
     let targetUrl = ''
 
     if (useLightning) {
@@ -1071,6 +1113,7 @@ class UltraForceWindowManager {
           }
           break
       }
+
     }
 
     if (targetUrl) {
@@ -1166,7 +1209,8 @@ class UltraForceWindowManager {
         closeOnNavigate: true,
         navigationMode: 'auto',
         fuzzySearch: true,
-        searchError: null
+        searchError: null,
+        userLightningPreference: null
       }
 
       this.log('WindowManager destroyed successfully')
