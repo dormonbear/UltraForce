@@ -957,6 +957,18 @@ class UltraForceWindowManager {
             // Custom query results - navigate to record directly
             targetUrl = `${baseUrl}/lightning/r/sObject/${result.id}/view`
             break
+          case 'Queue': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            targetUrl = `https://${setupHost}/lightning/setup/Queues/page?address=%2Fp%2Fown%2FQueue%2Fd%3Fid%3D${result.id}`
+            break
+          }
+          case 'Group': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            targetUrl = `https://${setupHost}/lightning/setup/PublicGroups/page?address=%2Fsetup%2Fown%2Fgroupdetail.jsp%3Fid%3D${result.id}`
+            break
+          }
           default:
             targetUrl = `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
         }
@@ -1014,6 +1026,12 @@ class UltraForceWindowManager {
           }
           case 'CustomQuery':
             targetUrl = `${baseUrl}/${result.id}`
+            break
+          case 'Queue':
+            targetUrl = `${baseUrl}/p/own/Queue/d?id=${result.id}&setupid=Queues`
+            break
+          case 'Group':
+            targetUrl = `${baseUrl}/setup/own/groupdetail.jsp?id=${result.id}&setupid=PublicGroups`
             break
           default:
             targetUrl = `${baseUrl}/${result.id}`
