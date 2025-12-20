@@ -37,7 +37,8 @@ const METADATA_TYPES = [
   { value: 'CustomMetadataType', label: 'Custom Metadata Types' },
   { value: 'CustomSetting', label: 'Custom Settings' },
   { value: 'PermissionSet', label: 'Permission Sets' },
-  { value: 'Profile', label: 'Profiles' }
+  { value: 'Profile', label: 'Profiles' },
+  { value: 'Queue,Group', label: 'Queues & Public Groups' }
 ]
 
 const NAVIGATION_MODES = [
