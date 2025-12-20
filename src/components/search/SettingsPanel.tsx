@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import type { SearchCommand, CustomCommand } from '~types'
+import type { CustomCommand } from '~types'
 import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands } from '~lib/command-parser'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'

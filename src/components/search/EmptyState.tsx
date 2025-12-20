@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useState } from 'react'
 
 interface EmptyStateProps {
   type: 'loading' | 'empty' | 'no-session' | 'start' | 'command' | 'error' | 'id-navigation'
@@ -41,9 +41,9 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, commandDescription, selectedTypes, errorMessage }) => {
-  const randomHint = useMemo(() => {
+  const [randomHint] = useState(() => {
     return SEARCH_HINTS[Math.floor(Math.random() * SEARCH_HINTS.length)]
-  }, [])
+  })
 
   if (type === 'loading') {
     return (
@@ -96,7 +96,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
     return (
       <div className="search-empty">
         <div className="empty-title">No Results Found</div>
-        <div className="empty-desc">We couldn't find anything matching "{query}"</div>
+        <div className="empty-desc">No results for &quot;{query}&quot;</div>
       </div>
     )
   }

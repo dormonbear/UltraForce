@@ -43,7 +43,7 @@ function createMiniSearchInstance(): MiniSearch<IndexedRecord> {
       if (!text) return []
       return text
         .toLowerCase()
-        .split(/[\s_\-\.,;|:\/\\]+/)
+        .split(/[\s_\-.,;|:/\\]+/)
         .filter((token) => token.length > 0)
     }
   })
@@ -67,7 +67,7 @@ function generateSearchTerms(name: string, label: string, apiName: string): stri
   addTerm(apiName)
 
   // Add concatenated versions (remove spaces, underscores, hyphens)
-  const concat = (str: string) => str.replace(/[\s_\-]+/g, '').toLowerCase()
+  const concat = (str: string) => str.replace(/[\s_-]+/g, '').toLowerCase()
   addTerm(concat(name))
   addTerm(concat(label))
   addTerm(concat(apiName))

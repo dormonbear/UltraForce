@@ -153,7 +153,7 @@ async function handleGetSfHost(
             sendResponse(myDomain)
             return
           }
-        } catch (e) {}
+        } catch {}
       }
 
       sendResponse(currentDomain)
@@ -176,7 +176,7 @@ async function handleGetSfHost(
             return
           }
         }
-      } catch (e) {}
+      } catch {}
     }
 
     for (const domain of SF_DOMAINS) {
@@ -256,7 +256,7 @@ chrome.action.onClicked.addListener(async (tab) => {
   if (tab.url && isSalesforceTab(tab.url)) {
     try {
       await chrome.tabs.sendMessage(tab.id!, { action: 'toggleModal' })
-    } catch (error) {
+    } catch {
       // Content script not ready
     }
   }
@@ -269,7 +269,7 @@ chrome.commands?.onCommand.addListener((command) => {
       if (tab?.id && tab.url && isSalesforceTab(tab.url)) {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'toggleModal' })
-        } catch (error) {
+        } catch {
           // Content script not ready
         }
       }
