@@ -1432,4 +1432,104 @@ export const SEARCH_MODAL_STYLES = `
   .soql-table td .subquery-result {
     white-space: normal;
   }
+
+  /* Clickable Salesforce IDs */
+  .soql-clickable-id {
+    color: #60a5fa;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .soql-clickable-id:hover {
+    color: #93c5fd;
+    text-decoration: underline;
+  }
+
+  .subquery-record .soql-clickable-id {
+    color: #60a5fa;
+  }
+
+  .subquery-record .soql-clickable-id:hover {
+    color: #93c5fd;
+  }
+
+  /* Copyable cells */
+  .soql-cell-copyable {
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease;
+  }
+
+  .soql-cell-copyable:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .soql-cell-copied {
+    background: rgba(34, 197, 94, 0.15) !important;
+  }
+
+  .copy-indicator {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: #22c55e;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  /* Actions column */
+  .soql-actions-header {
+    width: 40px;
+    min-width: 40px;
+  }
+
+  .soql-actions-cell {
+    width: 40px;
+    min-width: 40px;
+    text-align: center;
+    padding: 4px 8px !important;
+  }
+
+  .soql-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .soql-action-btn:hover {
+    background: rgba(96, 165, 250, 0.2);
+    border-color: rgba(96, 165, 250, 0.4);
+    color: #60a5fa;
+  }
+
+  /* Related object field display */
+  .soql-related-values {
+    display: inline;
+  }
+
+  .soql-field-sep {
+    color: rgba(255, 255, 255, 0.3);
+    margin: 0 2px;
+  }
+
+  .soql-field-pair {
+    display: inline;
+  }
+
+  .soql-field-key {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.9em;
+  }
 `

@@ -573,6 +573,76 @@ const SearchModal: React.FC<SearchModalProps> = ({
     ? Object.keys(soqlResult.records[0]).filter(k => k !== 'attributes')
     : []
 
+  const handleIdClick = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    if (onIdNavigate) {
+      onIdNavigate(id)
+      if (closeOnNavigate) {
+        onClose()
+      }
+    }
+  }
+
+  // Extract record ID from attributes.url (e.g., /services/data/v59.0/sobjects/Account/001xx000003DGbY)
+  const getRecordIdFromAttributes = (record: Record<string, unknown>): string | null => {
+    const attributes = record.attributes as Record<string, unknown> | undefined
+    if (!attributes?.url) return null
+    const url = String(attributes.url)
+    const match = url.match(/\/([a-zA-Z0-9]{15,18})$/)
+    return match ? match[1] : null
+  }
+
+  const [copiedCell, setCopiedCell] = useState<string | null>(null)
+
+  const handleCellClick = async (value: unknown, cellKey: string) => {
+    if (value === null || value === undefined) return
+    let textToCopy: string
+    if (typeof value === 'object') {
+      const obj = value as Record<string, unknown>
+      // Subquery result - copy as JSON
+      if ('records' in obj && Array.isArray(obj.records)) {
+        textToCopy = JSON.stringify(obj.records)
+      }
+      // Related object - extract primitive values
+      else if ('attributes' in obj) {
+        const fields = Object.entries(obj)
+          .filter(([k, v]) => k !== 'attributes' && v !== null && typeof v !== 'object')
+        if (fields.length === 1) {
+          textToCopy = String(fields[0][1])
+        } else {
+          textToCopy = fields.map(([k, v]) => {
+            const shortKey = k.replace(/__c$/i, '').replace(/_/g, ' ')
+            return `${shortKey}: ${v}`
+          }).join(' | ') || JSON.stringify(value)
+        }
+      } else {
+        textToCopy = JSON.stringify(value)
+      }
+    } else {
+      textToCopy = String(value)
+    }
+    const success = await copyToClipboard(textToCopy)
+    if (success) {
+      setCopiedCell(cellKey)
+      setTimeout(() => setCopiedCell(null), 1500)
+    }
+  }
+
+  const renderClickableId = (val: string) => {
+    if (isSalesforceId(val)) {
+      return (
+        <span
+          className="soql-clickable-id"
+          onClick={(e) => handleIdClick(val, e)}
+          title="Click to open record"
+        >
+          {val}
+        </span>
+      )
+    }
+    return val
+  }
+
   const formatCellValue = (value: unknown): React.ReactNode => {
     if (value === null || value === undefined) return ''
     if (typeof value === 'object') {
@@ -598,20 +668,24 @@ const SearchModal: React.FC<SearchModalProps> = ({
               if (nestedFields.length === 0) return null
               return (
                 <span key={fieldName} className="subquery-field">
-                  {nestedFields.map(([k, v], i) => (
-                    <React.Fragment key={k}>
-                      {i > 0 && ', '}
-                      <span className="subquery-field-name">{fieldName}.{k}:</span> {String(v)}
-                    </React.Fragment>
-                  ))}
+                  {nestedFields.map(([k, v], i) => {
+                    const strVal = String(v)
+                    return (
+                      <React.Fragment key={k}>
+                        {i > 0 && ', '}
+                        <span className="subquery-field-name">{fieldName}.{k}:</span> {renderClickableId(strVal)}
+                      </React.Fragment>
+                    )
+                  })}
                 </span>
               )
             }
             return null
           }
+          const strVal = String(val)
           return (
             <span key={fieldName} className="subquery-field">
-              <span className="subquery-field-name">{fieldName}:</span> {String(val)}
+              <span className="subquery-field-name">{fieldName}:</span> {renderClickableId(strVal)}
             </span>
           )
         }
@@ -639,12 +713,40 @@ const SearchModal: React.FC<SearchModalProps> = ({
         delete copy.attributes
         const fields = Object.entries(copy).filter(([, v]) => v !== null && typeof v !== 'object')
         if (fields.length === 0) return ''
-        return fields.map(([k, v]) => `${k}: ${v}`).join(', ')
+        // Single field - just show value
+        if (fields.length === 1) {
+          const strVal = String(fields[0][1])
+          return isSalesforceId(strVal) ? (
+            <span className="soql-clickable-id" onClick={(e) => handleIdClick(strVal, e)}>{strVal}</span>
+          ) : strVal
+        }
+        // Multiple fields - show as value pairs with separator
+        return (
+          <span className="soql-related-values">
+            {fields.map(([k, v], i) => {
+              const strVal = String(v)
+              // Remove __c suffix for cleaner display
+              const shortKey = k.replace(/__c$/i, '').replace(/_/g, ' ')
+              return (
+                <React.Fragment key={k}>
+                  {i > 0 && <span className="soql-field-sep"> | </span>}
+                  <span className="soql-field-pair">
+                    <span className="soql-field-key">{shortKey}:</span>{' '}
+                    {isSalesforceId(strVal) ? (
+                      <span className="soql-clickable-id" onClick={(e) => handleIdClick(strVal, e)}>{strVal}</span>
+                    ) : strVal}
+                  </span>
+                </React.Fragment>
+              )
+            })}
+          </span>
+        )
       }
 
       return JSON.stringify(value)
     }
-    return String(value)
+    const strVal = String(value)
+    return renderClickableId(strVal)
   }
 
   const modalClassName = [
@@ -795,16 +897,47 @@ const SearchModal: React.FC<SearchModalProps> = ({
                                 {soqlColumns.map((col) => (
                                   <th key={col}>{col}</th>
                                 ))}
+                                <th className="soql-actions-header"></th>
                               </tr>
                             </thead>
                             <tbody>
-                              {soqlResult.records.map((record, rowIndex) => (
-                                <tr key={rowIndex}>
-                                  {soqlColumns.map((col) => (
-                                    <td key={col}>{formatCellValue(record[col])}</td>
-                                  ))}
-                                </tr>
-                              ))}
+                              {soqlResult.records.map((record, rowIndex) => {
+                                const recordId = getRecordIdFromAttributes(record)
+                                return (
+                                  <tr key={rowIndex}>
+                                    {soqlColumns.map((col) => {
+                                      const cellKey = `${rowIndex}-${col}`
+                                      const isCopied = copiedCell === cellKey
+                                      return (
+                                        <td
+                                          key={col}
+                                          className={`soql-cell-copyable ${isCopied ? 'soql-cell-copied' : ''}`}
+                                          onClick={() => handleCellClick(record[col], cellKey)}
+                                          title="Click to copy"
+                                        >
+                                          {formatCellValue(record[col])}
+                                          {isCopied && <span className="copy-indicator">Copied</span>}
+                                        </td>
+                                      )
+                                    })}
+                                    <td className="soql-actions-cell">
+                                      {recordId && (
+                                        <button
+                                          className="soql-action-btn"
+                                          onClick={() => handleIdClick(recordId)}
+                                          title="Open record"
+                                        >
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                            <polyline points="15 3 21 3 21 9" />
+                                            <line x1="10" y1="14" x2="21" y2="3" />
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
