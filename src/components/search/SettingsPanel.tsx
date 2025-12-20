@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { CustomCommand } from '~types'
 import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands } from '~lib/command-parser'
+import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
@@ -90,6 +91,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const displayName = sfHost ? sfHost.split('.')[0] : null
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
+  const [apiStats, setApiStats] = useState<ApiStatsDisplay>({ total: 0, last24h: 0, lastMonth: 0 })
+
+  useEffect(() => {
+    getApiStats().then(setApiStats).catch(() => {
+      // Ignore errors, keep default values
+    })
+  }, [])
   const [formState, setFormState] = useState<CommandFormState>({
     key: '',
     description: '',
@@ -275,6 +283,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       descriptionFields: ''
     })
     setFormError(null)
+  }
+
+  const handleResetStats = async () => {
+    if (!confirm('Reset all API statistics?')) {
+      return
+    }
+    await resetAllStats()
+    setApiStats(await getApiStats())
   }
 
   const renderCommandForm = () => (
@@ -584,6 +600,27 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
         )}
+
+        <div className="setting-section">
+          <h3 className="section-title">API Statistics</h3>
+          <div className="stats-list">
+            <div className="stats-row">
+              <span>Last 24 hours</span>
+              <span className="stats-value">{apiStats.last24h}</span>
+            </div>
+            <div className="stats-row">
+              <span>Last 30 days</span>
+              <span className="stats-value">{apiStats.lastMonth}</span>
+            </div>
+            <div className="stats-row">
+              <span>Total</span>
+              <span className="stats-value">{apiStats.total}</span>
+            </div>
+          </div>
+          <button className="cmd-btn cmd-btn-secondary" onClick={handleResetStats} style={{ marginTop: '12px' }}>
+            Reset
+          </button>
+        </div>
 
         <div className="settings-meta">
           <span className="meta-item">UltraForce v{getAppVersion()}</span>
