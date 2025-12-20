@@ -803,13 +803,16 @@ export async function warmupMetadataCache(sfHost: string): Promise<void> {
   const host = normalizeHost(sfHost)
 
   const session = await getSession(host)
-  if (!session) return
+  if (!session) {
+    return
+  }
 
   const start = Date.now()
   await Promise.all(
     commonTypes.map(async (type) => {
       try {
-        const { data } = await listMetadata(type, host, session.key, true)
+        // Use cache if available, only fetch if cache miss
+        const { data } = await listMetadata(type, host, session.key, false)
         buildSearchIndex(type, data, host)
       } catch (error) {
         logger.error('warmup failed', { type, error })
