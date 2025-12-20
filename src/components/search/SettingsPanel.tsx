@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import type { SearchCommand, CustomCommand } from '~types'
+import React, { useState, useEffect } from 'react'
+import type { CustomCommand } from '~types'
 import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands } from '~lib/command-parser'
+import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
@@ -18,6 +19,8 @@ interface SettingsPanelProps {
   onFuzzySearchChange: (value: boolean) => void
   hideManagedPackage: boolean
   onHideManagedPackageChange: (value: boolean) => void
+  maxResultsPerType: number
+  onMaxResultsPerTypeChange: (value: number) => void
   navigationMode: NavigationMode
   onNavigationModeChange: (mode: NavigationMode) => void
   sfHost: string | null
@@ -35,7 +38,8 @@ const METADATA_TYPES = [
   { value: 'CustomMetadataType', label: 'Custom Metadata Types' },
   { value: 'CustomSetting', label: 'Custom Settings' },
   { value: 'PermissionSet', label: 'Permission Sets' },
-  { value: 'Profile', label: 'Profiles' }
+  { value: 'Profile', label: 'Profiles' },
+  { value: 'Queue,Group', label: 'Queues & Public Groups' }
 ]
 
 const NAVIGATION_MODES = [
@@ -44,7 +48,13 @@ const NAVIGATION_MODES = [
   { value: 'classic', label: 'Salesforce Classic' }
 ]
 
-const APP_VERSION = '0.0.7'
+const getAppVersion = () => {
+  try {
+    return chrome.runtime.getManifest().version
+  } catch {
+    return 'unknown'
+  }
+}
 const PRIVACY_URL = 'https://gist.github.com/dormonbear/14242e4e5effbf0c7159c0e2bc14bbda'
 
 interface CommandFormState {
@@ -68,17 +78,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onAutoLoadFieldsChange,
   fuzzySearch,
   onFuzzySearchChange,
+  hideManagedPackage,
+  onHideManagedPackageChange,
+  maxResultsPerType,
+  onMaxResultsPerTypeChange,
   navigationMode,
   onNavigationModeChange,
   sfHost,
   customCommands,
-  onCustomCommandsChange,
-  hideManagedPackage,
-  onHideManagedPackageChange
+  onCustomCommandsChange
 }) => {
   const displayName = sfHost ? sfHost.split('.')[0] : null
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
+  const [apiStats, setApiStats] = useState<ApiStatsDisplay>({ total: 0, last24h: 0, lastMonth: 0 })
+
+  useEffect(() => {
+    getApiStats().then(setApiStats).catch(() => {
+      // Ignore errors, keep default values
+    })
+  }, [])
   const [formState, setFormState] = useState<CommandFormState>({
     key: '',
     description: '',
@@ -185,6 +204,73 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setFormError(null)
   }
 
+  const handleExportCommands = () => {
+    if (Object.keys(customCommands).length === 0) {
+      return
+    }
+    // Export without isBuiltin and key properties (key is the object key)
+    const exportData: Record<string, Omit<CustomCommand, 'isBuiltin' | 'key'>> = {}
+    for (const [cmdKey, cmd] of Object.entries(customCommands)) {
+      exportData[cmdKey] = {
+        description: cmd.description,
+        soql: cmd.soql,
+        useToolingApi: cmd.useToolingApi,
+        nameField: cmd.nameField,
+        ...(cmd.descriptionFields && cmd.descriptionFields.length > 0
+          ? { descriptionFields: cmd.descriptionFields }
+          : {})
+      }
+    }
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ultraforce-commands-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCommands = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const imported = JSON.parse(text) as Record<string, Partial<CustomCommand>>
+        // Validate structure (key comes from object key, not cmd.key)
+        const validCommands: Record<string, CustomCommand> = {}
+        for (const [key, cmd] of Object.entries(imported)) {
+          if (cmd && typeof cmd === 'object' && cmd.soql && cmd.nameField) {
+            validCommands[key] = {
+              key,
+              description: cmd.description || '',
+              soql: cmd.soql,
+              useToolingApi: cmd.useToolingApi || false,
+              nameField: cmd.nameField,
+              descriptionFields: cmd.descriptionFields
+            }
+          }
+        }
+        if (Object.keys(validCommands).length === 0) {
+          alert('No valid commands found in file')
+          return
+        }
+        const merged = { ...customCommands, ...validCommands }
+        onCustomCommandsChange(merged)
+        alert(`Imported ${Object.keys(validCommands).length} command(s)`)
+      } catch {
+        alert('Failed to parse file. Please ensure it is a valid JSON file.')
+      }
+    }
+    input.click()
+  }
+
   const startAddNew = () => {
     setIsAddingNew(true)
     setEditingKey(null)
@@ -197,6 +283,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       descriptionFields: ''
     })
     setFormError(null)
+  }
+
+  const handleResetStats = async () => {
+    if (!confirm('Reset all API statistics?')) {
+      return
+    }
+    await resetAllStats()
+    setApiStats(await getApiStats())
   }
 
   const renderCommandForm = () => (
@@ -316,7 +410,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="setting-section">
           <h3 className="section-title">Keyboard Shortcut</h3>
           <p className="section-desc">
-            Global shortcut: <strong>Ctrl/Cmd + B</strong> (works everywhere).
+            You can set a custom keyboard shortcut for UltraForce in Chrome Extension Keyboard Shortcuts (default: <strong>Ctrl/Cmd + B</strong>).
             <br />
             <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
               Customize at chrome://extensions/shortcuts
@@ -378,6 +472,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <input type="checkbox" checked={hideManagedPackage} onChange={(e) => onHideManagedPackageChange(e.target.checked)} className="toggle-checkbox" />
             <span className="toggle-label">Hide managed package items</span>
           </label>
+          <div className="toggle-option">
+            <span className="toggle-label">Max results per type</span>
+            <select
+              value={maxResultsPerType}
+              onChange={(e) => onMaxResultsPerTypeChange(Number(e.target.value))}
+              className="shortcut-key-select"
+              style={{ marginLeft: 'auto', width: 'auto' }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={200}>200</option>
+              <option value={500}>500</option>
+            </select>
+          </div>
         </div>
 
         <div className="setting-section">
@@ -458,6 +568,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           {!isAddingNew && !editingKey && (
             <div className="commands-footer">
               <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>+ Add Command</button>
+              <div className="commands-footer-right">
+                <button
+                  className="cmd-btn cmd-btn-secondary"
+                  onClick={handleImportCommands}
+                  title="Import commands from JSON file"
+                >
+                  Import
+                </button>
+                <button
+                  className="cmd-btn cmd-btn-secondary"
+                  onClick={handleExportCommands}
+                  disabled={Object.keys(customCommands).length === 0}
+                  title="Export commands to JSON file"
+                >
+                  Export
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -474,8 +601,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         )}
 
+        <div className="setting-section">
+          <h3 className="section-title">API Statistics</h3>
+          <div className="stats-list">
+            <div className="stats-row">
+              <span>Last 24 hours</span>
+              <span className="stats-value">{apiStats.last24h}</span>
+            </div>
+            <div className="stats-row">
+              <span>Last 30 days</span>
+              <span className="stats-value">{apiStats.lastMonth}</span>
+            </div>
+            <div className="stats-row">
+              <span>Total</span>
+              <span className="stats-value">{apiStats.total}</span>
+            </div>
+          </div>
+          <button className="cmd-btn cmd-btn-secondary" onClick={handleResetStats} style={{ marginTop: '12px' }}>
+            Reset
+          </button>
+        </div>
+
         <div className="settings-meta">
-          <span className="meta-item">UltraForce v{APP_VERSION}</span>
+          <span className="meta-item">UltraForce v{getAppVersion()}</span>
           <a
             className="meta-link"
             href={PRIVACY_URL}
