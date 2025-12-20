@@ -10,6 +10,12 @@ import type { ObjectAction } from '~components/search/ResultItem'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
+interface RecordContext {
+  objectApiName: string | null
+  recordId: string
+  recordTypeId?: string | null
+}
+
 interface WindowManagerState {
   isVisible: boolean
   isInitialized: boolean
@@ -22,6 +28,7 @@ interface WindowManagerState {
   fuzzySearch: boolean
   searchError: string | null
   userLightningPreference: boolean | null
+  recordContext: RecordContext | null
 }
 
 interface WindowManagerOptions {
@@ -129,14 +136,14 @@ function buildSetupUrl(sfHost: string | null, path: string): string | null {
 function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: string | null } {
   const path = window.location.pathname
 
-  // Lightning record URL: /lightning/r/ObjectApiName/recordId/view
-  const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})\/(?:view|edit|related)/)
+  // Lightning record URL: /lightning/r/ObjectApiName/recordId/view (or edit, related, etc.)
+  const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})(?:\/|$)/)
   if (lightningMatch && lightningMatch[1] && lightningMatch[2]) {
     return { objectApiName: lightningMatch[1], recordId: lightningMatch[2] }
   }
 
   // Classic record URL: /001xxxxxxxxxxxxxx or /001xxxxxxxxxxxxxx?...
-  const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})/)
+  const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})(?:\/|$|\?)/)
   if (classicMatch && classicMatch[1]) {
     return { objectApiName: null, recordId: classicMatch[1] }
   }
@@ -232,7 +239,8 @@ class UltraForceWindowManager {
     navigationMode: 'auto',
     fuzzySearch: true,
     searchError: null,
-    userLightningPreference: null
+    userLightningPreference: null,
+    recordContext: null
   }
 
   private options: Required<WindowManagerOptions> = {
@@ -462,6 +470,25 @@ class UltraForceWindowManager {
 
     await this.loadState()
 
+    // Detect record context
+    const { objectApiName: urlObjectApiName, recordId } = getCurrentRecordFromUrl()
+    if (recordId) {
+      // For Classic URLs, objectApiName is null - resolve it from record ID
+      let objectApiName = urlObjectApiName
+      if (!objectApiName) {
+        objectApiName = await this.resolveObjectApiNameFromRecord(recordId)
+        this.log('Resolved objectApiName from recordId:', objectApiName)
+      }
+      this.state.recordContext = { objectApiName, recordId }
+      // Fetch RecordTypeId in background (don't block show)
+      if (objectApiName) {
+        this.fetchRecordTypeId(objectApiName, recordId)
+      }
+      this.log('Record context detected:', this.state.recordContext)
+    } else {
+      this.state.recordContext = null
+    }
+
     this.state.isVisible = true
     this.log('Showing modal')
 
@@ -523,7 +550,11 @@ class UltraForceWindowManager {
           onNavigationModeChange: this.handleNavigationModeChange.bind(this),
           fuzzySearch: this.state.fuzzySearch,
           onFuzzySearchChange: this.handleFuzzySearchChange.bind(this),
-          searchError: this.state.searchError
+          searchError: this.state.searchError,
+          recordContext: this.state.recordContext,
+          onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
+          onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
+          onFieldsClick: this.handleFieldsNavigation.bind(this)
         })
       )
     )
@@ -686,30 +717,203 @@ class UltraForceWindowManager {
     await this.renderComponent()
   }
 
-  private async getCurrentRecordLayoutUrl(): Promise<{ url: string; objectApiName: string } | null> {
+  private async fetchRecordTypeId(objectApiName: string | null, recordId: string): Promise<void> {
+    if (!this.state.sfHost || !objectApiName) return
+
+    try {
+      const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
+      if (record?.RecordTypeId && this.state.recordContext) {
+        this.state.recordContext.recordTypeId = record.RecordTypeId
+        await this.renderComponent()
+      }
+    } catch (error) {
+      // Record may not have RecordType field, ignore
+      logger.debug('fetchRecordTypeId: no RecordTypeId field or error', error)
+    }
+  }
+
+  private async handleFieldsNavigation(): Promise<void> {
+    if (!this.state.recordContext?.objectApiName) {
+      this.state.searchError = 'No object found for this record.'
+      await this.renderComponent()
+      return
+    }
+
+    // Show loading state
+    this.state.isLoading = true
+    await this.renderComponent()
+
+    try {
+      const objectApiName = this.state.recordContext.objectApiName
+      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+
+      let url: string | null = null
+
+      if (useLightning) {
+        // Get object DurableId for Lightning URL
+        const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
+        const entityResp = await sfRest(this.state.sfHost!, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
+        const objectDurableId = entityResp?.records?.[0]?.DurableId
+
+        if (objectDurableId) {
+          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${objectDurableId}/FieldsAndRelationships/view`)
+        }
+      } else {
+        // Classic URL: /p/setup/layout/LayoutFieldList?type={objectApiName}&setupid={objectApiName}Fields&retURL=%2Fui%2Fsetup%2FSetup%3Fsetupid%3D{objectApiName}
+        url = `https://${this.state.sfHost}/p/setup/layout/LayoutFieldList?type=${objectApiName}&setupid=${objectApiName}Fields&retURL=%2Fui%2Fsetup%2FSetup%3Fsetupid%3D${objectApiName}`
+      }
+
+      if (url) {
+        this.state.isLoading = false
+        window.open(url, '_blank')
+        if (this.state.closeOnNavigate) {
+          this.hide()
+        } else {
+          await this.renderComponent()
+        }
+        return
+      }
+
+      this.state.searchError = 'Could not determine Fields URL.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    } catch (error) {
+      logger.error('Failed to navigate to Fields:', error)
+      this.state.searchError = 'Failed to load Fields information.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    }
+  }
+
+  private async handleRecordTypeNavigation(): Promise<void> {
+    if (!this.state.recordContext?.recordTypeId || !this.state.recordContext?.objectApiName) {
+      this.state.searchError = 'No RecordType found for this record.'
+      await this.renderComponent()
+      return
+    }
+
+    // Show loading state
+    this.state.isLoading = true
+    await this.renderComponent()
+
+    try {
+      const objectApiName = this.state.recordContext.objectApiName
+      const recordTypeId = this.state.recordContext.recordTypeId
+      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+
+      let url: string | null = null
+
+      if (useLightning) {
+        // Get object DurableId for Lightning URL
+        const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
+        const entityResp = await sfRest(this.state.sfHost!, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
+        const objectDurableId = entityResp?.records?.[0]?.DurableId
+
+        if (objectDurableId) {
+          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${objectDurableId}/RecordTypes/${recordTypeId}/view`)
+        }
+      } else {
+        // Classic URL: /setup/ui/recordtypefields.jsp?id={recordTypeId}&type={objectApiName}&setupid={objectApiName}Records
+        url = `https://${this.state.sfHost}/setup/ui/recordtypefields.jsp?id=${recordTypeId}&type=${objectApiName}&setupid=${objectApiName}Records`
+      }
+
+      if (url) {
+        this.state.isLoading = false
+        window.open(url, '_blank')
+        if (this.state.closeOnNavigate) {
+          this.hide()
+        } else {
+          await this.renderComponent()
+        }
+        return
+      }
+
+      this.state.searchError = 'Could not determine RecordType URL.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    } catch (error) {
+      logger.error('Failed to navigate to RecordType:', error)
+      this.state.searchError = 'Failed to load RecordType information.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    }
+  }
+
+  private async handlePageLayoutNavigation(): Promise<void> {
+    // Show loading state
+    this.state.isLoading = true
+    await this.renderComponent()
+
+    try {
+      const layoutInfo = await this.getCurrentRecordLayoutInfo()
+      if (layoutInfo) {
+        const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+        let url: string | null
+
+        if (useLightning) {
+          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
+        } else {
+          // Classic URL: /layouteditor/layoutEditor.apexp?type=Account&lid=00h0I000006U7pu&retURL=%2F{recordId}
+          url = `https://${this.state.sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
+        }
+
+        if (url) {
+          this.state.isLoading = false
+          window.open(url, '_blank')
+          if (this.state.closeOnNavigate) {
+            this.hide()
+          } else {
+            await this.renderComponent()
+          }
+          return
+        }
+      }
+      this.state.searchError = 'Could not determine page layout for this record.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    } catch (error) {
+      logger.error('Failed to navigate to page layout:', error)
+      this.state.searchError = 'Failed to load page layout information.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    }
+  }
+
+  private async getCurrentRecordLayoutInfo(): Promise<{ objectApiName: string; objectDurableId: string; layoutId: string; recordId: string } | null> {
     const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
+    logger.debug('getCurrentRecordLayoutInfo', { fromUrlObject, recordId })
+
     const objectApiName = fromUrlObject || (recordId ? await this.resolveObjectApiNameFromRecord(recordId) : null)
+    logger.debug('getCurrentRecordLayoutInfo:objectApiName', { objectApiName })
 
     if (!this.state.sfHost || !objectApiName || !recordId) {
+      logger.debug('getCurrentRecordLayoutInfo:missing', { sfHost: this.state.sfHost, objectApiName, recordId })
       return null
     }
 
     try {
-      const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
-      const recordTypeId = record?.RecordTypeId || null
+      let recordTypeId: string | null = null
+      try {
+        const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
+        recordTypeId = record?.RecordTypeId || null
+      } catch (e) {
+        logger.debug('getCurrentRecordLayoutInfo:recordTypeId fetch failed (may not have RecordTypeId field)', e)
+      }
+      logger.debug('getCurrentRecordLayoutInfo:recordTypeId', { recordTypeId })
 
       const profileId = await this.getCurrentUserProfileId()
+      logger.debug('getCurrentRecordLayoutInfo:profileId', { profileId })
       if (!profileId) {
         return null
       }
 
-      const layoutId = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
-      if (!layoutId) {
+      const layoutResult = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
+      logger.debug('getCurrentRecordLayoutInfo:layoutResult', { layoutResult })
+      if (!layoutResult) {
         return null
       }
 
-      const url = buildSetupUrl(this.state.sfHost, `/lightning/setup/ObjectManager/${objectApiName}/PageLayouts/${layoutId}/view`)
-      return url ? { url, objectApiName } : null
+      return { objectApiName, objectDurableId: layoutResult.objectDurableId, layoutId: layoutResult.layoutId, recordId }
     } catch (error) {
       logger.warn('Failed to resolve current record layout:', error)
       return null
@@ -813,24 +1017,43 @@ class UltraForceWindowManager {
     return null
   }
 
-  private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<string | null> {
+  private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<{ layoutId: string; objectDurableId: string } | null> {
     if (!this.state.sfHost) return null
 
-    // Prefer matching record type; if not found, fallback to default (RecordTypeId = null)
+    // First get the DurableId for the object (ProfileLayout uses DurableId, not API name)
+    let objectDurableId: string | null = null
+    try {
+      const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
+      const entityResp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
+      objectDurableId = entityResp?.records?.[0]?.DurableId || null
+      logger.debug('getLayoutAssignment:objectDurableId', { objectApiName, objectDurableId })
+    } catch (error) {
+      logger.warn('EntityDefinition query failed:', error)
+    }
+
+    if (!objectDurableId) {
+      return null
+    }
+
+    // Use ProfileLayout (Tooling API) - prefer matching record type; if not found, fallback to default (RecordTypeId = null)
     const queries = [
-      recordTypeId ? `SELECT LayoutId FROM LayoutAssignment WHERE TableEnumOrId='${objectApiName}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
-      `SELECT LayoutId FROM LayoutAssignment WHERE TableEnumOrId='${objectApiName}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
+      recordTypeId ? `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
+      `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
     ].filter(Boolean) as string[]
+
+    logger.debug('getLayoutAssignment:queries', { objectDurableId, profileId, recordTypeId, queries })
 
     for (const q of queries) {
       try {
+        logger.debug('getLayoutAssignment:executing', { query: q })
         const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(q)}`)
+        logger.debug('getLayoutAssignment:response', { records: resp?.records })
         const layoutId = resp?.records?.[0]?.LayoutId
         if (layoutId) {
-          return layoutId
+          return { layoutId, objectDurableId }
         }
       } catch (error) {
-        logger.warn('Layout assignment query failed:', error)
+        logger.warn('ProfileLayout query failed:', error)
       }
     }
 

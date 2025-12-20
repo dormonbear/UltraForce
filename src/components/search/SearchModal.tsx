@@ -18,6 +18,12 @@ function isSalesforceId(str: string): boolean {
   return /^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$/.test(trimmed)
 }
 
+interface RecordContext {
+  objectApiName: string | null
+  recordId: string
+  recordTypeId?: string | null
+}
+
 interface SearchModalProps {
   isVisible: boolean
   onClose: () => void
@@ -37,6 +43,10 @@ interface SearchModalProps {
   fuzzySearch?: boolean
   onFuzzySearchChange?: (value: boolean) => void
   searchError?: string | null
+  recordContext?: RecordContext | null
+  onPageLayoutClick?: () => void
+  onRecordTypeClick?: () => void
+  onFieldsClick?: () => void
 }
 
 const SearchModal: React.FC<SearchModalProps> = ({
@@ -57,7 +67,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onNavigationModeChange,
   fuzzySearch: externalFuzzySearch,
   onFuzzySearchChange,
-  searchError
+  searchError,
+  recordContext,
+  onPageLayoutClick,
+  onRecordTypeClick,
+  onFieldsClick
 }) => {
   const [query, setQuery] = useState('')
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['CustomObject', 'CustomField'])
@@ -314,7 +328,29 @@ const SearchModal: React.FC<SearchModalProps> = ({
     setVisibleItemCount(count)
   }, [])
 
+  // Record actions available when on a record page
+  const recordActions = useMemo(() => {
+    if (!recordContext) return []
+    const actions: { id: string; name: string; handler: () => void; icon: string }[] = []
+    if (onPageLayoutClick) {
+      actions.push({ id: 'page-layout', name: 'Page Layout', handler: onPageLayoutClick, icon: 'layout' })
+    }
+    if (recordContext.recordTypeId && onRecordTypeClick) {
+      actions.push({ id: 'record-type', name: 'Record Type', handler: onRecordTypeClick, icon: 'type' })
+    }
+    if (onFieldsClick) {
+      actions.push({ id: 'fields', name: 'Fields', handler: onFieldsClick, icon: 'fields' })
+    }
+    return actions
+  }, [recordContext, onPageLayoutClick, onRecordTypeClick, onFieldsClick])
+
+  // Track selected record action index (separate from search results)
+  const [selectedRecordActionIndex, setSelectedRecordActionIndex] = useState(0)
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    // When query is empty and we have record actions, handle navigation for record actions
+    const isInRecordActionsMode = !query.trim() && recordActions.length > 0 && hasSession && !isLoading
+
     switch (event.key) {
       case 'Escape':
         event.preventDefault()
@@ -328,18 +364,28 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
       case 'ArrowDown':
         event.preventDefault()
-        setSelectedIndex((prev) => Math.min(prev + 1, visibleResults.length - 1))
+        if (isInRecordActionsMode) {
+          setSelectedRecordActionIndex((prev) => Math.min(prev + 1, recordActions.length - 1))
+        } else {
+          setSelectedIndex((prev) => Math.min(prev + 1, visibleResults.length - 1))
+        }
         break
 
       case 'ArrowUp':
         event.preventDefault()
-        setSelectedIndex((prev) => Math.max(prev - 1, 0))
+        if (isInRecordActionsMode) {
+          setSelectedRecordActionIndex((prev) => Math.max(prev - 1, 0))
+        } else {
+          setSelectedIndex((prev) => Math.max(prev - 1, 0))
+        }
         break
 
       case 'Enter':
         event.preventDefault()
-        // Check if query is a Salesforce ID - navigate directly
-        if (isSalesforceId(query) && onIdNavigate) {
+        if (isInRecordActionsMode && recordActions[selectedRecordActionIndex]) {
+          recordActions[selectedRecordActionIndex].handler()
+        } else if (isSalesforceId(query) && onIdNavigate) {
+          // Check if query is a Salesforce ID - navigate directly
           onIdNavigate(query.trim())
         } else if (visibleResults[selectedIndex]) {
           onResultClick(visibleResults[selectedIndex])
@@ -488,7 +534,59 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   errorMessage={searchError}
                 />
               ) : !query.trim() ? (
-                <EmptyState type="start" selectedTypes={selectedTypes} />
+                <>
+                  {recordContext && recordActions.length > 0 && (
+                    <div className="record-actions">
+                      <div className="record-actions-header">
+                        Record Actions
+                        {recordContext.objectApiName && (
+                          <span className="record-object-name">{recordContext.objectApiName}</span>
+                        )}
+                      </div>
+                      {recordActions.map((action, index) => (
+                        <div
+                          key={action.id}
+                          className={`record-action-item${selectedRecordActionIndex === index ? ' selected' : ''}`}
+                          onClick={action.handler}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === 'Enter' && action.handler()}
+                        >
+                          <span className="record-action-icon">
+                            {action.icon === 'layout' ? (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <line x1="3" y1="9" x2="21" y2="9"/>
+                                <line x1="9" y1="21" x2="9" y2="9"/>
+                              </svg>
+                            ) : action.icon === 'type' ? (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                              </svg>
+                            ) : (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="8" y1="6" x2="21" y2="6"/>
+                                <line x1="8" y1="12" x2="21" y2="12"/>
+                                <line x1="8" y1="18" x2="21" y2="18"/>
+                                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                                <line x1="3" y1="18" x2="3.01" y2="18"/>
+                              </svg>
+                            )}
+                          </span>
+                          <span className="record-action-text">{action.name}</span>
+                          <span className="record-action-desc">
+                            {action.icon === 'layout' ? 'Open page layout' : action.icon === 'type' ? 'Open record type' : 'Open fields list'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <EmptyState type="start" selectedTypes={selectedTypes} />
+                </>
               ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
                 <EmptyState
                   type="command"
