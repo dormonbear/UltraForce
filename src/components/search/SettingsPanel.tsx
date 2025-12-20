@@ -46,7 +46,13 @@ const NAVIGATION_MODES = [
   { value: 'classic', label: 'Salesforce Classic' }
 ]
 
-const APP_VERSION = '0.0.7'
+const getAppVersion = () => {
+  try {
+    return chrome.runtime.getManifest().version
+  } catch {
+    return 'unknown'
+  }
+}
 const PRIVACY_URL = 'https://gist.github.com/dormonbear/14242e4e5effbf0c7159c0e2bc14bbda'
 
 interface CommandFormState {
@@ -495,7 +501,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         )}
 
         <div className="settings-meta">
-          <span className="meta-item">UltraForce v{APP_VERSION}</span>
+          <span className="meta-item">UltraForce v{getAppVersion()}</span>
           <a
             className="meta-link"
             href={PRIVACY_URL}
