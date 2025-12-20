@@ -1379,4 +1379,57 @@ export const SEARCH_MODAL_STYLES = `
   .soql-table tr:nth-child(even):hover td {
     background: rgba(255, 255, 255, 0.04);
   }
+
+  /* Subquery result display */
+  .subquery-result {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 400px;
+  }
+
+  .subquery-count {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .subquery-records {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .subquery-record {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 3px;
+    font-size: 11px;
+  }
+
+  .subquery-field {
+    display: inline-flex;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .subquery-field-name {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .subquery-more {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 2px 6px;
+    font-style: italic;
+  }
+
+  .soql-table td .subquery-result {
+    white-space: normal;
+  }
 `

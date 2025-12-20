@@ -1070,8 +1070,6 @@ class UltraForceWindowManager {
     }
 
     const objectId = result.metadata.DurableId
-    const objectEntityId = result.metadata.Id || objectId
-    const lightningObjectId = result.metadata.Id || objectId
     const objectApiName = result.metadata.QualifiedApiName
     const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
     let targetUrl = ''
@@ -1083,13 +1081,13 @@ class UltraForceWindowManager {
           targetUrl = `${baseUrl}/lightning/o/${objectApiName}/list`
           break
         case 'fields':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${lightningObjectId}/FieldsAndRelationships/view`
+          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/FieldsAndRelationships/view`
           break
         case 'layouts':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${lightningObjectId}/PageLayouts/view`
+          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/PageLayouts/view`
           break
         case 'details':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${lightningObjectId}/Details/view`
+          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/Details/view`
           break
       }
     } else {
@@ -1106,11 +1104,7 @@ class UltraForceWindowManager {
           targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
           break
         case 'details':
-          if (objectEntityId && /^[a-zA-Z0-9]{15,18}$/.test(objectEntityId)) {
-            targetUrl = `${baseUrl}/setup/ui/viewCustomObject.apexp?id=${objectEntityId}`
-          } else if (objectApiName) {
-            targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          }
+          targetUrl = `${baseUrl}/${objectId}`
           break
       }
 

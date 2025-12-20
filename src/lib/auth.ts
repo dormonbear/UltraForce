@@ -227,10 +227,6 @@ export async function getOrgInfo(sfHost: string): Promise<{
 export const auth = {
   getSession,
   getSfHost,
-  getSessionInfo,
-  getCurrentOrganization,
-  validateSession,
-  sfRest,
   API_VERSION
 }
 

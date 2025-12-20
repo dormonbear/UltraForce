@@ -573,15 +573,75 @@ const SearchModal: React.FC<SearchModalProps> = ({
     ? Object.keys(soqlResult.records[0]).filter(k => k !== 'attributes')
     : []
 
-  const formatCellValue = (value: unknown): string => {
+  const formatCellValue = (value: unknown): React.ReactNode => {
     if (value === null || value === undefined) return ''
     if (typeof value === 'object') {
-      if ('attributes' in (value as any)) {
-        const obj = value as Record<string, unknown>
+      const obj = value as Record<string, unknown>
+
+      // Subquery result (has records array)
+      if ('records' in obj && Array.isArray(obj.records)) {
+        const records = obj.records as Record<string, unknown>[]
+        if (records.length === 0) return '(0 records)'
+
+        // Get field names from first record, excluding 'attributes'
+        const fields = Object.keys(records[0]).filter(k => k !== 'attributes')
+
+        // Format a single field value (handles nested objects)
+        const formatFieldValue = (val: unknown, fieldName: string): React.ReactNode => {
+          if (val === null || val === undefined) return null
+          if (typeof val === 'object') {
+            const nestedObj = val as Record<string, unknown>
+            // Related object - extract non-null primitive values
+            if ('attributes' in nestedObj) {
+              const nestedFields = Object.entries(nestedObj)
+                .filter(([k, v]) => k !== 'attributes' && v !== null && typeof v !== 'object')
+              if (nestedFields.length === 0) return null
+              return (
+                <span key={fieldName} className="subquery-field">
+                  {nestedFields.map(([k, v], i) => (
+                    <React.Fragment key={k}>
+                      {i > 0 && ', '}
+                      <span className="subquery-field-name">{fieldName}.{k}:</span> {String(v)}
+                    </React.Fragment>
+                  ))}
+                </span>
+              )
+            }
+            return null
+          }
+          return (
+            <span key={fieldName} className="subquery-field">
+              <span className="subquery-field-name">{fieldName}:</span> {String(val)}
+            </span>
+          )
+        }
+
+        return (
+          <div className="subquery-result">
+            <div className="subquery-count">{records.length} record{records.length !== 1 ? 's' : ''}</div>
+            <div className="subquery-records">
+              {records.slice(0, 5).map((rec, idx) => (
+                <div key={idx} className="subquery-record">
+                  {fields.map(f => formatFieldValue(rec[f], f))}
+                </div>
+              ))}
+              {records.length > 5 && (
+                <div className="subquery-more">+{records.length - 5} more</div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      // Related object (has attributes)
+      if ('attributes' in obj) {
         const copy = { ...obj }
         delete copy.attributes
-        return JSON.stringify(copy)
+        const fields = Object.entries(copy).filter(([, v]) => v !== null && typeof v !== 'object')
+        if (fields.length === 0) return ''
+        return fields.map(([k, v]) => `${k}: ${v}`).join(', ')
       }
+
       return JSON.stringify(value)
     }
     return String(value)

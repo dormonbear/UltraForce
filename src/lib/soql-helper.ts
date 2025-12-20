@@ -1,4 +1,13 @@
-import type { SOQLSuggestion, SOQLQueryResult, GlobalDescribe, SObjectDescribe, ExportFormat } from '~types/soql'
+import type {
+  SOQLSuggestion,
+  SOQLQueryResult,
+  GlobalDescribe,
+  SObjectDescribe,
+  SObjectField,
+  ExportFormat,
+  SOQLContext,
+  SOQLParseResult
+} from '~types/soql'
 import { sfRest, API_VERSION } from './auth'
 
 const SOQL_KEYWORDS = [
@@ -18,6 +27,14 @@ const SOQL_FUNCTIONS = [
 
 const SOQL_OPERATORS = ['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'IN', 'NOT IN', 'INCLUDES', 'EXCLUDES']
 
+const DATE_LITERALS = [
+  'TODAY', 'YESTERDAY', 'TOMORROW', 'LAST_WEEK', 'THIS_WEEK', 'NEXT_WEEK',
+  'LAST_MONTH', 'THIS_MONTH', 'NEXT_MONTH', 'LAST_90_DAYS', 'NEXT_90_DAYS',
+  'LAST_N_DAYS:n', 'NEXT_N_DAYS:n', 'LAST_QUARTER', 'THIS_QUARTER', 'NEXT_QUARTER',
+  'LAST_YEAR', 'THIS_YEAR', 'NEXT_YEAR', 'LAST_FISCAL_QUARTER', 'THIS_FISCAL_QUARTER',
+  'NEXT_FISCAL_QUARTER', 'LAST_FISCAL_YEAR', 'THIS_FISCAL_YEAR', 'NEXT_FISCAL_YEAR'
+]
+
 let globalDescribeCache: GlobalDescribe | null = null
 let globalDescribeCacheTime = 0
 const sobjectDescribeCache: Record<string, SObjectDescribe> = {}
@@ -34,7 +51,7 @@ async function getGlobalDescribe(sfHost: string): Promise<GlobalDescribe> {
 }
 
 async function getSObjectDescribe(sfHost: string, sobjectName: string): Promise<SObjectDescribe | null> {
-  const cacheKey = `${sfHost}:${sobjectName}`
+  const cacheKey = `${sfHost}:${sobjectName.toLowerCase()}`
   if (sobjectDescribeCache[cacheKey]) {
     return sobjectDescribeCache[cacheKey]
   }
@@ -47,9 +64,24 @@ async function getSObjectDescribe(sfHost: string, sobjectName: string): Promise<
         name: f.name,
         label: f.label,
         type: f.type,
-        referenceTo: f.referenceTo,
-        relationshipName: f.relationshipName
-      }))
+        referenceTo: f.referenceTo || [],
+        relationshipName: f.relationshipName || null,
+        aggregatable: f.aggregatable ?? true,
+        groupable: f.groupable ?? true,
+        sortable: f.sortable ?? true,
+        filterable: f.filterable ?? true,
+        nillable: f.nillable ?? false,
+        picklistValues: f.picklistValues?.map((p: any) => ({
+          value: p.value,
+          label: p.label,
+          active: p.active
+        })) || []
+      })),
+      childRelationships: result.childRelationships?.map((r: any) => ({
+        childSObject: r.childSObject,
+        relationshipName: r.relationshipName,
+        field: r.field
+      })).filter((r: any) => r.relationshipName) || []
     }
     sobjectDescribeCache[cacheKey] = describe
     return describe
@@ -58,90 +90,202 @@ async function getSObjectDescribe(sfHost: string, sobjectName: string): Promise<
   }
 }
 
-type SOQLContext = 'keyword' | 'object' | 'field' | 'operator' | 'value' | 'logical' | 'unknown'
+function findSubqueryContext(query: string, cursorPos: number): { isInSubquery: boolean; subqueryRelationshipName?: string; subqueryStart?: number; subqueryEnd?: number } {
+  const beforeCursor = query.substring(0, cursorPos)
 
-function parseSOQLContext(query: string, cursorPos: number): {
-  context: SOQLContext
-  currentWord: string
-  fromObject: string | null
-} {
-  const beforeCursor = query.substring(0, cursorPos).toUpperCase()
-  const fullQueryUpper = query.toUpperCase()
-  const wordMatch = query.substring(0, cursorPos).match(/[\w.]*$/)
-  const currentWord = wordMatch ? wordMatch[0] : ''
+  let depth = 0
+  let subqueryStart = -1
 
-  // Look for FROM clause in the ENTIRE query, not just before cursor
-  const fromMatch = fullQueryUpper.match(/FROM\s+(\w+)/i)
-  const fromObject = fromMatch ? fromMatch[1] : null
-
-  // Check if cursor is right after "FROM " - typing object name
-  if (/FROM\s+[\w]*$/i.test(beforeCursor)) {
-    return { context: 'object', currentWord, fromObject }
+  for (let i = beforeCursor.length - 1; i >= 0; i--) {
+    if (beforeCursor[i] === ')') {
+      depth++
+    } else if (beforeCursor[i] === '(') {
+      if (depth === 0) {
+        subqueryStart = i
+        break
+      }
+      depth--
+    }
   }
 
-  // Check if cursor is in SELECT clause (between SELECT and FROM, or after SELECT if no FROM yet)
-  const selectMatch = fullQueryUpper.match(/SELECT\s+/i)
-  const fromIndex = fullQueryUpper.indexOf('FROM')
+  if (subqueryStart === -1) {
+    return { isInSubquery: false }
+  }
 
-  if (selectMatch) {
-    const selectEndIndex = selectMatch.index! + selectMatch[0].length
-    // Cursor is after SELECT keyword
-    if (cursorPos >= selectEndIndex) {
-      // If no FROM clause yet, or cursor is before FROM
-      if (fromIndex === -1 || cursorPos <= fromIndex) {
-        return { context: 'field', currentWord, fromObject }
+  const afterParen = query.substring(subqueryStart + 1)
+  if (!/^\s*SELECT\b/i.test(afterParen)) {
+    return { isInSubquery: false }
+  }
+
+  let subqueryEnd = -1
+  depth = 1
+  for (let i = subqueryStart + 1; i < query.length; i++) {
+    if (query[i] === '(') depth++
+    else if (query[i] === ')') {
+      depth--
+      if (depth === 0) {
+        subqueryEnd = i
+        break
       }
     }
   }
 
-  // Check if cursor is after WHERE clause
-  const whereIndex = beforeCursor.indexOf('WHERE')
-  if (whereIndex !== -1) {
-    const afterWhere = beforeCursor.substring(whereIndex)
-    const tail = query.substring(Math.max(0, cursorPos - 120), cursorPos)
+  const subqueryContent = query.substring(subqueryStart + 1, subqueryEnd !== -1 ? subqueryEnd : undefined)
+  const fromMatch = subqueryContent.match(/FROM\s+(\w+)/i)
+  const subqueryRelationshipName = fromMatch ? fromMatch[1] : undefined
+
+  return { isInSubquery: true, subqueryRelationshipName, subqueryStart, subqueryEnd }
+}
+
+function findMainFromObject(query: string): string | null {
+  const upper = query.toUpperCase()
+  let depth = 0
+  let i = 0
+
+  while (i < upper.length) {
+    if (upper[i] === '(') {
+      depth++
+    } else if (upper[i] === ')') {
+      depth--
+    } else if (depth === 0 && upper.substring(i, i + 4) === 'FROM') {
+      const afterFrom = query.substring(i + 4).match(/^\s+(\w+)/i)
+      if (afterFrom) {
+        return afterFrom[1]
+      }
+    }
+    i++
+  }
+  return null
+}
+
+function parseSOQLContext(query: string, cursorPos: number): SOQLParseResult {
+  const beforeCursor = query.substring(0, cursorPos)
+  const beforeCursorUpper = beforeCursor.toUpperCase()
+  const fullQueryUpper = query.toUpperCase()
+
+  const wordMatch = beforeCursor.match(/[\w.]*$/)
+  const currentWord = wordMatch ? wordMatch[0] : ''
+
+  const fromObject = findMainFromObject(query)
+
+  const subqueryInfo = findSubqueryContext(query, cursorPos)
+  const { isInSubquery, subqueryRelationshipName } = subqueryInfo
+
+  let effectiveQuery = query
+  let effectiveCursorPos = cursorPos
+  let effectiveFromObject = fromObject
+
+  if (isInSubquery && subqueryInfo.subqueryStart !== undefined) {
+    effectiveQuery = query.substring(subqueryInfo.subqueryStart + 1, subqueryInfo.subqueryEnd !== undefined ? subqueryInfo.subqueryEnd : undefined)
+    effectiveCursorPos = cursorPos - subqueryInfo.subqueryStart - 1
+  }
+
+  const effectiveQueryUpper = effectiveQuery.toUpperCase()
+  const effectiveBeforeCursor = effectiveQuery.substring(0, effectiveCursorPos)
+  const effectiveBeforeCursorUpper = effectiveBeforeCursor.toUpperCase()
+
+  const selectMatch = effectiveQueryUpper.match(/SELECT\s+/i)
+  const fromIndex = effectiveQueryUpper.indexOf('FROM')
+  const whereIndex = effectiveBeforeCursorUpper.indexOf('WHERE')
+  const groupByIndex = effectiveBeforeCursorUpper.indexOf('GROUP BY')
+  const orderByIndex = effectiveBeforeCursorUpper.indexOf('ORDER BY')
+  const limitIndex = effectiveBeforeCursorUpper.indexOf('LIMIT')
+  const offsetIndex = effectiveBeforeCursorUpper.indexOf('OFFSET')
+
+  const isInSelectClause = selectMatch
+    ? effectiveCursorPos >= (selectMatch.index! + selectMatch[0].length) && (fromIndex === -1 || effectiveCursorPos <= fromIndex)
+    : false
+  const isInWhereClause = whereIndex !== -1 && (groupByIndex === -1 || effectiveCursorPos < groupByIndex) && (orderByIndex === -1 || effectiveCursorPos < orderByIndex) && (limitIndex === -1 || effectiveCursorPos < limitIndex)
+  const isInGroupByClause = groupByIndex !== -1 && (orderByIndex === -1 || effectiveCursorPos < orderByIndex) && effectiveCursorPos > groupByIndex && (limitIndex === -1 || effectiveCursorPos < limitIndex)
+  const isInOrderByClause = orderByIndex !== -1 && effectiveCursorPos > orderByIndex && (limitIndex === -1 || effectiveCursorPos < limitIndex)
+  const isAfterLimit = limitIndex !== -1 && effectiveCursorPos > limitIndex
+  const isAfterOffset = offsetIndex !== -1 && effectiveCursorPos > offsetIndex
+
+  const relationshipPath = currentWord.includes('.') ? currentWord.split('.') : undefined
+  const fieldName = extractFieldNameBeforeCursor(effectiveBeforeCursor)
+
+  const baseResult = {
+    fromObject: effectiveFromObject,
+    isInSelectClause,
+    isInWhereClause,
+    isInGroupByClause,
+    isInOrderByClause,
+    isInSubquery,
+    subqueryRelationshipName
+  }
+
+  if (/FROM\s+[\w]*$/i.test(effectiveBeforeCursorUpper)) {
+    if (isInSubquery) {
+      return { context: 'object', currentWord, ...baseResult, fromObject }
+    }
+    return { context: 'object', currentWord, ...baseResult }
+  }
+
+  if (isInGroupByClause && /GROUP\s+BY\s+[\w\s,]*$/i.test(effectiveBeforeCursorUpper)) {
+    return { context: 'groupby', currentWord, relationshipPath, ...baseResult }
+  }
+
+  if (isInOrderByClause && /ORDER\s+BY\s+[\w\s,]*$/i.test(effectiveBeforeCursorUpper)) {
+    return { context: 'orderby', currentWord, relationshipPath, ...baseResult }
+  }
+
+  // After LIMIT/OFFSET - suggest OFFSET or indicate query complete
+  if (isAfterLimit || isAfterOffset) {
+    // After "LIMIT <number>" - suggest OFFSET
+    if (/LIMIT\s+\d+\s+[\w]*$/i.test(effectiveBeforeCursorUpper) && !isAfterOffset) {
+      return { context: 'keyword', currentWord, ...baseResult }
+    }
+    // After "OFFSET <number>" - query is complete, no suggestions needed
+    if (/OFFSET\s+\d+\s*$/i.test(effectiveBeforeCursorUpper)) {
+      return { context: 'unknown', currentWord, ...baseResult }
+    }
+    // Still typing LIMIT/OFFSET number
+    return { context: 'unknown', currentWord, ...baseResult }
+  }
+
+  if (currentWord.includes('.') && currentWord.split('.').length >= 2) {
+    return { context: 'relationship', currentWord, relationshipPath, ...baseResult }
+  }
+
+  if (isInSelectClause) {
+    return { context: 'field', currentWord, relationshipPath, ...baseResult }
+  }
+
+  if (isInWhereClause) {
+    const afterWhere = effectiveBeforeCursorUpper.substring(whereIndex)
+    const tail = effectiveBeforeCursor.substring(Math.max(0, effectiveCursorPos - 120))
     const tailUpper = tail.toUpperCase()
 
-    // Operator -> value (includes LIKE/IN/etc)
     if (/(?:=|!=|<=|>=|<|>)\s*$/i.test(tailUpper) || /\b(?:LIKE|INCLUDES|EXCLUDES|IN|NOT\s+IN)\s*$/i.test(tailUpper)) {
-      return { context: 'value', currentWord, fromObject }
+      return { context: 'value', currentWord, fieldName, ...baseResult }
     }
     if (/(?:=|!=|<=|>=|<|>|\bLIKE\b|\bINCLUDES\b|\bEXCLUDES\b|\bIN\b|\bNOT\s+IN\b)\s+[\w'()]*$/i.test(tailUpper)) {
-      return { context: 'value', currentWord, fromObject }
+      return { context: 'value', currentWord, fieldName, ...baseResult }
     }
 
-    // Check if we're right after AND/OR - need field
     if (/\b(AND|OR)\s+[\w]*$/i.test(afterWhere)) {
-      return { context: 'field', currentWord, fromObject }
+      return { context: 'field', currentWord, relationshipPath, ...baseResult }
     }
-    // Check if we're typing field name after WHERE or after a comma
     if (/WHERE\s+[\w]*$/i.test(afterWhere) || /,\s*[\w]*$/i.test(afterWhere)) {
-      return { context: 'field', currentWord, fromObject }
+      return { context: 'field', currentWord, relationshipPath, ...baseResult }
     }
-    // Field -> operator
     if (/[\w.]+\s+$/i.test(tailUpper)) {
-      return { context: 'operator', currentWord, fromObject }
+      return { context: 'operator', currentWord, ...baseResult }
     }
-    // Completed value -> logical operator
     if (/(?:'[^']*'|\)|\bTRUE\b|\bFALSE\b|\bNULL\b|\d+)\s+$/i.test(tailUpper)) {
-      return { context: 'logical', currentWord, fromObject }
+      return { context: 'logical', currentWord, ...baseResult }
     }
-    // Default to field context in WHERE clause when typing a new condition
     if (/\s[\w]*$/i.test(afterWhere) && !/[=<>!]/.test(afterWhere.slice(-20))) {
-      return { context: 'field', currentWord, fromObject }
+      return { context: 'field', currentWord, relationshipPath, ...baseResult }
     }
   }
 
-  // Check ORDER BY clause
-  if (/ORDER\s+BY\s+[\w\s,]*$/i.test(beforeCursor)) {
-    return { context: 'field', currentWord, fromObject }
-  }
+  return { context: 'keyword', currentWord, ...baseResult }
+}
 
-  // Check GROUP BY clause
-  if (/GROUP\s+BY\s+[\w\s,]*$/i.test(beforeCursor)) {
-    return { context: 'field', currentWord, fromObject }
-  }
-
-  return { context: 'keyword', currentWord, fromObject }
+function extractFieldNameBeforeCursor(beforeCursor: string): string | undefined {
+  const match = beforeCursor.match(/(\w+)\s*(?:=|!=|<=|>=|<|>|LIKE|IN|NOT\s+IN|INCLUDES|EXCLUDES)\s*[\w'()]*$/i)
+  return match ? match[1] : undefined
 }
 
 function normalizeForFuzzy(input: string): string {
@@ -188,13 +332,118 @@ function isCursorInSelectClause(query: string, cursorPos: number): boolean {
   return fromIndex === -1 || cursorPos <= fromIndex
 }
 
+function filterFieldsByContext(fields: SObjectField[], parseResult: SOQLParseResult): SObjectField[] {
+  return fields.filter(f => {
+    if (parseResult.isInGroupByClause && !f.groupable) return false
+    if (parseResult.isInOrderByClause && !f.sortable) return false
+    return true
+  })
+}
+
+async function getRelationshipFields(
+  sfHost: string,
+  fromObject: string,
+  relationshipPath: string[],
+  useFuzzy: boolean,
+  searchTerm: string
+): Promise<SOQLSuggestion[]> {
+  const suggestions: SOQLSuggestion[] = []
+
+  if (relationshipPath.length < 2) return suggestions
+
+  const pathWithoutLast = relationshipPath.slice(0, -1)
+  const currentInput = relationshipPath[relationshipPath.length - 1].toLowerCase()
+
+  let currentObject = fromObject
+  for (const segment of pathWithoutLast) {
+    const describe = await getSObjectDescribe(sfHost, currentObject)
+    if (!describe) return suggestions
+
+    const field = describe.fields.find(f =>
+      f.relationshipName?.toLowerCase() === segment.toLowerCase()
+    )
+    if (!field || !field.referenceTo || field.referenceTo.length === 0) return suggestions
+
+    currentObject = field.referenceTo[0]
+  }
+
+  const describe = await getSObjectDescribe(sfHost, currentObject)
+  if (!describe) return suggestions
+
+  const prefix = pathWithoutLast.join('.')
+
+  const keywordMatches = (candidate: string): boolean =>
+    useFuzzy ? fuzzyScore(currentInput, candidate) !== null : candidate.toLowerCase().startsWith(currentInput)
+
+  describe.fields
+    .filter(f => keywordMatches(f.name) || keywordMatches(f.label))
+    .slice(0, 20)
+    .forEach(f => {
+      suggestions.push({
+        value: `${prefix}.${f.name}`,
+        label: f.label,
+        type: 'field',
+        detail: `${currentObject}.${f.name} (${f.type})`
+      })
+
+      if (f.relationshipName && f.referenceTo && f.referenceTo.length > 0) {
+        suggestions.push({
+          value: `${prefix}.${f.relationshipName}.`,
+          label: `${f.relationshipName} ->`,
+          type: 'relationship',
+          detail: `Ref to ${f.referenceTo.join(', ')}`
+        })
+      }
+    })
+
+  return suggestions
+}
+
+async function getPicklistValues(
+  sfHost: string,
+  fromObject: string,
+  fieldName: string,
+  useFuzzy: boolean,
+  searchTerm: string
+): Promise<SOQLSuggestion[]> {
+  const suggestions: SOQLSuggestion[] = []
+
+  if (!fromObject || !fieldName) return suggestions
+
+  const describe = await getSObjectDescribe(sfHost, fromObject)
+  if (!describe) return suggestions
+
+  const field = describe.fields.find(f => f.name.toLowerCase() === fieldName.toLowerCase())
+  if (!field) return suggestions
+
+  if (['picklist', 'multipicklist'].includes(field.type) && field.picklistValues) {
+    const keywordMatches = (candidate: string): boolean =>
+      useFuzzy ? fuzzyScore(searchTerm, candidate) !== null : candidate.toLowerCase().startsWith(searchTerm.toLowerCase())
+
+    field.picklistValues
+      .filter(p => p.active && keywordMatches(p.value))
+      .slice(0, 20)
+      .forEach(p => {
+        suggestions.push({
+          value: `'${p.value}'`,
+          label: p.label || p.value,
+          type: 'value',
+          detail: 'Picklist'
+        })
+      })
+  }
+
+  return suggestions
+}
+
 export async function getSOQLSuggestions(
   sfHost: string,
   query: string,
   cursorPos: number,
   useFuzzy = false
 ): Promise<SOQLSuggestion[]> {
-  const { context, currentWord, fromObject } = parseSOQLContext(query, cursorPos)
+  const parseResult = parseSOQLContext(query, cursorPos)
+  const { context, currentWord, fromObject, relationshipPath, fieldName } = parseResult
   const searchTerm = currentWord.toLowerCase()
   const suggestions: SOQLSuggestion[] = []
 
@@ -203,7 +452,7 @@ export async function getSOQLSuggestions(
 
   switch (context) {
     case 'logical': {
-      ;['AND', 'OR', 'NOT'].forEach((k) => {
+      ;['AND', 'OR', 'ORDER BY', 'GROUP BY', 'LIMIT'].forEach((k) => {
         if (keywordMatches(k)) suggestions.push({ value: k, label: k, type: 'keyword' })
       })
       break
@@ -221,6 +470,22 @@ export async function getSOQLSuggestions(
     }
 
     case 'keyword': {
+      const beforeUpper = query.substring(0, cursorPos).toUpperCase()
+
+      // After LIMIT <number> or OFFSET <number>, suggest trailing clauses
+      if (/(?:LIMIT|OFFSET)\s+\d+\s+[\w]*$/i.test(beforeUpper)) {
+        const trailingKeywords = ['OFFSET', 'FOR UPDATE', 'FOR VIEW', 'FOR REFERENCE']
+        // Don't suggest OFFSET if already have one
+        const hasOffset = /OFFSET\s+\d+/i.test(beforeUpper)
+        trailingKeywords
+          .filter(k => !(k === 'OFFSET' && hasOffset))
+          .filter(k => keywordMatches(k))
+          .forEach(k => {
+            suggestions.push({ value: k, label: k, type: 'keyword' })
+          })
+        break
+      }
+
       const keywords = [...SOQL_KEYWORDS, ...SOQL_FUNCTIONS]
         .map((k) => ({ k, score: useFuzzy ? (fuzzyScore(searchTerm, k) ?? Number.POSITIVE_INFINITY) : 0 }))
         .filter(({ k, score }) => (useFuzzy ? Number.isFinite(score) : k.toLowerCase().startsWith(searchTerm)))
@@ -234,39 +499,82 @@ export async function getSOQLSuggestions(
 
     case 'object': {
       try {
-        const global = await getGlobalDescribe(sfHost)
-        const objects = global.sobjects
-          .filter((o) => o.queryable)
-          .map((o) => {
-            if (!useFuzzy) return { o, score: 0 }
-            const nameScore = fuzzyScore(searchTerm, o.name)
-            const labelScore = fuzzyScore(searchTerm, o.label)
-            const score = Math.min(
-              nameScore ?? Number.POSITIVE_INFINITY,
-              labelScore === null ? Number.POSITIVE_INFINITY : labelScore + 5
-            )
-            return { o, score }
-          })
-          .filter(({ o, score }) => (useFuzzy ? Number.isFinite(score) : o.name.toLowerCase().startsWith(searchTerm)))
-          .sort((a, b) => a.score - b.score || a.o.name.length - b.o.name.length)
-          .slice(0, 15)
+        if (parseResult.isInSubquery && fromObject) {
+          const parentDescribe = await getSObjectDescribe(sfHost, fromObject)
+          if (parentDescribe?.childRelationships) {
+            const childRels = parentDescribe.childRelationships
+              .filter(r => r.relationshipName && keywordMatches(r.relationshipName))
+              .slice(0, 15)
 
-        objects.forEach(({ o }) => {
-          suggestions.push({ value: o.name, label: o.label, type: 'object', detail: o.name })
-        })
+            childRels.forEach(r => {
+              suggestions.push({
+                value: r.relationshipName!,
+                label: r.relationshipName!,
+                type: 'object',
+                detail: `Child: ${r.childSObject}`
+              })
+            })
+          }
+        } else {
+          const global = await getGlobalDescribe(sfHost)
+          const objects = global.sobjects
+            .filter((o) => o.queryable)
+            .map((o) => {
+              if (!useFuzzy) return { o, score: 0 }
+              const nameScore = fuzzyScore(searchTerm, o.name)
+              const labelScore = fuzzyScore(searchTerm, o.label)
+              const score = Math.min(
+                nameScore ?? Number.POSITIVE_INFINITY,
+                labelScore === null ? Number.POSITIVE_INFINITY : labelScore + 5
+              )
+              return { o, score }
+            })
+            .filter(({ o, score }) => (useFuzzy ? Number.isFinite(score) : o.name.toLowerCase().startsWith(searchTerm)))
+            .sort((a, b) => a.score - b.score || a.o.name.length - b.o.name.length)
+            .slice(0, 15)
+
+          objects.forEach(({ o }) => {
+            suggestions.push({ value: o.name, label: o.label, type: 'object', detail: o.name })
+          })
+        }
       } catch {
         // ignore
       }
       break
     }
 
+    case 'relationship': {
+      let targetObject = fromObject
+
+      if (parseResult.isInSubquery && parseResult.subqueryRelationshipName && fromObject) {
+        const parentDescribe = await getSObjectDescribe(sfHost, fromObject)
+        if (parentDescribe?.childRelationships) {
+          const childRel = parentDescribe.childRelationships.find(
+            r => r.relationshipName?.toLowerCase() === parseResult.subqueryRelationshipName?.toLowerCase()
+          )
+          if (childRel) {
+            targetObject = childRel.childSObject
+          }
+        }
+      }
+
+      if (targetObject && relationshipPath) {
+        const relSuggestions = await getRelationshipFields(sfHost, targetObject, relationshipPath, useFuzzy, searchTerm)
+        suggestions.push(...relSuggestions)
+      }
+      break
+    }
+
+    case 'groupby':
+    case 'orderby':
     case 'field': {
-      const isInSelectClause = isCursorInSelectClause(query, cursorPos)
+      const isInSelectClause = parseResult.isInSelectClause ?? isCursorInSelectClause(query, cursorPos)
 
       if (isInSelectClause) {
         const prioritized: SOQLSuggestion[] = [
-          { value: 'Id', label: 'Id', type: 'field', detail: 'common' },
-          { value: 'COUNT(Id)', label: 'COUNT(Id)', type: 'field', detail: 'aggregate' }
+          { value: 'Id', label: 'Id', type: 'field', detail: 'common', sortOrder: 0 },
+          { value: 'Name', label: 'Name', type: 'field', detail: 'common', sortOrder: 1 },
+          { value: 'COUNT(Id)', label: 'COUNT(Id)', type: 'function', detail: 'aggregate', sortOrder: 2 }
         ]
 
         for (const s of prioritized) {
@@ -275,22 +583,29 @@ export async function getSOQLSuggestions(
         }
       }
 
-      if (fromObject) {
+      let targetObject = fromObject
+      let targetObjectLabel = fromObject
+
+      if (parseResult.isInSubquery && parseResult.subqueryRelationshipName && fromObject) {
+        const parentDescribe = await getSObjectDescribe(sfHost, fromObject)
+        if (parentDescribe?.childRelationships) {
+          const childRel = parentDescribe.childRelationships.find(
+            r => r.relationshipName?.toLowerCase() === parseResult.subqueryRelationshipName?.toLowerCase()
+          )
+          if (childRel) {
+            targetObject = childRel.childSObject
+            targetObjectLabel = `${childRel.relationshipName} (${childRel.childSObject})`
+          }
+        }
+      }
+
+      if (targetObject) {
         try {
-          const describe = await getSObjectDescribe(sfHost, fromObject)
+          const describe = await getSObjectDescribe(sfHost, targetObject)
           if (describe) {
-            const prioritizedInWhere = !isInSelectClause
-              ? (['Id', 'Name'] as const)
-              : ([] as const)
+            const filteredFields = filterFieldsByContext(describe.fields, parseResult)
 
-            if (prioritizedInWhere) {
-              for (const p of prioritizedInWhere) {
-                const match = useFuzzy ? fuzzyScore(searchTerm, p) !== null : p.toLowerCase().startsWith(searchTerm)
-                if (match) suggestions.push({ value: p, label: p, type: 'field', detail: 'common' })
-              }
-            }
-
-            const fields = describe.fields
+            const fields = filteredFields
               .map((f) => {
                 if (!useFuzzy) return { f, score: 0 }
                 const nameScore = fuzzyScore(searchTerm, f.name)
@@ -303,21 +618,46 @@ export async function getSOQLSuggestions(
               })
               .filter(({ f, score }) => (useFuzzy ? Number.isFinite(score) : f.name.toLowerCase().startsWith(searchTerm)))
               .sort((a, b) => a.score - b.score || a.f.name.length - b.f.name.length)
-              .slice(0, 20)
+              .slice(0, 25)
 
             fields.forEach(({ f }) => {
               suggestions.push({
                 value: f.name,
                 label: f.label,
                 type: 'field',
-                detail: f.type
+                detail: parseResult.isInSubquery ? `${targetObjectLabel}.${f.type}` : f.type
               })
+
+              if (f.relationshipName && f.referenceTo && f.referenceTo.length > 0) {
+                suggestions.push({
+                  value: `${f.relationshipName}.`,
+                  label: `${f.relationshipName} ->`,
+                  type: 'relationship',
+                  detail: `Ref to ${f.referenceTo.join(', ')}`
+                })
+              }
             })
+
+            if (isInSelectClause && !parseResult.isInSubquery && describe.childRelationships) {
+              const childRels = describe.childRelationships
+                .filter(r => r.relationshipName && keywordMatches(r.relationshipName))
+                .slice(0, 5)
+
+              childRels.forEach(r => {
+                suggestions.push({
+                  value: `(SELECT Id FROM ${r.relationshipName})`,
+                  label: `${r.relationshipName} (subquery)`,
+                  type: 'relationship',
+                  detail: `Child: ${r.childSObject}`
+                })
+              })
+            }
           }
         } catch {
           // ignore
         }
       }
+
       SOQL_FUNCTIONS.filter((f) => keywordMatches(f))
         .slice(0, 5)
         .forEach(f => {
@@ -328,19 +668,23 @@ export async function getSOQLSuggestions(
 
     case 'value': {
       const beforeUpper = query.substring(0, cursorPos).toUpperCase()
+
       if (/\b(?:IN|NOT\s+IN)\s*$/i.test(beforeUpper)) {
         suggestions.push({ value: '(', label: '(', type: 'operator' })
         suggestions.push({ value: '(SELECT Id FROM ', label: '(SELECT Id FROM ...)', type: 'keyword', detail: 'subquery' })
       }
 
-      const dateLiterals = SOQL_FUNCTIONS.filter(f =>
-        (f.startsWith('TODAY') || f.startsWith('YESTERDAY') || f.startsWith('LAST_') ||
-         f.startsWith('THIS_') || f.startsWith('NEXT_')) &&
-        keywordMatches(f)
-      )
-      dateLiterals.slice(0, 10).forEach(d => {
-        suggestions.push({ value: d, label: d, type: 'keyword' })
-      })
+      if (fromObject && fieldName) {
+        const picklistSuggestions = await getPicklistValues(sfHost, fromObject, fieldName, useFuzzy, searchTerm)
+        suggestions.push(...picklistSuggestions)
+      }
+
+      DATE_LITERALS.filter(d => keywordMatches(d))
+        .slice(0, 10)
+        .forEach(d => {
+          suggestions.push({ value: d, label: d, type: 'keyword', detail: 'Date Literal' })
+        })
+
       if (keywordMatches('true')) suggestions.push({ value: 'true', label: 'true', type: 'keyword' })
       if (keywordMatches('false')) suggestions.push({ value: 'false', label: 'false', type: 'keyword' })
       if (keywordMatches('null')) suggestions.push({ value: 'null', label: 'null', type: 'keyword' })
@@ -348,7 +692,6 @@ export async function getSOQLSuggestions(
     }
   }
 
-  // De-dupe while preserving order (prioritized suggestions should stay at the top)
   const seen = new Set<string>()
   return suggestions.filter((s) => {
     const key = `${s.type}:${s.value}`
@@ -366,10 +709,20 @@ export function applySuggestion(query: string, cursorPos: number, suggestion: SO
 
   let insertValue = suggestion.value
   const isInSelectClause = isCursorInSelectClause(query, cursorPos)
+
   if (suggestion.type === 'object') {
     insertValue += ' '
-  } else if (suggestion.type === 'field' || suggestion.type === 'function') {
+  } else if (suggestion.type === 'relationship') {
+    // Don't add space for relationship navigation (ends with .)
+    if (!insertValue.endsWith('.') && !insertValue.endsWith(')')) {
+      insertValue += ' '
+    }
+  } else if (suggestion.type === 'field') {
     insertValue += isInSelectClause ? ', ' : ' '
+  } else if (suggestion.type === 'function') {
+    insertValue += isInSelectClause ? ', ' : ' '
+  } else if (suggestion.type === 'value') {
+    insertValue += ' '
   } else if (suggestion.type === 'operator') {
     if (suggestion.value !== '(') insertValue += ' '
   } else if (suggestion.type === 'keyword' && !suggestion.value.includes('(')) {
