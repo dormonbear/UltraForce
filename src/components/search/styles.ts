@@ -936,8 +936,31 @@ export const SEARCH_MODAL_STYLES = `
 
   .commands-footer {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 8px;
     margin-top: 12px;
+  }
+
+  .commands-footer-right {
+    display: flex;
+    gap: 8px;
+  }
+
+  .cmd-btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .cmd-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .cmd-btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .cmd-btn-add {

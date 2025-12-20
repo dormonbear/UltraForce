@@ -195,6 +195,73 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setFormError(null)
   }
 
+  const handleExportCommands = () => {
+    if (Object.keys(customCommands).length === 0) {
+      return
+    }
+    // Export without isBuiltin and key properties (key is the object key)
+    const exportData: Record<string, Omit<CustomCommand, 'isBuiltin' | 'key'>> = {}
+    for (const [cmdKey, cmd] of Object.entries(customCommands)) {
+      exportData[cmdKey] = {
+        description: cmd.description,
+        soql: cmd.soql,
+        useToolingApi: cmd.useToolingApi,
+        nameField: cmd.nameField,
+        ...(cmd.descriptionFields && cmd.descriptionFields.length > 0
+          ? { descriptionFields: cmd.descriptionFields }
+          : {})
+      }
+    }
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ultraforce-commands-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCommands = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const imported = JSON.parse(text) as Record<string, Partial<CustomCommand>>
+        // Validate structure (key comes from object key, not cmd.key)
+        const validCommands: Record<string, CustomCommand> = {}
+        for (const [key, cmd] of Object.entries(imported)) {
+          if (cmd && typeof cmd === 'object' && cmd.soql && cmd.nameField) {
+            validCommands[key] = {
+              key,
+              description: cmd.description || '',
+              soql: cmd.soql,
+              useToolingApi: cmd.useToolingApi || false,
+              nameField: cmd.nameField,
+              descriptionFields: cmd.descriptionFields
+            }
+          }
+        }
+        if (Object.keys(validCommands).length === 0) {
+          alert('No valid commands found in file')
+          return
+        }
+        const merged = { ...customCommands, ...validCommands }
+        onCustomCommandsChange(merged)
+        alert(`Imported ${Object.keys(validCommands).length} command(s)`)
+      } catch {
+        alert('Failed to parse file. Please ensure it is a valid JSON file.')
+      }
+    }
+    input.click()
+  }
+
   const startAddNew = () => {
     setIsAddingNew(true)
     setEditingKey(null)
@@ -484,6 +551,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           {!isAddingNew && !editingKey && (
             <div className="commands-footer">
               <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>+ Add Command</button>
+              <div className="commands-footer-right">
+                <button
+                  className="cmd-btn cmd-btn-secondary"
+                  onClick={handleImportCommands}
+                  title="Import commands from JSON file"
+                >
+                  Import
+                </button>
+                <button
+                  className="cmd-btn cmd-btn-secondary"
+                  onClick={handleExportCommands}
+                  disabled={Object.keys(customCommands).length === 0}
+                  title="Export commands to JSON file"
+                >
+                  Export
+                </button>
+              </div>
             </div>
           )}
         </div>
