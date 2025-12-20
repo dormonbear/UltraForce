@@ -1173,4 +1173,30 @@ export const SEARCH_MODAL_STYLES = `
     color: rgba(255, 255, 255, 0.4);
     margin-left: auto;
   }
+
+  /* API Statistics */
+  .stats-list {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .stats-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .stats-value {
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: rgba(255, 255, 255, 0.9);
+  }
 `

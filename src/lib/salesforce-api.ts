@@ -2,6 +2,7 @@ import type { SearchResult } from '~types'
 import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
+import { trackApiRequest } from './api-stats'
 import {
   buildSearchIndex,
   searchIndex,
@@ -562,12 +563,14 @@ async function fetchAllPages(
 
     if (!response.ok) {
       const errorText = await response.text()
+      trackApiRequest()
       if (response.status === 401) {
         throw new Error('Session expired')
       }
       throw new Error(`API ${response.status}: ${errorText}`)
     }
 
+    trackApiRequest()
     const data = await response.json()
     const records = data.records || []
 
@@ -751,7 +754,9 @@ export async function validateSalesforceSession(sfHost: string): Promise<boolean
   try {
     const host = normalizeHost(sfHost)
     const session = await getSession(host)
-    if (!session) return false
+    if (!session) {
+      return false
+    }
 
     const endpoint = `https://${host}/services/data/v${API_VERSION}/sobjects/`
     const response = await fetch(endpoint, {
@@ -762,6 +767,7 @@ export async function validateSalesforceSession(sfHost: string): Promise<boolean
       }
     })
 
+    trackApiRequest()
     return response.ok
   } catch {
     return false
