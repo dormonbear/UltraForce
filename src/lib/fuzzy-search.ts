@@ -8,6 +8,7 @@ interface IndexedRecord {
   label?: string
   apiName?: string
   description?: string
+  searchTerms?: string
   type: string
   originalRecord: any
 }
@@ -24,13 +25,14 @@ const FIELD_BOOST = {
   name: 2.0,
   label: 1.5,
   apiName: 1.2,
+  searchTerms: 1.0,
   description: 0.8
 }
 
 function createMiniSearchInstance(): MiniSearch<IndexedRecord> {
   return new MiniSearch<IndexedRecord>({
-    fields: ['name', 'label', 'apiName', 'description'],
-    storeFields: ['name', 'label', 'apiName', 'description', 'type', 'originalRecord'],
+    fields: ['name', 'label', 'apiName', 'searchTerms', 'description'],
+    storeFields: ['name', 'label', 'apiName', 'description', 'searchTerms', 'type', 'originalRecord'],
     searchOptions: {
       boost: FIELD_BOOST,
       fuzzy: 0.2,
@@ -41,10 +43,46 @@ function createMiniSearchInstance(): MiniSearch<IndexedRecord> {
       if (!text) return []
       return text
         .toLowerCase()
-        .split(/[\s_\-\.,;|:\/\\]+/)
+        .split(/[\s_\-.,;|:/\\]+/)
         .filter((token) => token.length > 0)
     }
   })
+}
+
+function generateSearchTerms(name: string, label: string, apiName: string): string {
+  const terms: string[] = []
+  const seen = new Set<string>()
+
+  const addTerm = (term: string) => {
+    const normalized = term.toLowerCase().trim()
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized)
+      terms.push(normalized)
+    }
+  }
+
+  // Add original terms
+  addTerm(name)
+  addTerm(label)
+  addTerm(apiName)
+
+  // Add concatenated versions (remove spaces, underscores, hyphens)
+  const concat = (str: string) => str.replace(/[\s_-]+/g, '').toLowerCase()
+  addTerm(concat(name))
+  addTerm(concat(label))
+  addTerm(concat(apiName))
+
+  // Add CamelCase split versions (e.g., "VendorContract" -> "vendor contract")
+  const splitCamelCase = (str: string) => {
+    return str
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+      .toLowerCase()
+  }
+  addTerm(splitCamelCase(name))
+  addTerm(splitCamelCase(apiName))
+
+  return terms.join(' ')
 }
 
 function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord {
@@ -162,7 +200,8 @@ function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord
     id = record.Id || record.DurableId || record.QualifiedApiName || `${metadataType}-${name}`
   }
 
-  return { id, name, label, apiName, description, type: actualType, originalRecord: record }
+  const searchTerms = generateSearchTerms(name, label, apiName)
+  return { id, name, label, apiName, description, searchTerms, type: actualType, originalRecord: record }
 }
 
 export function buildSearchIndex(metadataType: string, records: any[], sfHost: string): void {

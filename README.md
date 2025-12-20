@@ -42,6 +42,11 @@ Type `:` to see available commands for quick filtering:
 | `:r` | Profiles | `:r system` |
 | `:l` | Custom Labels | `:l error_message` |
 | `:s` | Custom Settings | `:s my_setting` |
+| `:g` | Setup Shortcuts | `:g deploy` |
+
+## Direct Record Navigation
+
+Enter a Salesforce record ID (15 or 18 characters) directly and press Enter to navigate to that record.
 
 ## Keyboard Shortcuts
 
@@ -49,7 +54,7 @@ Type `:` to see available commands for quick filtering:
 |-----|--------|
 | `Cmd/Ctrl + B` | Open/Close UltraForce |
 | `Up/Down` | Navigate results |
-| `Enter` | Open selected result |
+| `Enter` | Open selected result (or navigate to record ID) |
 | `Tab` | Autocomplete (Object → `.` for fields, CMDT/Custom Setting → `.` for records) |
 | `Esc` | Close |
 
@@ -62,6 +67,7 @@ Click the gear icon to configure:
 - **Close on Navigate** - Auto-close after opening a result
 - **Fuzzy Search** - Enable typo-tolerant matching
 - **Hide Managed Package** - Filter out managed package components
+- **Max Results Per Type** - Limit the number of results shown per metadata type
 - **Navigation Mode** - Auto / Lightning / Classic
 - **Custom Commands** - Configure your own command shortcuts
 

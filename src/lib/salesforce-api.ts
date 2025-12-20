@@ -2,6 +2,7 @@ import type { SearchResult } from '~types'
 import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
+import { trackApiRequest } from './api-stats'
 import {
   buildSearchIndex,
   searchIndex,
@@ -53,6 +54,12 @@ const METADATA_TYPES: Record<string, { query: string }> = {
   },
   CustomSetting: {
     query: `SELECT DurableId, QualifiedApiName, DeveloperName, Label, NamespacePrefix FROM EntityDefinition WHERE IsCustomSetting = true ORDER BY QualifiedApiName ASC LIMIT 2000`
+  },
+  Queue: {
+    query: `SELECT Id, Name, DeveloperName, Email FROM Group WHERE Type = 'Queue' ORDER BY Name ASC LIMIT 2000`
+  },
+  Group: {
+    query: `SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Regular' ORDER BY Name ASC LIMIT 2000`
   }
 }
 
@@ -222,8 +229,30 @@ export async function searchSalesforceMetadata(
     }
   }
 
-  // Filter out CustomField (requires dot-notation) and User (handled above)
-  const typesToSearch = selectedTypes.filter((t) => t !== 'CustomField' && t !== 'User')
+  // Handle Queue search (real-time SOQL search)
+  if (selectedTypes.includes('Queue') && query.trim()) {
+    try {
+      const queueResults = await searchGroupsRealtime(query, 'Queue', apiHost, session.key)
+      results['Queue'] = queueResults
+    } catch (error) {
+      logger.error('search:queue failed', { error })
+      results['Queue'] = []
+    }
+  }
+
+  // Handle Public Group search (real-time SOQL search)
+  if (selectedTypes.includes('Group') && query.trim()) {
+    try {
+      const groupResults = await searchGroupsRealtime(query, 'Regular', apiHost, session.key)
+      results['Group'] = groupResults
+    } catch (error) {
+      logger.error('search:group failed', { error })
+      results['Group'] = []
+    }
+  }
+
+  // Filter out CustomField (requires dot-notation), User, Queue, Group (handled above)
+  const typesToSearch = selectedTypes.filter((t) => t !== 'CustomField' && t !== 'User' && t !== 'Queue' && t !== 'Group')
   if (typesToSearch.length > 0) {
     const otherResults = await searchMetadataTypes(query, typesToSearch, apiHost, session.key, useFuzzy, hideManagedPackage)
     Object.assign(results, otherResults)
@@ -269,6 +298,48 @@ async function searchUsersRealtime(
     })
   } catch (error) {
     logger.error('search:user failed', { term: searchTerm, error })
+    return []
+  }
+}
+
+async function searchGroupsRealtime(
+  searchTerm: string,
+  groupType: 'Queue' | 'Regular',
+  sfHost: string,
+  sessionId: string
+): Promise<SearchResult[]> {
+  const host = normalizeHost(sfHost)
+  const endpoint = `https://${host}/services/data/v${API_VERSION}/query`
+
+  const start = Date.now()
+  const escaped = escapeSoql(searchTerm)
+  const searchPattern = `%${escaped}%`
+  const resultType = groupType === 'Queue' ? 'Queue' : 'Group'
+
+  const query = groupType === 'Queue'
+    ? `SELECT Id, Name, DeveloperName, Email FROM Group WHERE Type = 'Queue' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
+    : `SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Regular' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
+
+  logger.debug(`search:${resultType.toLowerCase()}:soql`, { query })
+
+  try {
+    const records = await fetchAllPages(`${endpoint}?q=${encodeURIComponent(query)}`, host, sessionId)
+    logger.debug(`search:${resultType.toLowerCase()}`, { term: searchTerm, count: records.length, ms: Date.now() - start })
+
+    return records.map((record: any) => {
+      const parts = [record.DeveloperName]
+      if (record.Email) parts.push(record.Email)
+
+      return {
+        id: record.Id,
+        name: record.Name,
+        type: resultType,
+        description: parts.join(' | '),
+        metadata: record
+      }
+    })
+  } catch (error) {
+    logger.error(`search:${resultType.toLowerCase()} failed`, { term: searchTerm, error })
     return []
   }
 }
@@ -492,12 +563,14 @@ async function fetchAllPages(
 
     if (!response.ok) {
       const errorText = await response.text()
+      trackApiRequest()
       if (response.status === 401) {
         throw new Error('Session expired')
       }
       throw new Error(`API ${response.status}: ${errorText}`)
     }
 
+    trackApiRequest()
     const data = await response.json()
     const records = data.records || []
 
@@ -681,7 +754,9 @@ export async function validateSalesforceSession(sfHost: string): Promise<boolean
   try {
     const host = normalizeHost(sfHost)
     const session = await getSession(host)
-    if (!session) return false
+    if (!session) {
+      return false
+    }
 
     const endpoint = `https://${host}/services/data/v${API_VERSION}/sobjects/`
     const response = await fetch(endpoint, {
@@ -692,6 +767,7 @@ export async function validateSalesforceSession(sfHost: string): Promise<boolean
       }
     })
 
+    trackApiRequest()
     return response.ok
   } catch {
     return false
@@ -727,13 +803,16 @@ export async function warmupMetadataCache(sfHost: string): Promise<void> {
   const host = normalizeHost(sfHost)
 
   const session = await getSession(host)
-  if (!session) return
+  if (!session) {
+    return
+  }
 
   const start = Date.now()
   await Promise.all(
     commonTypes.map(async (type) => {
       try {
-        const { data } = await listMetadata(type, host, session.key, true)
+        // Use cache if available, only fetch if cache miss
+        const { data } = await listMetadata(type, host, session.key, false)
         buildSearchIndex(type, data, host)
       } catch (error) {
         logger.error('warmup failed', { type, error })

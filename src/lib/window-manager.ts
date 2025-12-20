@@ -10,6 +10,12 @@ import type { ObjectAction } from '~components/search/ResultItem'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
+interface RecordContext {
+  objectApiName: string | null
+  recordId: string
+  recordTypeId?: string | null
+}
+
 interface WindowManagerState {
   isVisible: boolean
   isInitialized: boolean
@@ -21,6 +27,8 @@ interface WindowManagerState {
   navigationMode: NavigationMode
   fuzzySearch: boolean
   searchError: string | null
+  userLightningPreference: boolean | null
+  recordContext: RecordContext | null
 }
 
 interface WindowManagerOptions {
@@ -41,7 +49,7 @@ type SetupShortcut = {
   path: string
 }
 
-// Common standard object key prefixes for Classic record URLs
+// Standard object key prefixes for Classic URL object resolution
 const KEY_PREFIX_MAP: Record<string, string> = {
   '001': 'Account',
   '003': 'Contact',
@@ -96,6 +104,14 @@ const SETUP_SHORTCUTS: SetupShortcut[] = [
   { id: 'sandboxes', name: 'Sandboxes', description: 'Environments', path: '/lightning/setup/DataManagementCreateTestInstance/home' }
 ]
 
+function resolveSetupShortcutPath(shortcut: SetupShortcut, sfHost: string | null): string {
+  // Alibaba domains use ManageUsersLightning instead of ManageUsers
+  if (shortcut.id === 'users' && (sfHost?.includes('sfcrmproducts.cn') || sfHost?.includes('sfcrmapps.cn'))) {
+    return '/lightning/setup/ManageUsersLightning/home'
+  }
+  return shortcut.path
+}
+
 function getSetupHost(sfHost: string | null): string | null {
   if (!sfHost) return null
   return sfHost
@@ -118,14 +134,12 @@ function buildSetupUrl(sfHost: string | null, path: string): string | null {
 function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: string | null } {
   const path = window.location.pathname
 
-  // Lightning record URL: /lightning/r/ObjectApiName/recordId/view
-  const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})\/(?:view|edit|related)/)
+  const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})(?:\/|$)/)
   if (lightningMatch && lightningMatch[1] && lightningMatch[2]) {
     return { objectApiName: lightningMatch[1], recordId: lightningMatch[2] }
   }
 
-  // Classic record URL: /001xxxxxxxxxxxxxx or /001xxxxxxxxxxxxxx?...
-  const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})/)
+  const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})(?:\/|$|\?)/)
   if (classicMatch && classicMatch[1]) {
     return { objectApiName: null, recordId: classicMatch[1] }
   }
@@ -133,30 +147,29 @@ function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: st
   return { objectApiName: null, recordId: null }
 }
 
-/**
- * Detect if should use Lightning URLs based on mode setting
- */
-function shouldUseLightning(mode: NavigationMode): boolean {
-  // If explicit mode is set, use it
-  if (mode === 'lightning') return true
-  if (mode === 'classic') return false
+function shouldUseLightning(mode: NavigationMode, userPreference: boolean | null = null): boolean {
+  if (mode === 'lightning') {
+    return true
+  }
+  if (mode === 'classic') {
+    return false
+  }
 
-  // Auto mode: detect from current page
+  if (userPreference !== null) {
+    return userPreference
+  }
+
   const url = window.location.href
   const hostname = window.location.hostname
   const pathname = window.location.pathname
 
-  // Explicit Classic mode in URL
   if (url.includes('lex=off')) {
     return false
   }
-
-  // Lightning URL patterns - definitive Lightning indicators
   if (url.includes('/lightning/') || url.includes('/one/one.app')) {
     return true
   }
 
-  // Lightning-specific domains (always Lightning)
   if (hostname.includes('.lightning.force.com') ||
       hostname.includes('.salesforce-setup.com') ||
       hostname.includes('.setup.sfcrmproducts.cn') ||
@@ -164,37 +177,19 @@ function shouldUseLightning(mode: NavigationMode): boolean {
     return true
   }
 
-  // Classic URL patterns - check these BEFORE defaulting to Lightning
-  const classicPatterns = [
-    '/home/home.jsp',
-    '/setup/forcecomHomepage.apexp',
-    '/ui/setup/',
-    '/p/setup/',
-    '/apexpages/',
-    '/_ui/',
-    '/servlet/'
-  ]
-
+  const classicPatterns = ['/home/home.jsp', '/setup/forcecomHomepage.apexp', '/ui/setup/', '/p/setup/', '/apexpages/', '/_ui/', '/servlet/']
   if (classicPatterns.some(pattern => pathname.includes(pattern))) {
     return false
   }
 
-  // Check if it's a Classic record page (15 or 18 char ID directly in path)
-  // Classic URLs: /001xxx... or /a0Bxxx...
-  // Lightning URLs: /lightning/r/Object/001xxx.../view
   const classicRecordPattern = /^\/[a-zA-Z0-9]{15,18}(\/|$|\?)/
   if (classicRecordPattern.test(pathname) && !pathname.includes('/lightning/')) {
     return false
   }
 
-  // Default to Lightning for modern Salesforce domains
   return true
 }
 
-/**
- * UltraForce Window Manager - Singleton pattern
- * Manages modal window lifecycle with cookie-based auth
- */
 class UltraForceWindowManager {
   private static instance: UltraForceWindowManager | null = null
   private static initializationPromise: Promise<UltraForceWindowManager> | null = null
@@ -215,7 +210,9 @@ class UltraForceWindowManager {
     closeOnNavigate: true,
     navigationMode: 'auto',
     fuzzySearch: true,
-    searchError: null
+    searchError: null,
+    userLightningPreference: null,
+    recordContext: null
   }
 
   private options: Required<WindowManagerOptions> = {
@@ -225,10 +222,10 @@ class UltraForceWindowManager {
   }
 
   private eventHandlers = new Map<string, Set<Function>>()
-  // Cache keyed by sfHost for multi-org support
   private sobjectPrefixCache: Record<string, Record<string, string>> = {}
   private sobjectCacheTimestamp: Record<string, number> = {}
   private currentUserProfileId: Record<string, string> = {}
+  private userLightningPreferenceCache: Record<string, boolean> = {}
 
   private constructor(options: WindowManagerOptions = {}) {
     this.options = { ...this.options, ...options }
@@ -330,7 +327,7 @@ class UltraForceWindowManager {
       try {
         this.shadowRoot = this.containerElement.attachShadow({ mode: 'closed' })
         this.log('Shadow DOM created for style isolation')
-      } catch (error) {
+      } catch {
         logger.warn('Shadow DOM not supported, falling back to regular DOM')
         this.options.useShadowDOM = false
       }
@@ -401,6 +398,11 @@ class UltraForceWindowManager {
         const session = await getSession(sfHost)
         this.state.hasSession = session !== null
         this.log('Session status:', this.state.hasSession ? 'Active' : 'None')
+
+        // Fetch user Lightning preference in background (non-blocking)
+        if (this.state.hasSession) {
+          this.getUserLightningPreference().catch(() => {})
+        }
       }
 
       // Load settings
@@ -438,6 +440,25 @@ class UltraForceWindowManager {
     }
 
     await this.loadState()
+
+    // Detect record context
+    const { objectApiName: urlObjectApiName, recordId } = getCurrentRecordFromUrl()
+    if (recordId) {
+      // For Classic URLs, objectApiName is null - resolve it from record ID
+      let objectApiName = urlObjectApiName
+      if (!objectApiName) {
+        objectApiName = await this.resolveObjectApiNameFromRecord(recordId)
+        this.log('Resolved objectApiName from recordId:', objectApiName)
+      }
+      this.state.recordContext = { objectApiName, recordId }
+      // Fetch RecordTypeId in background (don't block show)
+      if (objectApiName) {
+        this.fetchRecordTypeId(objectApiName, recordId)
+      }
+      this.log('Record context detected:', this.state.recordContext)
+    } else {
+      this.state.recordContext = null
+    }
 
     this.state.isVisible = true
     this.log('Showing modal')
@@ -489,6 +510,7 @@ class UltraForceWindowManager {
           onCustomSearch: this.handleCustomSearch.bind(this),
           onSetupSearch: this.handleSetupShortcutSearch.bind(this),
           onResultClick: this.handleResultClick.bind(this),
+          onIdNavigate: this.handleIdNavigate.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onClearResults: this.handleClearResults.bind(this),
           searchResults: this.state.searchResults,
@@ -499,7 +521,11 @@ class UltraForceWindowManager {
           onNavigationModeChange: this.handleNavigationModeChange.bind(this),
           fuzzySearch: this.state.fuzzySearch,
           onFuzzySearchChange: this.handleFuzzySearchChange.bind(this),
-          searchError: this.state.searchError
+          searchError: this.state.searchError,
+          recordContext: this.state.recordContext,
+          onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
+          onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
+          onFieldsClick: this.handleFieldsNavigation.bind(this)
         })
       )
     )
@@ -602,9 +628,10 @@ class UltraForceWindowManager {
     const normalized = query.trim().toLowerCase()
     const searchTerms = normalized.split(/\s+/).filter(Boolean)
 
-    // Helper to check if all search terms match the target text
     const matchesAllTerms = (text: string): boolean => {
-      if (searchTerms.length === 0) return true
+      if (searchTerms.length === 0) {
+        return true
+      }
       const lowerText = text.toLowerCase()
       return searchTerms.every((term) => lowerText.includes(term))
     }
@@ -643,7 +670,8 @@ class UltraForceWindowManager {
         return matchesAllTerms(combinedText)
       })
       .map((shortcut) => {
-        const url = buildSetupUrl(this.state.sfHost, shortcut.path)
+        const resolvedPath = resolveSetupShortcutPath(shortcut, this.state.sfHost)
+        const url = buildSetupUrl(this.state.sfHost, resolvedPath)
         return {
           id: shortcut.id,
           name: shortcut.name,
@@ -656,12 +684,173 @@ class UltraForceWindowManager {
     this.state.searchResults = { SetupShortcut: [...results, ...listResults] }
     this.state.searchError = null
     this.state.isLoading = false
-
-    // Render immediately to show results
     await this.renderComponent()
   }
 
-  private async getCurrentRecordLayoutUrl(): Promise<{ url: string; objectApiName: string } | null> {
+  private async fetchRecordTypeId(objectApiName: string | null, recordId: string): Promise<void> {
+    if (!this.state.sfHost || !objectApiName) {
+      return
+    }
+
+    try {
+      const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
+      if (record?.RecordTypeId && this.state.recordContext) {
+        this.state.recordContext.recordTypeId = record.RecordTypeId
+        await this.renderComponent()
+      }
+    } catch {
+      // Record may not have RecordType field
+    }
+  }
+
+  private async handleFieldsNavigation(): Promise<void> {
+    if (!this.state.recordContext?.objectApiName) {
+      this.state.searchError = 'No object found for this record.'
+      await this.renderComponent()
+      return
+    }
+
+    // Show loading state
+    this.state.isLoading = true
+    await this.renderComponent()
+
+    try {
+      const objectApiName = this.state.recordContext.objectApiName
+      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+
+      let url: string | null = null
+
+      if (useLightning) {
+        // Get object DurableId for Lightning URL
+        const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
+        const entityResp = await sfRest(this.state.sfHost!, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
+        const objectDurableId = entityResp?.records?.[0]?.DurableId
+
+        if (objectDurableId) {
+          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${objectDurableId}/FieldsAndRelationships/view`)
+        }
+      } else {
+        // Classic URL: /p/setup/layout/LayoutFieldList?type={objectApiName}&setupid={objectApiName}Fields&retURL=%2Fui%2Fsetup%2FSetup%3Fsetupid%3D{objectApiName}
+        url = `https://${this.state.sfHost}/p/setup/layout/LayoutFieldList?type=${objectApiName}&setupid=${objectApiName}Fields&retURL=%2Fui%2Fsetup%2FSetup%3Fsetupid%3D${objectApiName}`
+      }
+
+      if (url) {
+        this.state.isLoading = false
+        window.open(url, '_blank')
+        if (this.state.closeOnNavigate) {
+          this.hide()
+        } else {
+          await this.renderComponent()
+        }
+        return
+      }
+
+      this.state.searchError = 'Could not determine Fields URL.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    } catch (error) {
+      logger.error('Failed to navigate to Fields:', error)
+      this.state.searchError = 'Failed to load Fields information.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    }
+  }
+
+  private async handleRecordTypeNavigation(): Promise<void> {
+    if (!this.state.recordContext?.recordTypeId || !this.state.recordContext?.objectApiName) {
+      this.state.searchError = 'No RecordType found for this record.'
+      await this.renderComponent()
+      return
+    }
+
+    // Show loading state
+    this.state.isLoading = true
+    await this.renderComponent()
+
+    try {
+      const objectApiName = this.state.recordContext.objectApiName
+      const recordTypeId = this.state.recordContext.recordTypeId
+      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+
+      let url: string | null = null
+
+      if (useLightning) {
+        // Get object DurableId for Lightning URL
+        const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
+        const entityResp = await sfRest(this.state.sfHost!, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
+        const objectDurableId = entityResp?.records?.[0]?.DurableId
+
+        if (objectDurableId) {
+          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${objectDurableId}/RecordTypes/${recordTypeId}/view`)
+        }
+      } else {
+        // Classic URL: /setup/ui/recordtypefields.jsp?id={recordTypeId}&type={objectApiName}&setupid={objectApiName}Records
+        url = `https://${this.state.sfHost}/setup/ui/recordtypefields.jsp?id=${recordTypeId}&type=${objectApiName}&setupid=${objectApiName}Records`
+      }
+
+      if (url) {
+        this.state.isLoading = false
+        window.open(url, '_blank')
+        if (this.state.closeOnNavigate) {
+          this.hide()
+        } else {
+          await this.renderComponent()
+        }
+        return
+      }
+
+      this.state.searchError = 'Could not determine RecordType URL.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    } catch (error) {
+      logger.error('Failed to navigate to RecordType:', error)
+      this.state.searchError = 'Failed to load RecordType information.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    }
+  }
+
+  private async handlePageLayoutNavigation(): Promise<void> {
+    // Show loading state
+    this.state.isLoading = true
+    await this.renderComponent()
+
+    try {
+      const layoutInfo = await this.getCurrentRecordLayoutInfo()
+      if (layoutInfo) {
+        const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+        let url: string | null
+
+        if (useLightning) {
+          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
+        } else {
+          // Classic URL: /layouteditor/layoutEditor.apexp?type=Account&lid=00h0I000006U7pu&retURL=%2F{recordId}
+          url = `https://${this.state.sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
+        }
+
+        if (url) {
+          this.state.isLoading = false
+          window.open(url, '_blank')
+          if (this.state.closeOnNavigate) {
+            this.hide()
+          } else {
+            await this.renderComponent()
+          }
+          return
+        }
+      }
+      this.state.searchError = 'Could not determine page layout for this record.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    } catch (error) {
+      logger.error('Failed to navigate to page layout:', error)
+      this.state.searchError = 'Failed to load page layout information.'
+      this.state.isLoading = false
+      await this.renderComponent()
+    }
+  }
+
+  private async getCurrentRecordLayoutInfo(): Promise<{ objectApiName: string; objectDurableId: string; layoutId: string; recordId: string } | null> {
     const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
     const objectApiName = fromUrlObject || (recordId ? await this.resolveObjectApiNameFromRecord(recordId) : null)
 
@@ -670,21 +859,25 @@ class UltraForceWindowManager {
     }
 
     try {
-      const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
-      const recordTypeId = record?.RecordTypeId || null
+      let recordTypeId: string | null = null
+      try {
+        const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
+        recordTypeId = record?.RecordTypeId || null
+      } catch {
+        // Record may not have RecordType field
+      }
 
       const profileId = await this.getCurrentUserProfileId()
       if (!profileId) {
         return null
       }
 
-      const layoutId = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
-      if (!layoutId) {
+      const layoutResult = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
+      if (!layoutResult) {
         return null
       }
 
-      const url = buildSetupUrl(this.state.sfHost, `/lightning/setup/ObjectManager/${objectApiName}/PageLayouts/${layoutId}/view`)
-      return url ? { url, objectApiName } : null
+      return { objectApiName, objectDurableId: layoutResult.objectDurableId, layoutId: layoutResult.layoutId, recordId }
     } catch (error) {
       logger.warn('Failed to resolve current record layout:', error)
       return null
@@ -696,7 +889,6 @@ class UltraForceWindowManager {
     if (KEY_PREFIX_MAP[prefix]) {
       return KEY_PREFIX_MAP[prefix]
     }
-
     if (!this.state.sfHost) {
       return null
     }
@@ -740,13 +932,12 @@ class UltraForceWindowManager {
     }
 
     try {
-      // Use Chatter API to get current user info
       const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
       const userId = userInfo?.id
       if (!userId) {
         return null
       }
-      // Query ProfileId using the actual user ID
+
       const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
       const profileId = resp?.records?.[0]?.ProfileId
@@ -760,13 +951,59 @@ class UltraForceWindowManager {
     return null
   }
 
-  private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<string | null> {
-    if (!this.state.sfHost) return null
+  private async getUserLightningPreference(): Promise<boolean | null> {
+    if (!this.state.sfHost) {
+      return null
+    }
 
-    // Prefer matching record type; if not found, fallback to default (RecordTypeId = null)
+    const hostKey = this.state.sfHost
+    if (hostKey in this.userLightningPreferenceCache) {
+      return this.userLightningPreferenceCache[hostKey]
+    }
+
+    try {
+      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
+      const userId = userInfo?.id
+      if (!userId) {
+        return null
+      }
+
+      const soql = encodeURIComponent(`SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`)
+      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+      const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
+
+      if (typeof preference === 'boolean') {
+        this.userLightningPreferenceCache[hostKey] = preference
+        this.state.userLightningPreference = preference
+        return preference
+      }
+    } catch (error) {
+      logger.warn('Failed to fetch user Lightning preference:', error)
+    }
+    return null
+  }
+
+  private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<{ layoutId: string; objectDurableId: string } | null> {
+    if (!this.state.sfHost) {
+      return null
+    }
+
+    let objectDurableId: string | null = null
+    try {
+      const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
+      const entityResp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
+      objectDurableId = entityResp?.records?.[0]?.DurableId || null
+    } catch (error) {
+      logger.warn('EntityDefinition query failed:', error)
+    }
+
+    if (!objectDurableId) {
+      return null
+    }
+
     const queries = [
-      recordTypeId ? `SELECT LayoutId FROM LayoutAssignment WHERE TableEnumOrId='${objectApiName}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
-      `SELECT LayoutId FROM LayoutAssignment WHERE TableEnumOrId='${objectApiName}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
+      recordTypeId ? `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
+      `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
     ].filter(Boolean) as string[]
 
     for (const q of queries) {
@@ -774,10 +1011,10 @@ class UltraForceWindowManager {
         const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(q)}`)
         const layoutId = resp?.records?.[0]?.LayoutId
         if (layoutId) {
-          return layoutId
+          return { layoutId, objectDurableId }
         }
       } catch (error) {
-        logger.warn('Layout assignment query failed:', error)
+        logger.warn('ProfileLayout query failed:', error)
       }
     }
 
@@ -816,7 +1053,7 @@ class UltraForceWindowManager {
     // Navigate to the result
     if (this.state.sfHost && result.id) {
       const baseUrl = `https://${this.state.sfHost}`
-      const useLightning = shouldUseLightning(this.state.navigationMode)
+      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
       let targetUrl = ''
 
       if (useLightning) {
@@ -904,6 +1141,18 @@ class UltraForceWindowManager {
             // Custom query results - navigate to record directly
             targetUrl = `${baseUrl}/lightning/r/sObject/${result.id}/view`
             break
+          case 'Queue': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            targetUrl = `https://${setupHost}/lightning/setup/Queues/page?address=%2Fp%2Fown%2FQueue%2Fd%3Fid%3D${result.id}`
+            break
+          }
+          case 'Group': {
+            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            targetUrl = `https://${setupHost}/lightning/setup/PublicGroups/page?address=%2Fsetup%2Fown%2Fgroupdetail.jsp%3Fid%3D${result.id}`
+            break
+          }
           default:
             targetUrl = `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
         }
@@ -962,14 +1211,32 @@ class UltraForceWindowManager {
           case 'CustomQuery':
             targetUrl = `${baseUrl}/${result.id}`
             break
+          case 'Queue':
+            targetUrl = `${baseUrl}/p/own/Queue/d?id=${result.id}&setupid=Queues`
+            break
+          case 'Group':
+            targetUrl = `${baseUrl}/setup/own/groupdetail.jsp?id=${result.id}&setupid=PublicGroups`
+            break
           default:
             targetUrl = `${baseUrl}/${result.id}`
         }
+
       }
 
       window.open(targetUrl, '_blank')
     }
 
+    if (this.state.closeOnNavigate) {
+      this.hide()
+    }
+  }
+
+  private handleIdNavigate(id: string): void {
+    this.log(`Direct ID navigation: ${id}`)
+    if (this.state.sfHost) {
+      const baseUrl = `https://${this.state.sfHost}`
+      window.open(`${baseUrl}/${id}`, '_blank')
+    }
     if (this.state.closeOnNavigate) {
       this.hide()
     }
@@ -1006,7 +1273,7 @@ class UltraForceWindowManager {
 
     const objectId = result.metadata.DurableId
     const objectApiName = result.metadata.QualifiedApiName
-    const useLightning = shouldUseLightning(this.state.navigationMode)
+    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
     let targetUrl = ''
 
     if (useLightning) {
@@ -1042,6 +1309,7 @@ class UltraForceWindowManager {
           targetUrl = `${baseUrl}/${objectId}`
           break
       }
+
     }
 
     if (targetUrl) {
@@ -1137,7 +1405,8 @@ class UltraForceWindowManager {
         closeOnNavigate: true,
         navigationMode: 'auto',
         fuzzySearch: true,
-        searchError: null
+        searchError: null,
+        userLightningPreference: null
       }
 
       this.log('WindowManager destroyed successfully')
