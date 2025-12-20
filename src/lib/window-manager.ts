@@ -49,7 +49,7 @@ type SetupShortcut = {
   path: string
 }
 
-// Common standard object key prefixes for Classic record URLs
+// Standard object key prefixes for Classic URL object resolution
 const KEY_PREFIX_MAP: Record<string, string> = {
   '001': 'Account',
   '003': 'Contact',
@@ -105,11 +105,9 @@ const SETUP_SHORTCUTS: SetupShortcut[] = [
 ]
 
 function resolveSetupShortcutPath(shortcut: SetupShortcut, sfHost: string | null): string {
-  if (shortcut.id === 'users') {
-    // In .sfcrmproducts.cn / .sfcrmapps.cn environments, "Users" lives under ManageUsersLightning.
-    if (sfHost?.includes('sfcrmproducts.cn') || sfHost?.includes('sfcrmapps.cn')) {
-      return '/lightning/setup/ManageUsersLightning/home'
-    }
+  // Alibaba domains use ManageUsersLightning instead of ManageUsers
+  if (shortcut.id === 'users' && (sfHost?.includes('sfcrmproducts.cn') || sfHost?.includes('sfcrmapps.cn'))) {
+    return '/lightning/setup/ManageUsersLightning/home'
   }
   return shortcut.path
 }
@@ -136,13 +134,11 @@ function buildSetupUrl(sfHost: string | null, path: string): string | null {
 function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: string | null } {
   const path = window.location.pathname
 
-  // Lightning record URL: /lightning/r/ObjectApiName/recordId/view (or edit, related, etc.)
   const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})(?:\/|$)/)
   if (lightningMatch && lightningMatch[1] && lightningMatch[2]) {
     return { objectApiName: lightningMatch[1], recordId: lightningMatch[2] }
   }
 
-  // Classic record URL: /001xxxxxxxxxxxxxx or /001xxxxxxxxxxxxxx?...
   const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})(?:\/|$|\?)/)
   if (classicMatch && classicMatch[1]) {
     return { objectApiName: null, recordId: classicMatch[1] }
@@ -151,35 +147,29 @@ function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: st
   return { objectApiName: null, recordId: null }
 }
 
-/**
- * Detect if should use Lightning URLs based on mode setting and user preference
- */
 function shouldUseLightning(mode: NavigationMode, userPreference: boolean | null = null): boolean {
-  // If explicit mode is set, use it
-  if (mode === 'lightning') return true
-  if (mode === 'classic') return false
+  if (mode === 'lightning') {
+    return true
+  }
+  if (mode === 'classic') {
+    return false
+  }
 
-  // Auto mode: prefer user's API preference if available
   if (userPreference !== null) {
     return userPreference
   }
 
-  // Fallback: detect from current page URL
   const url = window.location.href
   const hostname = window.location.hostname
   const pathname = window.location.pathname
 
-  // Explicit Classic mode in URL
   if (url.includes('lex=off')) {
     return false
   }
-
-  // Lightning URL patterns - definitive Lightning indicators
   if (url.includes('/lightning/') || url.includes('/one/one.app')) {
     return true
   }
 
-  // Lightning-specific domains (always Lightning)
   if (hostname.includes('.lightning.force.com') ||
       hostname.includes('.salesforce-setup.com') ||
       hostname.includes('.setup.sfcrmproducts.cn') ||
@@ -187,37 +177,19 @@ function shouldUseLightning(mode: NavigationMode, userPreference: boolean | null
     return true
   }
 
-  // Classic URL patterns - check these BEFORE defaulting to Lightning
-  const classicPatterns = [
-    '/home/home.jsp',
-    '/setup/forcecomHomepage.apexp',
-    '/ui/setup/',
-    '/p/setup/',
-    '/apexpages/',
-    '/_ui/',
-    '/servlet/'
-  ]
-
+  const classicPatterns = ['/home/home.jsp', '/setup/forcecomHomepage.apexp', '/ui/setup/', '/p/setup/', '/apexpages/', '/_ui/', '/servlet/']
   if (classicPatterns.some(pattern => pathname.includes(pattern))) {
     return false
   }
 
-  // Check if it's a Classic record page (15 or 18 char ID directly in path)
-  // Classic URLs: /001xxx... or /a0Bxxx...
-  // Lightning URLs: /lightning/r/Object/001xxx.../view
   const classicRecordPattern = /^\/[a-zA-Z0-9]{15,18}(\/|$|\?)/
   if (classicRecordPattern.test(pathname) && !pathname.includes('/lightning/')) {
     return false
   }
 
-  // Default to Lightning for modern Salesforce domains
   return true
 }
 
-/**
- * UltraForce Window Manager - Singleton pattern
- * Manages modal window lifecycle with cookie-based auth
- */
 class UltraForceWindowManager {
   private static instance: UltraForceWindowManager | null = null
   private static initializationPromise: Promise<UltraForceWindowManager> | null = null
@@ -250,7 +222,6 @@ class UltraForceWindowManager {
   }
 
   private eventHandlers = new Map<string, Set<Function>>()
-  // Cache keyed by sfHost for multi-org support
   private sobjectPrefixCache: Record<string, Record<string, string>> = {}
   private sobjectCacheTimestamp: Record<string, number> = {}
   private currentUserProfileId: Record<string, string> = {}
@@ -356,7 +327,7 @@ class UltraForceWindowManager {
       try {
         this.shadowRoot = this.containerElement.attachShadow({ mode: 'closed' })
         this.log('Shadow DOM created for style isolation')
-      } catch (error) {
+      } catch {
         logger.warn('Shadow DOM not supported, falling back to regular DOM')
         this.options.useShadowDOM = false
       }
@@ -657,9 +628,10 @@ class UltraForceWindowManager {
     const normalized = query.trim().toLowerCase()
     const searchTerms = normalized.split(/\s+/).filter(Boolean)
 
-    // Helper to check if all search terms match the target text
     const matchesAllTerms = (text: string): boolean => {
-      if (searchTerms.length === 0) return true
+      if (searchTerms.length === 0) {
+        return true
+      }
       const lowerText = text.toLowerCase()
       return searchTerms.every((term) => lowerText.includes(term))
     }
@@ -712,13 +684,13 @@ class UltraForceWindowManager {
     this.state.searchResults = { SetupShortcut: [...results, ...listResults] }
     this.state.searchError = null
     this.state.isLoading = false
-
-    // Render immediately to show results
     await this.renderComponent()
   }
 
   private async fetchRecordTypeId(objectApiName: string | null, recordId: string): Promise<void> {
-    if (!this.state.sfHost || !objectApiName) return
+    if (!this.state.sfHost || !objectApiName) {
+      return
+    }
 
     try {
       const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
@@ -726,9 +698,8 @@ class UltraForceWindowManager {
         this.state.recordContext.recordTypeId = record.RecordTypeId
         await this.renderComponent()
       }
-    } catch (error) {
-      // Record may not have RecordType field, ignore
-      logger.debug('fetchRecordTypeId: no RecordTypeId field or error', error)
+    } catch {
+      // Record may not have RecordType field
     }
   }
 
@@ -881,13 +852,9 @@ class UltraForceWindowManager {
 
   private async getCurrentRecordLayoutInfo(): Promise<{ objectApiName: string; objectDurableId: string; layoutId: string; recordId: string } | null> {
     const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
-    logger.debug('getCurrentRecordLayoutInfo', { fromUrlObject, recordId })
-
     const objectApiName = fromUrlObject || (recordId ? await this.resolveObjectApiNameFromRecord(recordId) : null)
-    logger.debug('getCurrentRecordLayoutInfo:objectApiName', { objectApiName })
 
     if (!this.state.sfHost || !objectApiName || !recordId) {
-      logger.debug('getCurrentRecordLayoutInfo:missing', { sfHost: this.state.sfHost, objectApiName, recordId })
       return null
     }
 
@@ -896,19 +863,16 @@ class UltraForceWindowManager {
       try {
         const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
         recordTypeId = record?.RecordTypeId || null
-      } catch (e) {
-        logger.debug('getCurrentRecordLayoutInfo:recordTypeId fetch failed (may not have RecordTypeId field)', e)
+      } catch {
+        // Record may not have RecordType field
       }
-      logger.debug('getCurrentRecordLayoutInfo:recordTypeId', { recordTypeId })
 
       const profileId = await this.getCurrentUserProfileId()
-      logger.debug('getCurrentRecordLayoutInfo:profileId', { profileId })
       if (!profileId) {
         return null
       }
 
       const layoutResult = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
-      logger.debug('getCurrentRecordLayoutInfo:layoutResult', { layoutResult })
       if (!layoutResult) {
         return null
       }
@@ -925,7 +889,6 @@ class UltraForceWindowManager {
     if (KEY_PREFIX_MAP[prefix]) {
       return KEY_PREFIX_MAP[prefix]
     }
-
     if (!this.state.sfHost) {
       return null
     }
@@ -969,13 +932,12 @@ class UltraForceWindowManager {
     }
 
     try {
-      // Use Chatter API to get current user info
       const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
       const userId = userInfo?.id
       if (!userId) {
         return null
       }
-      // Query ProfileId using the actual user ID
+
       const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
       const profileId = resp?.records?.[0]?.ProfileId
@@ -990,7 +952,9 @@ class UltraForceWindowManager {
   }
 
   private async getUserLightningPreference(): Promise<boolean | null> {
-    if (!this.state.sfHost) return null
+    if (!this.state.sfHost) {
+      return null
+    }
 
     const hostKey = this.state.sfHost
     if (hostKey in this.userLightningPreferenceCache) {
@@ -1000,7 +964,9 @@ class UltraForceWindowManager {
     try {
       const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
       const userId = userInfo?.id
-      if (!userId) return null
+      if (!userId) {
+        return null
+      }
 
       const soql = encodeURIComponent(`SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
@@ -1018,15 +984,15 @@ class UltraForceWindowManager {
   }
 
   private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<{ layoutId: string; objectDurableId: string } | null> {
-    if (!this.state.sfHost) return null
+    if (!this.state.sfHost) {
+      return null
+    }
 
-    // First get the DurableId for the object (ProfileLayout uses DurableId, not API name)
     let objectDurableId: string | null = null
     try {
       const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
       const entityResp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
       objectDurableId = entityResp?.records?.[0]?.DurableId || null
-      logger.debug('getLayoutAssignment:objectDurableId', { objectApiName, objectDurableId })
     } catch (error) {
       logger.warn('EntityDefinition query failed:', error)
     }
@@ -1035,19 +1001,14 @@ class UltraForceWindowManager {
       return null
     }
 
-    // Use ProfileLayout (Tooling API) - prefer matching record type; if not found, fallback to default (RecordTypeId = null)
     const queries = [
       recordTypeId ? `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
       `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
     ].filter(Boolean) as string[]
 
-    logger.debug('getLayoutAssignment:queries', { objectDurableId, profileId, recordTypeId, queries })
-
     for (const q of queries) {
       try {
-        logger.debug('getLayoutAssignment:executing', { query: q })
         const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(q)}`)
-        logger.debug('getLayoutAssignment:response', { records: resp?.records })
         const layoutId = resp?.records?.[0]?.LayoutId
         if (layoutId) {
           return { layoutId, objectDurableId }

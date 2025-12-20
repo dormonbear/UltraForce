@@ -34,7 +34,7 @@ class SetupEnhancer {
         this.enabled = false
         return
       }
-    } catch (e) {
+    } catch {
       // Use default (enabled)
     }
 

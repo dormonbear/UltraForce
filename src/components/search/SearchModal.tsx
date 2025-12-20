@@ -7,9 +7,8 @@ import SettingsPanel, { type NavigationMode } from './SettingsPanel'
 import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import { SEARCH_MODAL_STYLES } from './styles'
-import { parseCommand, getMatchingCommands, mergeCommands, BUILTIN_COMMANDS } from '~lib/command-parser'
+import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
 import { logger } from '~lib/logger'
-
 import type { ObjectAction } from './ResultItem'
 
 // Salesforce ID validation: 15 or 18 alphanumeric characters
@@ -86,7 +85,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [hideManagedPackage, setHideManagedPackage] = useState<boolean>(true)
   const [maxResultsPerType, setMaxResultsPerType] = useState<number>(50)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
-  const [visibleItemCount, setVisibleItemCount] = useState(0)
+  const [_visibleItemCount, setVisibleItemCount] = useState(0)
   const [customCommands, setCustomCommands] = useState<Record<string, CustomCommand>>({})
   const [showCommandHints, setShowCommandHints] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -211,9 +210,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [isVisible, showSettings])
 
-  // Debounced search - use useRef to avoid re-triggering on onSearch change
+  // Refs to avoid re-triggering useEffect on callback changes
   const onSearchRef = React.useRef(onSearch)
-  onSearchRef.current = onSearch
+  useEffect(() => {
+    onSearchRef.current = onSearch
+  }, [onSearch])
 
   // Merge builtin and custom commands
   const allCommands = useMemo(() => mergeCommands(customCommands), [customCommands])
@@ -240,13 +241,15 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [parsedCommand.isCommand, parsedCommand.commandKey, onClearResults])
 
-  // Ref for custom search callback
   const onCustomSearchRef = React.useRef(onCustomSearch)
-  onCustomSearchRef.current = onCustomSearch
+  useEffect(() => {
+    onCustomSearchRef.current = onCustomSearch
+  }, [onCustomSearch])
 
-  // Ref for setup shortcut search callback
   const onSetupSearchRef = React.useRef(onSetupSearch)
-  onSetupSearchRef.current = onSetupSearch
+  useEffect(() => {
+    onSetupSearchRef.current = onSetupSearch
+  }, [onSetupSearch])
 
   useEffect(() => {
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query

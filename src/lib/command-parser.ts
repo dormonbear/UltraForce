@@ -1,4 +1,4 @@
-import type { SearchCommand, BuiltinCommand, CustomCommand, isCustomCommand } from '~types'
+import type { SearchCommand, BuiltinCommand, CustomCommand } from '~types'
 
 export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
