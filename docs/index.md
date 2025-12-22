@@ -4,6 +4,10 @@ UltraForce is a Chrome extension designed to enhance Salesforce developers and a
 
 [Install from Chrome Web Store](https://chromewebstore.google.com/detail/ultraforce-for-salesforce/maemkmihjmlfilhpfeeindecjnagelkh)
 
+## Demo
+
+<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1148676988?badge=0&autopause=0&player_id=0&app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="UltraForce Demo"></iframe></div>
+
 ## What is UltraForce?
 
 UltraForce provides a command-palette style interface that allows you to:
@@ -36,11 +40,7 @@ Open UltraForce with `Cmd+B` (Mac) or `Ctrl+B` (Windows), then navigate results 
 
 ## Browser Support
 
-UltraForce works on Chromium-based browsers:
-
 - Google Chrome
-- Microsoft Edge
-- Brave
 
 ## Salesforce Support
 
