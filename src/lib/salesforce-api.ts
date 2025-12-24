@@ -3,6 +3,7 @@ import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
 import { trackApiRequest } from './api-stats'
+import { markTypeUnsupported, getUnsupportedTypes } from './unsupported-types'
 import {
   buildSearchIndex,
   searchIndex,
@@ -655,10 +656,19 @@ async function fetchMetadataFromAPI(
 
   logger.debug('fetch:soql', { type: metadataType, api: apiPath, query: config.query })
 
-  const records = await fetchAllPages(url, host, sessionId)
-  logger.debug('fetch:metadata', { type: metadataType, count: records.length, ms: Date.now() - start })
-
-  return records
+  try {
+    const records = await fetchAllPages(url, host, sessionId)
+    logger.debug('fetch:metadata', { type: metadataType, count: records.length, ms: Date.now() - start })
+    return records
+  } catch (error: any) {
+    // Check for INVALID_TYPE error (user doesn't have permission)
+    if (error.message?.includes('INVALID_TYPE') || error.message?.includes('not supported')) {
+      logger.warn('fetch:metadata:unsupported', { type: metadataType, host })
+      await markTypeUnsupported(host, metadataType)
+      return []
+    }
+    throw error
+  }
 }
 
 async function fetchCustomMetadataTypes(
@@ -835,6 +845,14 @@ export async function clearMetadataCache(): Promise<void> {
 export function getAvailableMetadataTypes(): string[] {
   return Object.keys(METADATA_TYPES)
 }
+
+export async function getSupportedMetadataTypes(sfHost: string): Promise<string[]> {
+  const allTypes = Object.keys(METADATA_TYPES)
+  const unsupported = await getUnsupportedTypes(normalizeHost(sfHost))
+  return allTypes.filter(type => !unsupported.includes(type))
+}
+
+export { getUnsupportedTypes } from './unsupported-types'
 
 const SALESFORCE_PATTERNS = [
   /https:\/\/.*\.salesforce\.com/,
