@@ -324,12 +324,30 @@ export function searchIndex(
       combineWith: 'AND'
     })
 
+    const searchLower = searchTerm.toLowerCase()
     results = searchResults
       .map((result) => {
         const indexed = index.records.get(result.id)
-        return indexed ? toSearchResult(indexed, result.score) : null
+        if (!indexed) return null
+
+        let adjustedScore = result.score
+        // Boost exact API name match significantly
+        if (indexed.apiName?.toLowerCase() === searchLower) {
+          adjustedScore = result.score + 10000
+        }
+        // Boost exact name/label match
+        else if (indexed.name?.toLowerCase() === searchLower || indexed.label?.toLowerCase() === searchLower) {
+          adjustedScore = result.score + 5000
+        }
+        // Boost prefix match on API name
+        else if (indexed.apiName?.toLowerCase().startsWith(searchLower)) {
+          adjustedScore = result.score + 1000
+        }
+
+        return toSearchResult(indexed, adjustedScore)
       })
       .filter((r): r is SearchResult => r !== null)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
   }
 
   if (hideManagedPackage) {
