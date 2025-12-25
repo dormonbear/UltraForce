@@ -5,6 +5,7 @@
  */
 
 import type { Organization } from '~types'
+import { trackApiRequest } from './api-stats'
 
 export const API_VERSION = '62.0'
 
@@ -171,6 +172,7 @@ export async function sfRest(
 
   if (!response.ok) {
     const errorText = await response.text()
+    trackApiRequest()
 
     if (response.status === 401) {
       throw new Error('Session expired. Please refresh the page and try again.')
@@ -179,6 +181,7 @@ export async function sfRest(
     throw new Error(`API Error ${response.status}: ${errorText}`)
   }
 
+  trackApiRequest()
   return response.json()
 }
 

@@ -11,28 +11,28 @@ interface SearchInputProps {
 }
 
 function detectOrgType(sfHost: string | null): OrgType {
-  if (!sfHost) return 'unknown'
+  if (!sfHost) {
+    return 'unknown'
+  }
 
   const host = sfHost.toLowerCase()
 
-  // Scratch org
   if (host.includes('.scratch.') || host.includes('scratch.my.salesforce')) {
     return 'scratch'
   }
 
-  // Sandbox - check for sandbox patterns
   if (host.includes('.sandbox.') || host.includes('--') || host.includes('.cs') ||
       /--\w+\./.test(host) || host.includes('sandbox.my.salesforce')) {
     return 'sandbox'
   }
 
-  // Developer Edition - usually has 'dev' in the name but not always reliable
   if (host.includes('-dev.') || host.includes('developer.')) {
     return 'developer'
   }
 
-  // Production - default for .my.salesforce.com without sandbox/scratch indicators
-  if (host.includes('.my.salesforce.') || host.includes('.lightning.force.')) {
+  // Production - includes Alibaba domains (.sfcrmproducts.cn / .sfcrmapps.cn)
+  if (host.includes('.my.salesforce.') || host.includes('.lightning.force.') ||
+      host.includes('.sfcrmproducts.cn') || host.includes('.sfcrmapps.cn')) {
     return 'production'
   }
 

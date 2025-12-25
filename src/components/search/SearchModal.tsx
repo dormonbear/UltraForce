@@ -86,6 +86,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [soqlLoading, setSoqlLoading] = useState(false)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [soqlCursorPos, setSoqlCursorPos] = useState(0)
+  const [copiedCell, setCopiedCell] = useState<string | null>(null)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
@@ -591,8 +592,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
     const match = url.match(/\/([a-zA-Z0-9]{15,18})$/)
     return match ? match[1] : null
   }
-
-  const [copiedCell, setCopiedCell] = useState<string | null>(null)
 
   const handleCellClick = async (value: unknown, cellKey: string) => {
     if (value === null || value === undefined) return

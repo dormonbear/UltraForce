@@ -43,7 +43,7 @@ function createMiniSearchInstance(): MiniSearch<IndexedRecord> {
       if (!text) return []
       return text
         .toLowerCase()
-        .split(/[\s_\-\.,;|:\/\\]+/)
+        .split(/[\s_\-.,;|:/\\]+/)
         .filter((token) => token.length > 0)
     }
   })
@@ -67,7 +67,7 @@ function generateSearchTerms(name: string, label: string, apiName: string): stri
   addTerm(apiName)
 
   // Add concatenated versions (remove spaces, underscores, hyphens)
-  const concat = (str: string) => str.replace(/[\s_\-]+/g, '').toLowerCase()
+  const concat = (str: string) => str.replace(/[\s_-]+/g, '').toLowerCase()
   addTerm(concat(name))
   addTerm(concat(label))
   addTerm(concat(apiName))
@@ -324,12 +324,30 @@ export function searchIndex(
       combineWith: 'AND'
     })
 
+    const searchLower = searchTerm.toLowerCase()
     results = searchResults
       .map((result) => {
         const indexed = index.records.get(result.id)
-        return indexed ? toSearchResult(indexed, result.score) : null
+        if (!indexed) return null
+
+        let adjustedScore = result.score
+        // Boost exact API name match significantly
+        if (indexed.apiName?.toLowerCase() === searchLower) {
+          adjustedScore = result.score + 10000
+        }
+        // Boost exact name/label match
+        else if (indexed.name?.toLowerCase() === searchLower || indexed.label?.toLowerCase() === searchLower) {
+          adjustedScore = result.score + 5000
+        }
+        // Boost prefix match on API name
+        else if (indexed.apiName?.toLowerCase().startsWith(searchLower)) {
+          adjustedScore = result.score + 1000
+        }
+
+        return toSearchResult(indexed, adjustedScore)
       })
       .filter((r): r is SearchResult => r !== null)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
   }
 
   if (hideManagedPackage) {

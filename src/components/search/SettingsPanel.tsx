@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
-import type { SearchCommand, CustomCommand } from '~types'
-import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands } from '~lib/command-parser'
+import React, { useState, useEffect, useMemo } from 'react'
+import type { CustomCommand } from '~types'
+import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands, filterCommandsBySupported } from '~lib/command-parser'
+import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
+import { getUnsupportedTypes } from '~lib/salesforce-api'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
@@ -37,7 +39,8 @@ const METADATA_TYPES = [
   { value: 'CustomMetadataType', label: 'Custom Metadata Types' },
   { value: 'CustomSetting', label: 'Custom Settings' },
   { value: 'PermissionSet', label: 'Permission Sets' },
-  { value: 'Profile', label: 'Profiles' }
+  { value: 'Profile', label: 'Profiles' },
+  { value: 'Queue,Group', label: 'Queues & Public Groups' }
 ]
 
 const NAVIGATION_MODES = [
@@ -46,8 +49,15 @@ const NAVIGATION_MODES = [
   { value: 'classic', label: 'Salesforce Classic' }
 ]
 
-const APP_VERSION = '0.0.7'
+const getAppVersion = () => {
+  try {
+    return chrome.runtime.getManifest().version
+  } catch {
+    return 'unknown'
+  }
+}
 const PRIVACY_URL = 'https://gist.github.com/dormonbear/14242e4e5effbf0c7159c0e2bc14bbda'
+const DOCS_URL = 'https://ultraforce.dormon.net/'
 
 interface CommandFormState {
   key: string
@@ -83,6 +93,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const displayName = sfHost ? sfHost.split('.')[0] : null
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
+  const [apiStats, setApiStats] = useState<ApiStatsDisplay>({ total: 0, last24h: 0, lastMonth: 0 })
+  const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
+
+  useEffect(() => {
+    getApiStats().then(setApiStats).catch(() => {})
+    if (sfHost) {
+      getUnsupportedTypes(sfHost).then(setUnsupportedTypes).catch(() => {})
+    }
+  }, [sfHost])
+
+  const supportedBuiltinCommands = useMemo(() => {
+    return filterCommandsBySupported(BUILTIN_COMMANDS, unsupportedTypes)
+  }, [unsupportedTypes])
+
+  const supportedMetadataTypes = useMemo(() => {
+    return METADATA_TYPES.filter(type => {
+      const types = type.value.split(',')
+      return types.some(t => !unsupportedTypes.includes(t))
+    })
+  }, [unsupportedTypes])
   const [formState, setFormState] = useState<CommandFormState>({
     key: '',
     description: '',
@@ -189,6 +219,73 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setFormError(null)
   }
 
+  const handleExportCommands = () => {
+    if (Object.keys(customCommands).length === 0) {
+      return
+    }
+    // Export without isBuiltin and key properties (key is the object key)
+    const exportData: Record<string, Omit<CustomCommand, 'isBuiltin' | 'key'>> = {}
+    for (const [cmdKey, cmd] of Object.entries(customCommands)) {
+      exportData[cmdKey] = {
+        description: cmd.description,
+        soql: cmd.soql,
+        useToolingApi: cmd.useToolingApi,
+        nameField: cmd.nameField,
+        ...(cmd.descriptionFields && cmd.descriptionFields.length > 0
+          ? { descriptionFields: cmd.descriptionFields }
+          : {})
+      }
+    }
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const blob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ultraforce-commands-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCommands = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        const imported = JSON.parse(text) as Record<string, Partial<CustomCommand>>
+        // Validate structure (key comes from object key, not cmd.key)
+        const validCommands: Record<string, CustomCommand> = {}
+        for (const [key, cmd] of Object.entries(imported)) {
+          if (cmd && typeof cmd === 'object' && cmd.soql && cmd.nameField) {
+            validCommands[key] = {
+              key,
+              description: cmd.description || '',
+              soql: cmd.soql,
+              useToolingApi: cmd.useToolingApi || false,
+              nameField: cmd.nameField,
+              descriptionFields: cmd.descriptionFields
+            }
+          }
+        }
+        if (Object.keys(validCommands).length === 0) {
+          alert('No valid commands found in file')
+          return
+        }
+        const merged = { ...customCommands, ...validCommands }
+        onCustomCommandsChange(merged)
+        alert(`Imported ${Object.keys(validCommands).length} command(s)`)
+      } catch {
+        alert('Failed to parse file. Please ensure it is a valid JSON file.')
+      }
+    }
+    input.click()
+  }
+
   const startAddNew = () => {
     setIsAddingNew(true)
     setEditingKey(null)
@@ -201,6 +298,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       descriptionFields: ''
     })
     setFormError(null)
+  }
+
+  const handleResetStats = async () => {
+    if (!confirm('Reset all API statistics?')) {
+      return
+    }
+    await resetAllStats()
+    setApiStats(await getApiStats())
   }
 
   const renderCommandForm = () => (
@@ -294,7 +399,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <h3 className="section-title">Search Types</h3>
           <p className="section-desc">Select metadata types to include in search.</p>
           <div className="type-grid">
-            {METADATA_TYPES.map((type) => {
+            {supportedMetadataTypes.map((type) => {
               const types = type.value.split(',')
               const isChecked = types.every((t) => selectedTypes.includes(t))
               const handleToggle = () => {
@@ -417,7 +522,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <h3 className="section-title">Built-in Commands</h3>
           <p className="section-desc">Type : followed by a command to filter search.</p>
           <div className="commands-list">
-            {Object.values(BUILTIN_COMMANDS).map((cmd) => (
+            {Object.values(supportedBuiltinCommands).map((cmd) => (
               <div key={cmd.key} className="command-row command-row-builtin">
                 <span className="command-key">:{cmd.key}</span>
                 <span className="command-desc">{cmd.description}</span>
@@ -478,6 +583,23 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           {!isAddingNew && !editingKey && (
             <div className="commands-footer">
               <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>+ Add Command</button>
+              <div className="commands-footer-right">
+                <button
+                  className="cmd-btn cmd-btn-secondary"
+                  onClick={handleImportCommands}
+                  title="Import commands from JSON file"
+                >
+                  Import
+                </button>
+                <button
+                  className="cmd-btn cmd-btn-secondary"
+                  onClick={handleExportCommands}
+                  disabled={Object.keys(customCommands).length === 0}
+                  title="Export commands to JSON file"
+                >
+                  Export
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -494,8 +616,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
         )}
 
+        <div className="setting-section">
+          <h3 className="section-title">API Statistics</h3>
+          <div className="stats-list">
+            <div className="stats-row">
+              <span>Last 24 hours</span>
+              <span className="stats-value">{apiStats.last24h}</span>
+            </div>
+            <div className="stats-row">
+              <span>Last 30 days</span>
+              <span className="stats-value">{apiStats.lastMonth}</span>
+            </div>
+            <div className="stats-row">
+              <span>Total</span>
+              <span className="stats-value">{apiStats.total}</span>
+            </div>
+          </div>
+          <button className="cmd-btn cmd-btn-secondary" onClick={handleResetStats} style={{ marginTop: '12px' }}>
+            Reset
+          </button>
+        </div>
+
         <div className="settings-meta">
-          <span className="meta-item">UltraForce v{APP_VERSION}</span>
+          <span className="meta-item">UltraForce v{getAppVersion()}</span>
+          <a
+            className="meta-link"
+            href={DOCS_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Documentation
+          </a>
           <a
             className="meta-link"
             href={PRIVACY_URL}

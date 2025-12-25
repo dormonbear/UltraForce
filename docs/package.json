@@ -1,0 +1,15 @@
+{
+  "name": "ultraforce-docs",
+  "version": "1.0.0",
+  "description": "UltraForce Documentation",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

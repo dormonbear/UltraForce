@@ -1,0 +1,47 @@
+# Features Overview
+
+UltraForce provides a comprehensive set of features for Salesforce metadata search and navigation.
+
+## Core Features
+
+### [Metadata Search](./metadata-search)
+
+Search across all Salesforce metadata types with fuzzy matching and intelligent caching.
+
+### [Field Search](./field-search)
+
+Use dot notation to search object fields directly (e.g., `Account.Name`).
+
+### [Record Navigation](./record-navigation)
+
+Navigate to record detail pages and detect objects from record IDs.
+
+### [Setup Navigation](./setup-navigation)
+
+Jump directly to Setup pages using the `:g` command.
+
+## Search Capabilities
+
+- **Fuzzy matching** - Find results even with typos
+- **Prefix matching** - Match from the beginning of names
+- **Case-insensitive** - Search without worrying about case
+- **Multi-type search** - Search across all metadata simultaneously
+
+## Performance
+
+- **24-hour cache** - Metadata cached locally for instant searches
+- **Background refresh** - Cache updates automatically after 2 hours
+- **Incremental search** - Results update as you type
+- **API efficiency** - Minimized API calls with smart caching
+
+## Supported Metadata Types
+
+| Category | Types |
+|----------|-------|
+| Objects | CustomObject, CustomField |
+| Code | ApexClass, ApexTrigger, ApexPage, ApexComponent |
+| Lightning | AuraDefinitionBundle, LightningComponentBundle |
+| Automation | Flow, ValidationRule, WorkflowRule |
+| Security | Profile, PermissionSet, PermissionSetGroup |
+| Configuration | CustomLabel, CustomMetadata, CustomSetting |
+| Users | User, Queue, Group |

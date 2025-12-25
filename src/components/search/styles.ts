@@ -1532,4 +1532,111 @@ export const SEARCH_MODAL_STYLES = `
     color: rgba(255, 255, 255, 0.5);
     font-size: 0.9em;
   }
+
+  /* Record Actions */
+  .record-actions {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .record-actions-header {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .record-object-name {
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: rgba(59, 130, 246, 0.8);
+    background: rgba(59, 130, 246, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .record-action-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .record-action-item:hover,
+  .record-action-item.selected {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.2);
+  }
+
+  .record-action-item.selected {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .record-action-item:focus {
+    outline: none;
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+
+  .record-action-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+
+  .record-action-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .record-action-desc {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-left: auto;
+  }
+
+  /* API Statistics */
+  .stats-list {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .stats-row:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .stats-value {
+    font-weight: 600;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: rgba(255, 255, 255, 0.9);
+  }
 `

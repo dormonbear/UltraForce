@@ -79,9 +79,9 @@ export class MetadataCache {
     try {
       const key = getCacheKey(orgId, metadataType)
 
-      // For CustomLabel, strip Value field to reduce storage size (Value is only needed for search indexing)
+      // For CustomLabel, strip Value field to reduce storage size
       const cacheData = metadataType === 'CustomLabel'
-        ? data.map(({ Value, ...rest }) => rest)
+        ? data.map(({ Value: _Value, ...rest }) => rest)
         : data
 
       const cacheItem: CacheItem = {
@@ -104,7 +104,7 @@ export class MetadataCache {
         try {
           const key = getCacheKey(orgId, metadataType)
           const cacheData = metadataType === 'CustomLabel'
-            ? data.map(({ Value, ...rest }) => rest)
+            ? data.map(({ Value: _Value, ...rest }) => rest)
             : data
           const cacheItem: CacheItem = {
             data: cacheData,

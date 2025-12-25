@@ -1,4 +1,4 @@
-import type { SearchCommand, BuiltinCommand, CustomCommand, isCustomCommand } from '~types'
+import type { SearchCommand, BuiltinCommand, CustomCommand } from '~types'
 
 export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
@@ -8,6 +8,7 @@ export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   p: { key: 'p', types: ['Profile', 'PermissionSet', 'PermissionSetGroup', 'CustomPermission'], description: 'Profiles & Permissions', isBuiltin: true },
   l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels', isBuiltin: true },
   m: { key: 'm', types: ['CustomMetadataType', 'CustomSetting'], description: 'Custom Metadata & Settings', isBuiltin: true },
+  q: { key: 'q', types: ['Queue', 'Group'], description: 'Queues & Public Groups', isBuiltin: true },
   g: { key: 'g', types: [], description: 'Go to Setup', isBuiltin: true },
   s: { key: 's', types: [], description: 'SOQL Query', isBuiltin: true }
 }
@@ -68,16 +69,26 @@ export function parseCommand(
 
 export function getMatchingCommands(
   input: string,
-  commands: Record<string, SearchCommand> = DEFAULT_COMMANDS
+  commands: Record<string, SearchCommand> = DEFAULT_COMMANDS,
+  unsupportedTypes: string[] = []
 ): SearchCommand[] {
   if (!input.startsWith(':')) return []
 
   const partial = input.slice(1).toLowerCase().split(' ')[0]
+
+  // Filter out commands where all types are unsupported
+  const filteredCommands = Object.values(commands).filter((cmd) => {
+    // Commands with no types (like :g) or custom commands are always shown
+    if (!('types' in cmd) || cmd.types.length === 0) return true
+    // Check if at least one type is supported
+    return cmd.types.some(type => !unsupportedTypes.includes(type))
+  })
+
   if (!partial) {
-    return Object.values(commands)
+    return filteredCommands
   }
 
-  return Object.values(commands).filter(
+  return filteredCommands.filter(
     (cmd) =>
       cmd.key.toLowerCase().startsWith(partial) ||
       cmd.description.toLowerCase().includes(partial)
@@ -113,4 +124,28 @@ export function mergeCommands(
   customCommands: Record<string, CustomCommand>
 ): Record<string, SearchCommand> {
   return { ...BUILTIN_COMMANDS, ...customCommands }
+}
+
+export function filterCommandsBySupported(
+  commands: Record<string, BuiltinCommand>,
+  unsupportedTypes: string[]
+): Record<string, BuiltinCommand> {
+  if (unsupportedTypes.length === 0) {
+    return commands
+  }
+
+  const filtered: Record<string, BuiltinCommand> = {}
+  for (const [key, cmd] of Object.entries(commands)) {
+    // Commands with no types (like :g) are always shown
+    if (cmd.types.length === 0) {
+      filtered[key] = cmd
+      continue
+    }
+    // Check if at least one type is supported
+    const hasSupported = cmd.types.some(type => !unsupportedTypes.includes(type))
+    if (hasSupported) {
+      filtered[key] = cmd
+    }
+  }
+  return filtered
 }
