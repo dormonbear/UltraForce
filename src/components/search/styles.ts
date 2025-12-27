@@ -1639,4 +1639,123 @@ export const SEARCH_MODAL_STYLES = `
     font-family: 'SF Mono', Monaco, monospace;
     color: rgba(255, 255, 255, 0.9);
   }
+
+  /* SOQL History */
+  .soql-history {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .soql-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    flex-shrink: 0;
+  }
+
+  .soql-history-header span {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .soql-history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .soql-history-list::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .soql-history-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .soql-history-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .soql-history-list::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .soql-history-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    border-left: 2px solid transparent;
+    margin: 0 8px;
+    border-radius: 6px;
+  }
+
+  .soql-history-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-left-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .soql-history-query {
+    font-size: 12px;
+    font-family: 'SF Mono', Monaco, monospace;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+
+  .soql-history-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  .soql-history-count {
+    color: rgba(59, 130, 246, 0.8);
+    font-weight: 500;
+  }
+
+  .soql-history-time {
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  .soql-history-remove {
+    opacity: 0;
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+  }
+
+  .soql-history-item:hover .soql-history-remove {
+    opacity: 1;
+  }
+
+  .soql-history-remove:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+  }
 `

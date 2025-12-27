@@ -10,6 +10,7 @@ import CommandHints from './CommandHints'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { parseCommand, getMatchingCommands, mergeCommands, BUILTIN_COMMANDS } from '~lib/command-parser'
 import { getSOQLSuggestions, applySuggestion, executeSOQLQuery, exportResults, copyToClipboard } from '~lib/soql-helper'
+import { getSOQLHistory, addSOQLHistory, removeSOQLHistoryItem, formatHistoryTime, type SOQLHistoryItem } from '~lib/soql-history'
 import { logger } from '~lib/logger'
 
 import type { ObjectAction } from './ResultItem'
@@ -87,6 +88,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [soqlCursorPos, setSoqlCursorPos] = useState(0)
   const [copiedCell, setCopiedCell] = useState<string | null>(null)
+  const [soqlHistory, setSoqlHistory] = useState<SOQLHistoryItem[]>([])
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
@@ -265,6 +267,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const onSetupSearchRef = React.useRef(onSetupSearch)
   onSetupSearchRef.current = onSetupSearch
 
+  // Load SOQL history when entering SOQL mode
+  useEffect(() => {
+    if (isSOQLMode) {
+      getSOQLHistory().then(setSoqlHistory)
+    }
+  }, [isSOQLMode])
+
   // Fetch SOQL suggestions based on cursor position
   useEffect(() => {
     if (!isSOQLMode || !sfHost || !soqlQuery) {
@@ -393,6 +402,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
       const result = await executeSOQLQuery(sfHost, soqlQuery)
       setSoqlResult(result)
       setSoqlSuggestions([])
+      // Save to history on success
+      await addSOQLHistory(soqlQuery, result.totalSize)
+      // Refresh history list
+      const updatedHistory = await getSOQLHistory()
+      setSoqlHistory(updatedHistory)
     } catch (err: any) {
       setSoqlError(err.message || 'Query execution failed')
     } finally {
@@ -412,6 +426,27 @@ const SearchModal: React.FC<SearchModalProps> = ({
       setTimeout(() => setExportMessage(null), 2000)
     }
   }, [soqlResult])
+
+  // Select a query from history
+  const selectHistoryItem = useCallback((historyQuery: string) => {
+    setQuery(`:s ${historyQuery}`)
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+        const pos = 3 + historyQuery.length
+        inputRef.current.setSelectionRange(pos, pos)
+        setSoqlCursorPos(historyQuery.length)
+      }
+    }, 0)
+  }, [])
+
+  // Remove a history item
+  const handleRemoveHistory = useCallback(async (historyQuery: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await removeSOQLHistoryItem(historyQuery)
+    const updatedHistory = await getSOQLHistory()
+    setSoqlHistory(updatedHistory)
+  }, [])
 
   // Apply SOQL suggestion at current cursor position
   const applySoqlSuggestion = useCallback((suggestion: SOQLSuggestion) => {
@@ -944,9 +979,44 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     </div>
                   )}
 
-                  {/* SOQL Empty State */}
+                  {/* SOQL Empty State or History */}
                   {!soqlLoading && !soqlError && !soqlResult && soqlSuggestions.length === 0 && (
-                    <EmptyState type="command" commandTypes={[]} commandDescription="Type SOQL query, press Enter to execute" />
+                    !soqlQuery.trim() && soqlHistory.length > 0 ? (
+                      <div className="soql-history">
+                        <div className="soql-history-header">
+                          <span>Recent Queries</span>
+                        </div>
+                        <div className="soql-history-list">
+                          {soqlHistory.map((item, index) => (
+                            <div
+                              key={`${item.timestamp}-${index}`}
+                              className="soql-history-item"
+                              onClick={() => selectHistoryItem(item.query)}
+                            >
+                              <div className="soql-history-query">{item.query}</div>
+                              <div className="soql-history-meta">
+                                {item.resultCount !== undefined && (
+                                  <span className="soql-history-count">{item.resultCount} records</span>
+                                )}
+                                <span className="soql-history-time">{formatHistoryTime(item.timestamp)}</span>
+                                <button
+                                  className="soql-history-remove"
+                                  onClick={(e) => handleRemoveHistory(item.query, e)}
+                                  title="Remove from history"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <EmptyState type="command" commandTypes={[]} commandDescription="Type SOQL query, press Enter to execute" />
+                    )
                   )}
                 </>
               ) : (
