@@ -39,11 +39,14 @@ export async function checkForUpdate(): Promise<{
   newVersion: string
   releaseNotesUrl: string
 }> {
+  // Set to true to test the update notification
+  const DEBUG_FORCE_SHOW = false
+
   const currentVersion = getCurrentVersion()
   const state = await getVersionCheckState()
 
   const isNewVersion = state.lastVersion !== '' && state.lastVersion !== currentVersion
-  const hasUpdate = isNewVersion && !state.hasShownNotification
+  const hasUpdate = DEBUG_FORCE_SHOW || (isNewVersion && !state.hasShownNotification)
 
   return {
     hasUpdate,

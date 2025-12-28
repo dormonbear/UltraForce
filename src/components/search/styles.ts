@@ -1226,11 +1226,11 @@ export const SEARCH_MODAL_STYLES = `
     gap: 16px;
     padding: 16px 20px;
     background: rgba(20, 20, 25, 0.95);
-    border: 1px solid rgba(168, 85, 247, 0.4);
+    border: 1px solid rgba(1, 118, 211, 0.5);
     border-radius: 16px;
     backdrop-filter: blur(24px);
     box-shadow:
-      0 8px 32px rgba(139, 92, 246, 0.3),
+      0 8px 32px rgba(1, 118, 211, 0.25),
       0 4px 16px rgba(0, 0, 0, 0.4),
       inset 0 1px 0 rgba(255, 255, 255, 0.1);
   }
@@ -1245,7 +1245,7 @@ export const SEARCH_MODAL_STYLES = `
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-bottom: 8px solid rgba(168, 85, 247, 0.4);
+    border-bottom: 8px solid rgba(1, 118, 211, 0.5);
   }
 
   .update-celebration-content::after {
@@ -1293,21 +1293,21 @@ export const SEARCH_MODAL_STYLES = `
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    background: linear-gradient(135deg, #0176d3 0%, #1589ee 100%);
     border-radius: 8px;
     color: #fff;
     font-size: 13px;
     font-weight: 500;
     text-decoration: none;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    box-shadow: 0 4px 12px rgba(1, 118, 211, 0.3);
     flex-shrink: 0;
   }
 
   .update-celebration-link:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
-    background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+    box-shadow: 0 6px 16px rgba(1, 118, 211, 0.4);
+    background: linear-gradient(135deg, #014486 0%, #0176d3 100%);
   }
 
   .update-celebration-dismiss {
