@@ -78,6 +78,8 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
     <div
       ref={itemRef}
       className={`result-item ${isSelected ? 'selected' : ''}`}
+      data-ultraforce-result-item
+      data-selected={isSelected}
       onClick={onClick}
     >
       <div className="result-info">

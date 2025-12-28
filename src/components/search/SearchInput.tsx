@@ -75,6 +75,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'
           }
           className="search-input"
+          data-ultraforce-input
           autoFocus
         />
         {displayName && (

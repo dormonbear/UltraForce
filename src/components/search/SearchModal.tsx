@@ -511,6 +511,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
       <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
         <div
           className="ultraforce-search-modal"
+          data-ultraforce-modal
           ref={modalRef}
           tabIndex={-1}
           onKeyDown={handleKeyDown}
@@ -663,6 +664,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
               <button
                 className="settings-button"
+                data-ultraforce-settings-button
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
