@@ -5,15 +5,10 @@ export const RELEASE_NOTES_URL = 'https://ultraforce.dormon.net/guide/release-no
 interface VersionCheckState {
   lastVersion: string
   hasShownNotification: boolean
-  dismissedAt?: number
 }
 
 function getCurrentVersion(): string {
-  try {
-    return chrome.runtime.getManifest().version
-  } catch {
-    return '0.0.0'
-  }
+  return chrome.runtime.getManifest().version
 }
 
 async function getVersionCheckState(): Promise<VersionCheckState> {
@@ -25,21 +20,11 @@ async function getVersionCheckState(): Promise<VersionCheckState> {
   }
 }
 
-async function saveVersionCheckState(state: VersionCheckState): Promise<void> {
-  try {
-    await chrome.storage.local.set({ [VERSION_CHECK_KEY]: state })
-  } catch {
-    // ignore
-  }
-}
-
 export async function checkForUpdate(): Promise<{
   hasUpdate: boolean
   currentVersion: string
-  newVersion: string
-  releaseNotesUrl: string
 }> {
-  // Set to true to test the update notification
+  // 调试用：设为 true 强制显示更新通知
   const DEBUG_FORCE_SHOW = false
 
   const currentVersion = getCurrentVersion()
@@ -48,27 +33,16 @@ export async function checkForUpdate(): Promise<{
   const isNewVersion = state.lastVersion !== '' && state.lastVersion !== currentVersion
   const hasUpdate = DEBUG_FORCE_SHOW || (isNewVersion && !state.hasShownNotification)
 
-  return {
-    hasUpdate,
-    currentVersion,
-    newVersion: currentVersion,
-    releaseNotesUrl: RELEASE_NOTES_URL
-  }
+  return { hasUpdate, currentVersion }
 }
 
 export async function markNotificationAsShown(): Promise<void> {
   const currentVersion = getCurrentVersion()
-  const state = await getVersionCheckState()
-  state.lastVersion = currentVersion
-  state.hasShownNotification = true
-  await saveVersionCheckState(state)
-}
-
-export async function dismissUpdateNotification(): Promise<void> {
-  const currentVersion = getCurrentVersion()
-  const state = await getVersionCheckState()
-  state.lastVersion = currentVersion
-  state.hasShownNotification = true
-  state.dismissedAt = Date.now()
-  await saveVersionCheckState(state)
+  try {
+    await chrome.storage.local.set({
+      [VERSION_CHECK_KEY]: { lastVersion: currentVersion, hasShownNotification: true }
+    })
+  } catch {
+    // ignore
+  }
 }

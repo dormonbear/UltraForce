@@ -3,7 +3,7 @@ import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
 import { trackApiRequest } from './api-stats'
-import { markTypeUnsupported, getUnsupportedTypes } from './unsupported-types'
+import { markTypeUnsupported, getUnsupportedTypes, markTypesChecked, needsPermissionCheck } from './unsupported-types'
 import {
   buildSearchIndex,
   searchIndex,
@@ -347,6 +347,7 @@ async function searchGroupsRealtime(
 
 async function ensureFieldIndex(objectName: string, apiHost: string, sessionId: string): Promise<void> {
   if (hasSearchIndex(`Field:${objectName}`, apiHost)) return
+  if (!isApiAvailable(apiHost)) return
 
   const fields = await fetchFieldsForObject(objectName, apiHost, sessionId)
   if (fields.length > 0) {
@@ -760,14 +761,36 @@ async function fetchFieldsForObject(
   }
 }
 
+// Cache for API availability per host (to avoid repeated 403 requests)
+const apiAvailabilityCache = new Map<string, { available: boolean; sessionHash: string }>()
+
+function getSessionHash(sessionKey: string): string {
+  return sessionKey.substring(0, 8)
+}
+
+export function isApiAvailable(sfHost: string, sessionKey?: string): boolean {
+  const host = normalizeHost(sfHost)
+  const cached = apiAvailabilityCache.get(host)
+  if (!cached) return true // Unknown, assume available
+  if (sessionKey && cached.sessionHash !== getSessionHash(sessionKey)) {
+    return true // Session changed, need to recheck
+  }
+  return cached.available
+}
+
+function markApiAvailability(sfHost: string, available: boolean, sessionKey: string): void {
+  const host = normalizeHost(sfHost)
+  apiAvailabilityCache.set(host, { available, sessionHash: getSessionHash(sessionKey) })
+}
+
 export async function validateSalesforceSession(sfHost: string): Promise<boolean> {
   try {
-    const host = normalizeHost(sfHost)
-    const session = await getSession(host)
+    const session = await getSession(sfHost)
     if (!session) {
       return false
     }
 
+    const host = normalizeHost(session.hostname)
     const endpoint = `https://${host}/services/data/v${API_VERSION}/sobjects/`
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -778,7 +801,9 @@ export async function validateSalesforceSession(sfHost: string): Promise<boolean
     })
 
     trackApiRequest()
-    return response.ok
+    const available = response.ok
+    markApiAvailability(sfHost, available, session.key)
+    return available
   } catch {
     return false
   }
@@ -808,29 +833,145 @@ export async function refreshMetadataCache(metadataType: string, sfHost: string)
   }
 }
 
+// Mapping of metadata types to the actual object and API to query for permission check
+const PERMISSION_CHECK_MAP: Record<string, { object: string; useRestApi: boolean }> = {
+  ApexClass: { object: 'ApexClass', useRestApi: false },
+  ApexTrigger: { object: 'ApexTrigger', useRestApi: false },
+  ApexPage: { object: 'ApexPage', useRestApi: false },
+  ApexComponent: { object: 'ApexComponent', useRestApi: false },
+  LightningComponentBundle: { object: 'LightningComponentBundle', useRestApi: false },
+  AuraDefinitionBundle: { object: 'AuraDefinitionBundle', useRestApi: false },
+  CustomObject: { object: 'EntityDefinition', useRestApi: true },
+  Flow: { object: 'Flow', useRestApi: false },
+  User: { object: 'User', useRestApi: true },
+  PermissionSet: { object: 'PermissionSet', useRestApi: false },
+  PermissionSetGroup: { object: 'PermissionSetGroup', useRestApi: false },
+  CustomPermission: { object: 'CustomPermission', useRestApi: false },
+  Profile: { object: 'Profile', useRestApi: false },
+  CustomLabel: { object: 'ExternalString', useRestApi: false },
+  CustomMetadataType: { object: 'EntityDefinition', useRestApi: true },
+  CustomSetting: { object: 'EntityDefinition', useRestApi: true },
+  Queue: { object: 'Group', useRestApi: true },
+  Group: { object: 'Group', useRestApi: true }
+}
+
+// Types that require ViewSetup permission (Tooling API metadata)
+const TOOLING_API_TYPES = [
+  'ApexClass', 'ApexTrigger', 'ApexPage', 'ApexComponent',
+  'LightningComponentBundle', 'AuraDefinitionBundle', 'Flow',
+  'PermissionSet', 'PermissionSetGroup', 'CustomPermission', 'Profile', 'CustomLabel'
+]
+
+async function checkViewSetupPermission(apiHost: string, sessionKey: string): Promise<boolean> {
+  try {
+    const url = `https://${apiHost}/services/data/v${API_VERSION}/tooling/query?q=SELECT+Id+FROM+ApexClass+LIMIT+1`
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${sessionKey}` }
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+export async function checkMetadataPermissions(sfHost: string): Promise<string[]> {
+  const allTypes = Object.keys(METADATA_TYPES)
+
+  const session = await getSession(sfHost)
+  if (!session) {
+    return []
+  }
+
+  const apiHost = normalizeHost(session.hostname)
+
+  // First check ViewSetup permission
+  const hasViewSetup = await checkViewSetupPermission(apiHost, session.key)
+
+  if (!hasViewSetup) {
+    logger.debug('permission:check - no ViewSetup, skipping Tooling API types')
+    const unsupportedTypes = TOOLING_API_TYPES.filter(t => allTypes.includes(t))
+    await markTypesChecked(apiHost, unsupportedTypes, session.key)
+    return unsupportedTypes
+  }
+
+  // Has ViewSetup - do individual checks for edge cases
+  const checkedObjects = new Map<string, boolean>()
+
+  const checkType = async (type: string): Promise<boolean> => {
+    const config = PERMISSION_CHECK_MAP[type]
+    if (!config) return true
+
+    const cacheKey = `${config.object}:${config.useRestApi}`
+    if (checkedObjects.has(cacheKey)) {
+      return checkedObjects.get(cacheKey)!
+    }
+
+    try {
+      const apiPath = config.useRestApi ? 'query' : 'tooling/query'
+      const url = `https://${apiHost}/services/data/v${API_VERSION}/${apiPath}?q=SELECT+Id+FROM+${config.object}+LIMIT+1`
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${session.key}` }
+      })
+      if (!response.ok) {
+        const text = await response.text()
+        if (text.includes('INVALID_TYPE') || text.includes('not supported') || text.includes('sObject type')) {
+          checkedObjects.set(cacheKey, false)
+          return false
+        }
+      }
+      checkedObjects.set(cacheKey, true)
+      return true
+    } catch {
+      checkedObjects.set(cacheKey, false)
+      return false
+    }
+  }
+
+  await Promise.all(
+    allTypes.map(async (type) => {
+      const isSupported = await checkType(type)
+      if (!isSupported) {
+        unsupported.push(type)
+      }
+    })
+  )
+
+  await markTypesChecked(apiHost, unsupported, session.key)
+  logger.debug('permission:check done', { hasViewSetup, unsupported })
+  return unsupported
+}
+
 export async function warmupMetadataCache(sfHost: string): Promise<void> {
   const commonTypes = ['ApexClass', 'ApexTrigger', 'Flow', 'CustomObject']
-  const host = normalizeHost(sfHost)
 
-  const session = await getSession(host)
+  const session = await getSession(sfHost)
   if (!session) {
     return
   }
 
+  const apiHost = normalizeHost(session.hostname)
+
+  // Check permissions if needed (also recheck if session changed)
+  if (await needsPermissionCheck(apiHost, session.key)) {
+    await checkMetadataPermissions(sfHost)
+  }
+
   const start = Date.now()
+  const unsupported = await getUnsupportedTypes(apiHost)
+  const typesToWarmup = commonTypes.filter(t => !unsupported.includes(t))
+
   await Promise.all(
-    commonTypes.map(async (type) => {
+    typesToWarmup.map(async (type) => {
       try {
-        // Use cache if available, only fetch if cache miss
-        const { data } = await listMetadata(type, host, session.key, false)
-        buildSearchIndex(type, data, host)
+        const { data } = await listMetadata(type, apiHost, session.key, false)
+        buildSearchIndex(type, data, apiHost)
       } catch (error) {
         logger.error('warmup failed', { type, error })
       }
     })
   )
 
-  logger.debug('warmup:done', { types: commonTypes.length, ms: Date.now() - start })
+  logger.debug('warmup:done', { types: typesToWarmup.length, ms: Date.now() - start })
 }
 
 export async function getCacheStats() {
@@ -846,13 +987,17 @@ export function getAvailableMetadataTypes(): string[] {
   return Object.keys(METADATA_TYPES)
 }
 
-export async function getSupportedMetadataTypes(sfHost: string): Promise<string[]> {
-  const allTypes = Object.keys(METADATA_TYPES)
-  const unsupported = await getUnsupportedTypes(normalizeHost(sfHost))
-  return allTypes.filter(type => !unsupported.includes(type))
+import { getUnsupportedTypes as getUnsupportedTypesRaw } from './unsupported-types'
+
+export async function getUnsupportedTypes(sfHost: string): Promise<string[]> {
+  return getUnsupportedTypesRaw(normalizeHost(sfHost))
 }
 
-export { getUnsupportedTypes } from './unsupported-types'
+export async function getSupportedMetadataTypes(sfHost: string): Promise<string[]> {
+  const allTypes = Object.keys(METADATA_TYPES)
+  const unsupported = await getUnsupportedTypes(sfHost)
+  return allTypes.filter(type => !unsupported.includes(type))
+}
 
 const SALESFORCE_PATTERNS = [
   /https:\/\/.*\.salesforce\.com/,

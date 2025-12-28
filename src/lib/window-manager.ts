@@ -2,7 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
-import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
+import { searchSalesforceMetadata, executeCustomCommand, isApiAvailable, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
 import { logger } from '~lib/logger'
 import type { SearchResult } from '~types'
@@ -921,6 +921,37 @@ class UltraForceWindowManager {
     }
   }
 
+  private currentUserId: Record<string, string> = {}
+
+  private async getCurrentUserId(): Promise<string | null> {
+    if (!this.state.sfHost) {
+      return null
+    }
+
+    const hostKey = this.state.sfHost
+    if (this.currentUserId[hostKey]) {
+      return this.currentUserId[hostKey]
+    }
+
+    // Skip if API is not available
+    if (!isApiAvailable(this.state.sfHost)) {
+      return null
+    }
+
+    try {
+      const apex = encodeURIComponent('throw new System.TypeException(UserInfo.getUserId());')
+      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/executeAnonymous/?anonymousBody=${apex}`)
+      const userId = resp?.exceptionMessage?.replace('System.TypeException: ', '')
+      if (userId && userId.startsWith('005')) {
+        this.currentUserId[hostKey] = userId
+        return userId
+      }
+    } catch {
+      // User may not have Author Apex permission
+    }
+    return null
+  }
+
   private async getCurrentUserProfileId(): Promise<string | null> {
     if (!this.state.sfHost) {
       return null
@@ -931,13 +962,12 @@ class UltraForceWindowManager {
       return this.currentUserProfileId[hostKey]
     }
 
-    try {
-      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
-      const userId = userInfo?.id
-      if (!userId) {
-        return null
-      }
+    const userId = await this.getCurrentUserId()
+    if (!userId) {
+      return null
+    }
 
+    try {
       const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
       const profileId = resp?.records?.[0]?.ProfileId
@@ -945,8 +975,8 @@ class UltraForceWindowManager {
         this.currentUserProfileId[hostKey] = profileId
         return profileId
       }
-    } catch (error) {
-      logger.warn('Failed to fetch current user profile:', error)
+    } catch {
+      // ignore
     }
     return null
   }
@@ -961,13 +991,14 @@ class UltraForceWindowManager {
       return this.userLightningPreferenceCache[hostKey]
     }
 
-    try {
-      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
-      const userId = userInfo?.id
-      if (!userId) {
-        return null
-      }
+    const userId = await this.getCurrentUserId()
+    if (!userId) {
+      this.userLightningPreferenceCache[hostKey] = true
+      this.state.userLightningPreference = true
+      return true
+    }
 
+    try {
       const soql = encodeURIComponent(`SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
       const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
@@ -977,10 +1008,13 @@ class UltraForceWindowManager {
         this.state.userLightningPreference = preference
         return preference
       }
-    } catch (error) {
-      logger.warn('Failed to fetch user Lightning preference:', error)
+    } catch {
+      // ignore
     }
-    return null
+
+    this.userLightningPreferenceCache[hostKey] = true
+    this.state.userLightningPreference = true
+    return true
   }
 
   private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<{ layoutId: string; objectDurableId: string } | null> {
