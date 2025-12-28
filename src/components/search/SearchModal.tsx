@@ -10,7 +10,7 @@ import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
-import { checkForUpdate, dismissUpdateNotification, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
+import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { logger } from '~lib/logger'
 import type { ObjectAction } from './ResultItem'
 
@@ -380,7 +380,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const handleDismissUpdate = useCallback(() => {
     setShowUpdateNotification(false)
-    dismissUpdateNotification().catch(() => {})
   }, [])
 
   const handleKeyDown = (event: React.KeyboardEvent) => {

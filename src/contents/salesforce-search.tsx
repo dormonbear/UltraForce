@@ -1,6 +1,6 @@
 import type { PlasmoCSConfig } from 'plasmo'
 import UltraForceWindowManager from '~lib/window-manager'
-import { validateSalesforceSession, warmupMetadataCache } from '~lib/salesforce-api'
+import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermissions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
 
@@ -50,6 +50,9 @@ class UltraForceContentScript {
 
   private async initialize(): Promise<void> {
     try {
+      // Check API availability first (before WindowManager tries to call APIs)
+      await this.initializeSession()
+
       this.windowManager = await UltraForceWindowManager.getInstance({
         debugMode: false,
         useShadowDOM: true
@@ -59,7 +62,6 @@ class UltraForceContentScript {
       this.setupKeyboardShortcuts()
       this.setupStorageListener()
       this.setupMessageListener()
-      await this.initializeSession()
 
       this.isInitialized = true
     } catch (error) {
@@ -209,6 +211,9 @@ class UltraForceContentScript {
             logger.warn('Cache warmup failed:', error)
           )
         }, 2000)
+      } else {
+        // API access denied - check and cache permissions
+        checkMetadataPermissions(sfHost).catch(() => {})
       }
     } catch (error) {
       logger.error('Failed to initialize session:', error)
