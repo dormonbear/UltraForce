@@ -1,6 +1,6 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.0.9",
+  "version": "0.1.0",
   "type": "module",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
@@ -64,6 +64,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.57.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "eslint": "^9.39.2",

@@ -6,8 +6,11 @@ import SearchResults from './SearchResults'
 import SettingsPanel, { type NavigationMode } from './SettingsPanel'
 import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
+import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
+import { getUnsupportedTypes } from '~lib/salesforce-api'
+import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { logger } from '~lib/logger'
 import type { ObjectAction } from './ResultItem'
 
@@ -88,6 +91,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [_visibleItemCount, setVisibleItemCount] = useState(0)
   const [customCommands, setCustomCommands] = useState<Record<string, CustomCommand>>({})
   const [showCommandHints, setShowCommandHints] = useState(false)
+  const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
+  const [showUpdateNotification, setShowUpdateNotification] = useState(false)
+  const [updateVersion, setUpdateVersion] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
   const isInitialMount = useRef(true)
@@ -216,12 +222,34 @@ const SearchModal: React.FC<SearchModalProps> = ({
     onSearchRef.current = onSearch
   }, [onSearch])
 
+  // Load unsupported types for current org
+  useEffect(() => {
+    if (sfHost) {
+      getUnsupportedTypes(sfHost).then(setUnsupportedTypes).catch(() => {})
+    }
+  }, [sfHost])
+
+  // Check for version updates (only on first mount)
+  const hasCheckedUpdate = useRef(false)
+  useEffect(() => {
+    if (isVisible && !hasCheckedUpdate.current) {
+      hasCheckedUpdate.current = true
+      checkForUpdate().then(({ hasUpdate, currentVersion }) => {
+        if (hasUpdate) {
+          setShowUpdateNotification(true)
+          setUpdateVersion(currentVersion)
+          markNotificationAsShown().catch(() => {})
+        }
+      }).catch(() => {})
+    }
+  }, [isVisible])
+
   // Merge builtin and custom commands
   const allCommands = useMemo(() => mergeCommands(customCommands), [customCommands])
 
   // Parse command from query
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
-  const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands), [query, allCommands])
+  const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands, unsupportedTypes), [query, allCommands, unsupportedTypes])
 
   // Show/hide command hints
   useEffect(() => {
@@ -349,6 +377,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   // Track selected record action index (separate from search results)
   const [selectedRecordActionIndex, setSelectedRecordActionIndex] = useState(0)
+
+  const handleDismissUpdate = useCallback(() => {
+    setShowUpdateNotification(false)
+  }, [])
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     // When query is empty and we have record actions, handle navigation for record actions
@@ -479,6 +511,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
       <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
         <div
           className="ultraforce-search-modal"
+          data-ultraforce-modal
           ref={modalRef}
           tabIndex={-1}
           onKeyDown={handleKeyDown}
@@ -515,7 +548,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 query={query}
                 onQueryChange={setQuery}
                 onKeyDown={(e) => {
-                  e.stopPropagation()
                   if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
                     handleKeyDown(e)
                   }
@@ -631,6 +663,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
               <button
                 className="settings-button"
+                data-ultraforce-settings-button
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -651,6 +684,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 </svg>
               </button>
             </div>
+
+            {showUpdateNotification && (
+              <UpdateNotification
+                version={updateVersion}
+                releaseNotesUrl={RELEASE_NOTES_URL}
+                onDismiss={handleDismissUpdate}
+              />
+            )}
           </>
         )}
         </div>

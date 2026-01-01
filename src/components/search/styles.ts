@@ -31,7 +31,7 @@ export const SEARCH_MODAL_STYLES = `
       0 0 0 1px rgba(0, 0, 0, 0.2),
       0 20px 60px -10px rgba(0, 0, 0, 0.6),
       0 10px 20px -5px rgba(0, 0, 0, 0.4);
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     z-index: 2147483647;
@@ -504,6 +504,14 @@ export const SEARCH_MODAL_STYLES = `
     display: flex;
     flex-direction: column;
     animation: fade-in 0.2s ease;
+  }
+
+  [data-ultraforce-settings] {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   @keyframes fade-in {
@@ -1198,5 +1206,169 @@ export const SEARCH_MODAL_STYLES = `
     font-weight: 600;
     font-family: 'SF Mono', Monaco, monospace;
     color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Update Celebration Notification */
+  .update-celebration {
+    position: absolute;
+    top: 100%;
+    left: 20px;
+    right: 20px;
+    z-index: 100;
+    overflow: visible;
+    transform: translateY(-20px) scaleY(0);
+    transform-origin: top center;
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  }
+
+  .update-celebration.visible {
+    transform: translateY(8px) scaleY(1);
+    opacity: 1;
+  }
+
+  .update-celebration-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: rgba(20, 20, 25, 0.95);
+    border: 1px solid rgba(1, 118, 211, 0.5);
+    border-radius: 16px;
+    backdrop-filter: blur(24px);
+    box-shadow:
+      0 8px 32px rgba(1, 118, 211, 0.25),
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .update-celebration-content::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 8px solid rgba(1, 118, 211, 0.5);
+  }
+
+  .update-celebration-content::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 6px solid rgba(20, 20, 25, 0.95);
+  }
+
+  .update-celebration-icon {
+    font-size: 32px;
+    animation: bounce-icon 1s ease-in-out infinite;
+  }
+
+  @keyframes bounce-icon {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+  }
+
+  .update-celebration-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .update-celebration-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 2px;
+  }
+
+  .update-celebration-desc {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .update-celebration-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #0176d3 0%, #1589ee 100%);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(1, 118, 211, 0.3);
+    flex-shrink: 0;
+  }
+
+  .update-celebration-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(1, 118, 211, 0.4);
+    background: linear-gradient(135deg, #014486 0%, #0176d3 100%);
+  }
+
+  .update-celebration-dismiss {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .update-celebration-dismiss:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Fireworks Animation */
+  .fireworks-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .firework-particle {
+    position: absolute;
+    font-size: 20px;
+    opacity: 0;
+    animation: firework-burst 2s ease-out forwards;
+    pointer-events: none;
+  }
+
+  @keyframes firework-burst {
+    0% {
+      opacity: 0;
+      transform: scale(0) translateY(20px);
+    }
+    20% {
+      opacity: 1;
+      transform: scale(1.2) translateY(-10px);
+    }
+    40% {
+      opacity: 1;
+      transform: scale(1) translateY(-20px);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(0.5) translateY(-40px);
+    }
   }
 `
