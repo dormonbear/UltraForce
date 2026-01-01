@@ -180,6 +180,16 @@ function recordToIndexedRecord(record: any, metadataType: string): IndexedRecord
         label = record.Label || ''
         apiName = record.QualifiedApiName || record.DeveloperName || ''
         break
+      case 'Report':
+        name = record.Name || ''
+        apiName = record.DeveloperName || ''
+        description = record.FolderName || ''
+        break
+      case 'Dashboard':
+        name = record.Title || ''
+        apiName = record.DeveloperName || ''
+        description = record.FolderName || ''
+        break
       default:
         name = record.Name || record.QualifiedApiName || record.MasterLabel || ''
     }
@@ -422,6 +432,20 @@ function toSearchResult(indexed: IndexedRecord, score?: number): SearchResult {
         result.description = indexed.description
       }
       break
+    case 'Report': {
+      const parts: string[] = []
+      if (record.FolderName) parts.push(record.FolderName)
+      if (record.LastModifiedBy?.Name) parts.push(record.LastModifiedBy.Name)
+      result.description = parts.join(' | ') || undefined
+      break
+    }
+    case 'Dashboard': {
+      const parts: string[] = []
+      if (record.FolderName) parts.push(record.FolderName)
+      if (record.LastModifiedBy?.Name) parts.push(record.LastModifiedBy.Name)
+      result.description = parts.join(' | ') || undefined
+      break
+    }
   }
 
   return result

@@ -506,6 +506,14 @@ export const SEARCH_MODAL_STYLES = `
     animation: fade-in 0.2s ease;
   }
 
+  [data-ultraforce-settings] {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }

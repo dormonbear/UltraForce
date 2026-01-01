@@ -74,3 +74,12 @@ export async function needsPermissionCheck(host: string, sessionKey?: string): P
   }
   return false
 }
+
+export async function clearUnsupportedTypesCache(): Promise<void> {
+  cache = null
+  try {
+    await chrome.storage.local.remove([STORAGE_KEY])
+  } catch {
+    // ignore
+  }
+}

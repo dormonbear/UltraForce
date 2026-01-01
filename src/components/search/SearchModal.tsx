@@ -548,7 +548,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 query={query}
                 onQueryChange={setQuery}
                 onKeyDown={(e) => {
-                  e.stopPropagation()
                   if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
                     handleKeyDown(e)
                   }

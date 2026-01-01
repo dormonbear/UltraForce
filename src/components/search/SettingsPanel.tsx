@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import type { CustomCommand } from '~types'
 import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands, filterCommandsBySupported } from '~lib/command-parser'
 import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
-import { getUnsupportedTypes } from '~lib/salesforce-api'
+import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~lib/salesforce-api'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
@@ -40,7 +40,8 @@ const METADATA_TYPES = [
   { value: 'CustomSetting', label: 'Custom Settings' },
   { value: 'PermissionSet', label: 'Permission Sets' },
   { value: 'Profile', label: 'Profiles' },
-  { value: 'Queue,Group', label: 'Queues & Public Groups' }
+  { value: 'Queue,Group', label: 'Queues & Public Groups' },
+  { value: 'Report,Dashboard', label: 'Reports & Dashboards' }
 ]
 
 const NAVIGATION_MODES = [
@@ -95,6 +96,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [apiStats, setApiStats] = useState<ApiStatsDisplay>({ total: 0, last24h: 0, lastMonth: 0 })
   const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
+  const [isRebuilding, setIsRebuilding] = useState(false)
 
   useEffect(() => {
     getApiStats().then(setApiStats).catch(() => {})
@@ -306,6 +308,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
     await resetAllStats()
     setApiStats(await getApiStats())
+  }
+
+  const handleRebuildCache = async () => {
+    if (!sfHost) return
+    setIsRebuilding(true)
+    try {
+      await clearMetadataCache()
+      await warmupMetadataCache(sfHost)
+    } finally {
+      setIsRebuilding(false)
+    }
   }
 
   const renderCommandForm = () => (
@@ -615,6 +628,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
         )}
+
+        <div className="setting-section">
+          <h3 className="section-title">Cache</h3>
+          <p className="section-desc">Rebuild metadata cache for current org.</p>
+          <button
+            className="cmd-btn cmd-btn-secondary"
+            onClick={handleRebuildCache}
+            disabled={isRebuilding || !sfHost}
+          >
+            {isRebuilding ? 'Rebuilding...' : 'Rebuild Cache'}
+          </button>
+        </div>
 
         <div className="setting-section">
           <h3 className="section-title">API Statistics</h3>
