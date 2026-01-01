@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import type { CustomCommand } from '~types'
-import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands } from '~lib/command-parser'
+import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands, filterCommandsBySupported } from '~lib/command-parser'
 import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
+import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~lib/salesforce-api'
 
 type NavigationMode = 'auto' | 'lightning' | 'classic'
 
@@ -39,7 +40,8 @@ const METADATA_TYPES = [
   { value: 'CustomSetting', label: 'Custom Settings' },
   { value: 'PermissionSet', label: 'Permission Sets' },
   { value: 'Profile', label: 'Profiles' },
-  { value: 'Queue,Group', label: 'Queues & Public Groups' }
+  { value: 'Queue,Group', label: 'Queues & Public Groups' },
+  { value: 'Report,Dashboard', label: 'Reports & Dashboards' }
 ]
 
 const NAVIGATION_MODES = [
@@ -56,6 +58,7 @@ const getAppVersion = () => {
   }
 }
 const PRIVACY_URL = 'https://gist.github.com/dormonbear/14242e4e5effbf0c7159c0e2bc14bbda'
+const DOCS_URL = 'https://ultraforce.dormon.net/'
 
 interface CommandFormState {
   key: string
@@ -92,12 +95,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [apiStats, setApiStats] = useState<ApiStatsDisplay>({ total: 0, last24h: 0, lastMonth: 0 })
+  const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
+  const [isRebuilding, setIsRebuilding] = useState(false)
 
   useEffect(() => {
-    getApiStats().then(setApiStats).catch(() => {
-      // Ignore errors, keep default values
+    getApiStats().then(setApiStats).catch(() => {})
+    if (sfHost) {
+      getUnsupportedTypes(sfHost).then(setUnsupportedTypes).catch(() => {})
+    }
+  }, [sfHost])
+
+  const supportedBuiltinCommands = useMemo(() => {
+    return filterCommandsBySupported(BUILTIN_COMMANDS, unsupportedTypes)
+  }, [unsupportedTypes])
+
+  const supportedMetadataTypes = useMemo(() => {
+    return METADATA_TYPES.filter(type => {
+      const types = type.value.split(',')
+      return types.some(t => !unsupportedTypes.includes(t))
     })
-  }, [])
+  }, [unsupportedTypes])
   const [formState, setFormState] = useState<CommandFormState>({
     key: '',
     description: '',
@@ -293,6 +310,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setApiStats(await getApiStats())
   }
 
+  const handleRebuildCache = async () => {
+    if (!sfHost) return
+    setIsRebuilding(true)
+    try {
+      await clearMetadataCache()
+      await warmupMetadataCache(sfHost)
+    } finally {
+      setIsRebuilding(false)
+    }
+  }
+
   const renderCommandForm = () => (
     <div className="command-edit-form">
       <div className="command-form-row">
@@ -369,7 +397,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   )
 
   return (
-    <>
+    <div data-ultraforce-settings>
       <div className="settings-header">
         <button className="back-button" onClick={onClose}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -384,7 +412,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <h3 className="section-title">Search Types</h3>
           <p className="section-desc">Select metadata types to include in search.</p>
           <div className="type-grid">
-            {METADATA_TYPES.map((type) => {
+            {supportedMetadataTypes.map((type) => {
               const types = type.value.split(',')
               const isChecked = types.every((t) => selectedTypes.includes(t))
               const handleToggle = () => {
@@ -507,7 +535,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <h3 className="section-title">Built-in Commands</h3>
           <p className="section-desc">Type : followed by a command to filter search.</p>
           <div className="commands-list">
-            {Object.values(BUILTIN_COMMANDS).map((cmd) => (
+            {Object.values(supportedBuiltinCommands).map((cmd) => (
               <div key={cmd.key} className="command-row command-row-builtin">
                 <span className="command-key">:{cmd.key}</span>
                 <span className="command-desc">{cmd.description}</span>
@@ -602,6 +630,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         )}
 
         <div className="setting-section">
+          <h3 className="section-title">Cache</h3>
+          <p className="section-desc">Rebuild metadata cache for current org.</p>
+          <button
+            className="cmd-btn cmd-btn-secondary"
+            onClick={handleRebuildCache}
+            disabled={isRebuilding || !sfHost}
+          >
+            {isRebuilding ? 'Rebuilding...' : 'Rebuild Cache'}
+          </button>
+        </div>
+
+        <div className="setting-section">
           <h3 className="section-title">API Statistics</h3>
           <div className="stats-list">
             <div className="stats-row">
@@ -626,6 +666,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <span className="meta-item">UltraForce v{getAppVersion()}</span>
           <a
             className="meta-link"
+            href={DOCS_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Documentation
+          </a>
+          <a
+            className="meta-link"
             href={PRIVACY_URL}
             target="_blank"
             rel="noreferrer"
@@ -634,7 +682,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </a>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { SearchResult } from '~types'
 
-export type ObjectAction = 'list' | 'fields' | 'layouts' | 'details' | 'preview'
+export type ObjectAction = 'list' | 'fields' | 'layouts' | 'details' | 'preview' | 'recordtypes' | 'validationrules'
 
 interface ResultItemProps {
   result: SearchResult
@@ -78,6 +78,8 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
     <div
       ref={itemRef}
       className={`result-item ${isSelected ? 'selected' : ''}`}
+      data-ultraforce-result-item
+      data-selected={isSelected}
       onClick={onClick}
     >
       <div className="result-info">
@@ -154,6 +156,26 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
                   <rect x="3" y="3" width="18" height="18" rx="2" />
                   <line x1="3" y1="9" x2="21" y2="9" />
                   <line x1="9" y1="21" x2="9" y2="9" />
+                </svg>
+              }
+            />
+            <ActionButton
+              title="Record Types"
+              onClick={handleActionClick('recordtypes')}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                </svg>
+              }
+            />
+            <ActionButton
+              title="Validation Rules"
+              onClick={handleActionClick('validationrules')}
+              icon={
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <polyline points="9 12 11 14 15 10" />
                 </svg>
               }
             />

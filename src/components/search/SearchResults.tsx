@@ -66,7 +66,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   let currentIndex = 0
 
   return (
-    <div className="search-results">
+    <div className="search-results" data-ultraforce-results>
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 

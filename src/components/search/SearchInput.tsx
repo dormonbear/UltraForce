@@ -70,11 +70,24 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           type="text"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={onKeyDown}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            e.nativeEvent.stopImmediatePropagation()
+            onKeyDown(e)
+          }}
+          onKeyUp={(e) => {
+            e.stopPropagation()
+            e.nativeEvent.stopImmediatePropagation()
+          }}
+          onKeyPress={(e) => {
+            e.stopPropagation()
+            e.nativeEvent.stopImmediatePropagation()
+          }}
           placeholder={
             displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'
           }
           className="search-input"
+          data-ultraforce-input
           autoFocus
         />
         {displayName && (

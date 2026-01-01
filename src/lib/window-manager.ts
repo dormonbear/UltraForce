@@ -2,7 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
-import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
+import { searchSalesforceMetadata, executeCustomCommand, isApiAvailable, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
 import { logger } from '~lib/logger'
 import type { SearchResult } from '~types'
@@ -47,6 +47,7 @@ type SetupShortcut = {
   name: string
   description: string
   path: string
+  classicPath?: string
 }
 
 // Standard object key prefixes for Classic URL object resolution
@@ -73,35 +74,83 @@ const KEY_PREFIX_MAP: Record<string, string> = {
 }
 
 const SETUP_SHORTCUTS: SetupShortcut[] = [
-  { id: 'approval-processes', name: 'Approval Processes', description: 'Process Automation', path: '/lightning/setup/ApprovalProcesses/home' },
-  { id: 'session-settings', name: 'Session Settings', description: 'Security > Session', path: '/lightning/setup/SessionSettings/home' },
-  { id: 'company-information', name: 'Company Information', description: 'Company Settings', path: '/lightning/setup/CompanyProfileInfo/home' },
-  { id: 'password-policies', name: 'Password Policies', description: 'Security > Password Policies', path: '/lightning/setup/PasswordPolicies/home' },
-  { id: 'login-history', name: 'Login History', description: 'Security > Login History', path: '/lightning/setup/SessionManagement/home' },
-  { id: 'users', name: 'Users', description: 'User Management', path: '/lightning/setup/ManageUsers/home' },
-  { id: 'permission-sets', name: 'Permission Sets', description: 'User Access', path: '/lightning/setup/PermSets/home' },
-  { id: 'permission-set-groups', name: 'Permission Set Groups', description: 'User Access', path: '/lightning/setup/PermSetGroups/home' },
-  { id: 'profiles', name: 'Profiles', description: 'User Access', path: '/lightning/setup/Profiles/home' },
-  { id: 'roles', name: 'Roles', description: 'User Access', path: '/lightning/setup/Roles/home' },
-  { id: 'sharing-settings', name: 'Sharing Settings', description: 'Security > Sharing', path: '/lightning/setup/SecuritySharing/home' },
-  { id: 'connected-apps', name: 'Connected Apps', description: 'Apps > App Manager', path: '/lightning/setup/ConnectedApplication/home' },
-  { id: 'apex-classes', name: 'Apex Classes', description: 'Development', path: '/lightning/setup/ApexClasses/home' },
-  { id: 'apex-triggers', name: 'Apex Triggers', description: 'Development', path: '/lightning/setup/ApexTriggers/home' },
-  { id: 'visualforce-pages', name: 'Visualforce Pages', description: 'Development', path: '/lightning/setup/ApexPages/home' },
-  { id: 'visualforce-components', name: 'Visualforce Components', description: 'Development', path: '/lightning/setup/ApexComponents/home' },
-  { id: 'remote-site-settings', name: 'Remote Site Settings', description: 'Security', path: '/lightning/setup/SecurityRemoteProxy/home' },
-  { id: 'named-credentials', name: 'Named Credentials', description: 'Security', path: '/lightning/setup/NamedCredential/home' },
-  { id: 'email-deliverability', name: 'Email Deliverability', description: 'Email', path: '/lightning/setup/OrgEmailSettings/home' },
-  { id: 'queues', name: 'Queues', description: 'User Management', path: '/lightning/setup/Queues/home' },
-  { id: 'public-groups', name: 'Public Groups', description: 'User Management', path: '/lightning/setup/PublicGroups/home' },
-  { id: 'debug-logs', name: 'Debug Logs', description: 'Logs & Monitoring', path: '/lightning/setup/DebugLogs/home' },
-  { id: 'apex-jobs', name: 'Apex Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/ApexJobs/home' },
-  { id: 'scheduled-jobs', name: 'Scheduled Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/ScheduledJobs/home' },
+  // Process Automation
+  { id: 'approval-processes', name: 'Approval Processes', description: 'Process Automation', path: '/lightning/setup/ApprovalProcesses/home', classicPath: '/setup/workflow/approval' },
+  { id: 'flows', name: 'Flows', description: 'Process Automation', path: '/lightning/setup/Flows/home' },
+  { id: 'workflow-rules', name: 'Workflow Rules', description: 'Process Automation', path: '/lightning/setup/WorkflowRules/home', classicPath: '/setup/workflow/rules' },
+
+  // Security
+  { id: 'session-settings', name: 'Session Settings', description: 'Security', path: '/lightning/setup/SecuritySession/home', classicPath: '/_ui/system/security/SessionSettings' },
+  { id: 'password-policies', name: 'Password Policies', description: 'Security', path: '/lightning/setup/SecurityPolicies/home', classicPath: '/secur/orgloginsettingedit.jsp' },
+  { id: 'sharing-settings', name: 'Sharing Settings', description: 'Security', path: '/lightning/setup/SecuritySharing/home', classicPath: '/p/own/OrgSharingDetail' },
+  { id: 'remote-site-settings', name: 'Remote Site Settings', description: 'Security', path: '/lightning/setup/SecurityRemoteProxy/home', classicPath: '/0rp' },
+  { id: 'named-credentials', name: 'Named Credentials', description: 'Security', path: '/lightning/setup/NamedCredential/home', classicPath: '/0XA' },
+  { id: 'cors', name: 'CORS', description: 'Security', path: '/lightning/setup/CorsWhitelistEntries/home', classicPath: '/074' },
+  { id: 'trusted-urls', name: 'Trusted URLs', description: 'Security', path: '/lightning/setup/SecurityCspTrustedSite/home', classicPath: '/08y' },
+  { id: 'health-check', name: 'Health Check', description: 'Security', path: '/lightning/setup/HealthCheck/home', classicPath: '/_ui/security/dashboard/aura/SecurityDashboardAuraContainer' },
+  { id: 'setup-audit-trail', name: 'Setup Audit Trail', description: 'Security', path: '/lightning/setup/SecurityEvents/home', classicPath: '/setup/org/orgsetupaudit.jsp' },
+  { id: 'certificates', name: 'Certificates', description: 'Security', path: '/lightning/setup/CertificatesAndKeysManagement/home', classicPath: '/0P1' },
+
+  // Identity
+  { id: 'login-history', name: 'Login History', description: 'Identity', path: '/lightning/setup/OrgLoginHistory/home', classicPath: '/0Ya' },
+  { id: 'sso-settings', name: 'Single Sign-On', description: 'Identity', path: '/lightning/setup/SingleSignOn/home', classicPath: '/_ui/identity/saml/SingleSignOnSettingsUi/d' },
+  { id: 'auth-providers', name: 'Auth Providers', description: 'Identity', path: '/lightning/setup/AuthProviders/home', classicPath: '/0SO' },
+  { id: 'oauth-settings', name: 'OAuth Settings', description: 'Identity', path: '/lightning/setup/OauthOidcSettings/home', classicPath: '/_ui/security/OauthOidcSettings/aura/OauthOidcSettingsAuraContainer' },
+
+  // User Management
+  { id: 'users', name: 'Users', description: 'User Management', path: '/lightning/setup/ManageUsers/home', classicPath: '/005?isUserEntityOverride=1' },
+  { id: 'permission-sets', name: 'Permission Sets', description: 'User Management', path: '/lightning/setup/PermSets/home', classicPath: '/0PS' },
+  { id: 'permission-set-groups', name: 'Permission Set Groups', description: 'User Management', path: '/lightning/setup/PermSetGroups/home', classicPath: '/_ui/perms/ui/setup/PermSetGroupsPage' },
+  { id: 'profiles', name: 'Profiles', description: 'User Management', path: '/lightning/setup/EnhancedProfiles/home', classicPath: '/00e' },
+  { id: 'roles', name: 'Roles', description: 'User Management', path: '/lightning/setup/Roles/home', classicPath: '/setup/user/roleSplash.jsp' },
+  { id: 'queues', name: 'Queues', description: 'User Management', path: '/lightning/setup/Queues/home', classicPath: '/p/own/OrgQueuesPage/d' },
+  { id: 'public-groups', name: 'Public Groups', description: 'User Management', path: '/lightning/setup/PublicGroups/home', classicPath: '/p/own/OrgPublicGroupsPage/d' },
+
+  // Company Settings
+  { id: 'company-information', name: 'Company Information', description: 'Company Settings', path: '/lightning/setup/CompanyProfileInfo/home', classicPath: '/setup/companyInfo.apexp' },
+  { id: 'my-domain', name: 'My Domain', description: 'Company Settings', path: '/lightning/setup/OrgDomain/home' },
+
+  // Apps
+  { id: 'app-manager', name: 'App Manager', description: 'Apps', path: '/lightning/setup/NavigationMenus/home', classicPath: '/02u' },
+  { id: 'connected-apps', name: 'Connected Apps', description: 'Apps', path: '/lightning/setup/ConnectedApplication/home' },
+
+  // Custom Code / Development
+  { id: 'apex-classes', name: 'Apex Classes', description: 'Custom Code', path: '/lightning/setup/ApexClasses/home', classicPath: '/01p' },
+  { id: 'apex-triggers', name: 'Apex Triggers', description: 'Custom Code', path: '/lightning/setup/ApexTriggers/home', classicPath: '/setup/build/allTriggers.apexp' },
+  { id: 'apex-settings', name: 'Apex Settings', description: 'Custom Code', path: '/lightning/setup/ApexSettings/home', classicPath: '/setup/apexsettings.apexp' },
+  { id: 'apex-test-execution', name: 'Apex Test Execution', description: 'Custom Code', path: '/lightning/setup/ApexTestQueue/home', classicPath: '/ui/setup/apex/ApexTestQueuePage' },
+  { id: 'visualforce-pages', name: 'Visualforce Pages', description: 'Custom Code', path: '/lightning/setup/ApexPages/home', classicPath: '/apexpages/setup/listApexPage.apexp' },
+  { id: 'visualforce-components', name: 'Visualforce Components', description: 'Custom Code', path: '/lightning/setup/ApexComponents/home', classicPath: '/apexpages/setup/listApexComponent.apexp' },
+  { id: 'lightning-components', name: 'Lightning Components', description: 'Custom Code', path: '/lightning/setup/LightningComponentBundles/home' },
+  { id: 'static-resources', name: 'Static Resources', description: 'Custom Code', path: '/lightning/setup/StaticResources/home', classicPath: '/apexpages/setup/listStaticResource.apexp' },
+  { id: 'custom-metadata-types', name: 'Custom Metadata Types', description: 'Custom Code', path: '/lightning/setup/CustomMetadata/home', classicPath: '/_ui/platform/ui/schema/wizard/entity/CustomMetadataTypeListPage' },
+  { id: 'custom-settings', name: 'Custom Settings', description: 'Custom Code', path: '/lightning/setup/CustomSettings/home', classicPath: '/setup/ui/listCustomSettings.apexp' },
+  { id: 'platform-cache', name: 'Platform Cache', description: 'Custom Code', path: '/lightning/setup/PlatformCache/home', classicPath: '/0Er' },
+
+  // Integrations
+  { id: 'platform-events', name: 'Platform Events', description: 'Integrations', path: '/lightning/setup/EventObjects/home', classicPath: '/p/setup/custent/EventObjectsPage' },
+  { id: 'external-services', name: 'External Services', description: 'Integrations', path: '/lightning/setup/ExternalServices/home' },
+  { id: 'data-loader', name: 'Data Loader', description: 'Integrations', path: '/lightning/setup/DataLoader/home' },
+  { id: 'data-import-wizard', name: 'Data Import Wizard', description: 'Integrations', path: '/lightning/setup/DataManagementDataImporter/home', classicPath: '/ui/setup/dataimporter/DataImporterLandingPage' },
+
+  // Logs & Monitoring
+  { id: 'debug-logs', name: 'Debug Logs', description: 'Logs & Monitoring', path: '/lightning/setup/ApexDebugLogs/home', classicPath: '/setup/ui/listApexTraces.apexp' },
+  { id: 'apex-jobs', name: 'Apex Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/AsyncApexJobs/home', classicPath: '/apexpages/setup/listAsyncApexJobs.apexp' },
+  { id: 'scheduled-jobs', name: 'Scheduled Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/ScheduledJobs/home', classicPath: '/08e' },
+  { id: 'bulk-data-load-jobs', name: 'Bulk Data Load Jobs', description: 'Logs & Monitoring', path: '/lightning/setup/AsyncApiJobStatus/home', classicPath: '/750' },
+
+  // Environments
+  { id: 'deployment-status', name: 'Deployment Status', description: 'Environments', path: '/lightning/setup/DeployStatus/home', classicPath: '/changemgmt/monitorDeployment.apexp' },
+  { id: 'sandboxes', name: 'Sandboxes', description: 'Environments', path: '/lightning/setup/DataManagementCreateTestInstance/home' },
+  { id: 'system-overview', name: 'System Overview', description: 'Environments', path: '/lightning/setup/SystemOverview/home', classicPath: '/setup/systemOverview.apexp' },
+
+  // Communication
+  { id: 'email-deliverability', name: 'Email Deliverability', description: 'Communication', path: '/lightning/setup/OrgEmailSettings/home' },
   { id: 'email-templates', name: 'Email Templates', description: 'Communication', path: '/lightning/setup/CommunicationTemplatesEmail/home' },
+
+  // Automation Rules
   { id: 'lead-assignment-rules', name: 'Lead Assignment Rules', description: 'Automation', path: '/lightning/setup/LeadRules/home' },
-  { id: 'case-assignment-rules', name: 'Case Assignment Rules', description: 'Automation', path: '/lightning/setup/CaseRules/home' },
-  { id: 'deployment-status', name: 'Deployment Status', description: 'Deploy', path: '/lightning/setup/DeployStatus/home' },
-  { id: 'sandboxes', name: 'Sandboxes', description: 'Environments', path: '/lightning/setup/DataManagementCreateTestInstance/home' }
+  { id: 'case-assignment-rules', name: 'Case Assignment Rules', description: 'Automation', path: '/lightning/setup/CaseRules/home' }
 ]
 
 function resolveSetupShortcutPath(shortcut: SetupShortcut, sfHost: string | null): string {
@@ -226,6 +275,7 @@ class UltraForceWindowManager {
   private sobjectCacheTimestamp: Record<string, number> = {}
   private currentUserProfileId: Record<string, string> = {}
   private userLightningPreferenceCache: Record<string, boolean> = {}
+  private keyboardInterceptor: ((e: KeyboardEvent) => void) | null = null
 
   private constructor(options: WindowManagerOptions = {}) {
     this.options = { ...this.options, ...options }
@@ -463,6 +513,50 @@ class UltraForceWindowManager {
     this.state.isVisible = true
     this.log('Showing modal')
 
+    // Add capture-phase keyboard interceptor to block Salesforce shortcuts
+    // Strategy: Only block specific keys that Salesforce intercepts
+    this.keyboardInterceptor = (e: KeyboardEvent) => {
+      // Get our input element
+      const ourInput = this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement
+
+      // For '/' key - Salesforce intercepts this to open search
+      // Block completely and manually insert the character
+      if (e.key === '/' && e.type === 'keydown') {
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        e.preventDefault()
+
+        // Manually insert '/' at cursor position
+        if (ourInput) {
+          const start = ourInput.selectionStart || 0
+          const end = ourInput.selectionEnd || 0
+          const value = ourInput.value
+          ourInput.value = value.slice(0, start) + '/' + value.slice(end)
+          ourInput.selectionStart = ourInput.selectionEnd = start + 1
+          // Trigger input event for React state update
+          ourInput.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+        return
+      }
+
+      // For other events of '/' key (keyup, keypress), just block
+      if (e.key === '/') {
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        e.preventDefault()
+        return
+      }
+
+      // Let all other keys pass through to Shadow DOM
+    }
+
+    // Add to window level to intercept before document level handlers
+    window.addEventListener('keydown', this.keyboardInterceptor, true)
+    window.addEventListener('keyup', this.keyboardInterceptor, true)
+    window.addEventListener('keypress', this.keyboardInterceptor, true)
+    logger.debug('keyboard:interceptor added')
+
+
     await this.renderComponent()
     this.emit('show', this.state)
   }
@@ -475,6 +569,15 @@ class UltraForceWindowManager {
 
     this.state.isVisible = false
     this.log('Hiding modal')
+
+    // Remove keyboard interceptor
+    if (this.keyboardInterceptor) {
+      window.removeEventListener('keydown', this.keyboardInterceptor, true)
+      window.removeEventListener('keyup', this.keyboardInterceptor, true)
+      window.removeEventListener('keypress', this.keyboardInterceptor, true)
+      this.keyboardInterceptor = null
+    }
+
 
     if (this.reactRoot) {
       this.reactRoot.unmount()
@@ -664,14 +767,26 @@ class UltraForceWindowManager {
 
     const shortcuts = [...SETUP_SHORTCUTS]
 
+    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+
     const listResults = shortcuts
       .filter((shortcut) => {
         const combinedText = `${shortcut.name} ${shortcut.description}`
         return matchesAllTerms(combinedText)
       })
       .map((shortcut) => {
-        const resolvedPath = resolveSetupShortcutPath(shortcut, this.state.sfHost)
-        const url = buildSetupUrl(this.state.sfHost, resolvedPath)
+        let url: string | null = null
+
+        if (useLightning) {
+          const resolvedPath = resolveSetupShortcutPath(shortcut, this.state.sfHost)
+          url = buildSetupUrl(this.state.sfHost, resolvedPath)
+        } else if (shortcut.classicPath && this.state.sfHost) {
+          url = `https://${this.state.sfHost}${shortcut.classicPath}`
+        } else {
+          const resolvedPath = resolveSetupShortcutPath(shortcut, this.state.sfHost)
+          url = buildSetupUrl(this.state.sfHost, resolvedPath)
+        }
+
         return {
           id: shortcut.id,
           name: shortcut.name,
@@ -850,6 +965,27 @@ class UltraForceWindowManager {
     }
   }
 
+  private async getCurrentRecordLayoutUrl(): Promise<{ objectApiName: string; url: string } | null> {
+    const layoutInfo = await this.getCurrentRecordLayoutInfo()
+    if (!layoutInfo) return null
+
+    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+    let url: string | null
+
+    if (useLightning) {
+      url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
+    } else {
+      url = `https://${this.state.sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
+    }
+
+    if (!url) return null
+
+    return {
+      objectApiName: layoutInfo.objectApiName,
+      url
+    }
+  }
+
   private async getCurrentRecordLayoutInfo(): Promise<{ objectApiName: string; objectDurableId: string; layoutId: string; recordId: string } | null> {
     const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
     const objectApiName = fromUrlObject || (recordId ? await this.resolveObjectApiNameFromRecord(recordId) : null)
@@ -921,6 +1057,37 @@ class UltraForceWindowManager {
     }
   }
 
+  private currentUserId: Record<string, string> = {}
+
+  private async getCurrentUserId(): Promise<string | null> {
+    if (!this.state.sfHost) {
+      return null
+    }
+
+    const hostKey = this.state.sfHost
+    if (this.currentUserId[hostKey]) {
+      return this.currentUserId[hostKey]
+    }
+
+    // Skip if API is not available
+    if (!isApiAvailable(this.state.sfHost)) {
+      return null
+    }
+
+    try {
+      const apex = encodeURIComponent('throw new System.TypeException(UserInfo.getUserId());')
+      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/executeAnonymous/?anonymousBody=${apex}`)
+      const userId = resp?.exceptionMessage?.replace('System.TypeException: ', '')
+      if (userId && userId.startsWith('005')) {
+        this.currentUserId[hostKey] = userId
+        return userId
+      }
+    } catch {
+      // User may not have Author Apex permission
+    }
+    return null
+  }
+
   private async getCurrentUserProfileId(): Promise<string | null> {
     if (!this.state.sfHost) {
       return null
@@ -931,13 +1098,12 @@ class UltraForceWindowManager {
       return this.currentUserProfileId[hostKey]
     }
 
-    try {
-      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
-      const userId = userInfo?.id
-      if (!userId) {
-        return null
-      }
+    const userId = await this.getCurrentUserId()
+    if (!userId) {
+      return null
+    }
 
+    try {
       const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
       const profileId = resp?.records?.[0]?.ProfileId
@@ -945,8 +1111,8 @@ class UltraForceWindowManager {
         this.currentUserProfileId[hostKey] = profileId
         return profileId
       }
-    } catch (error) {
-      logger.warn('Failed to fetch current user profile:', error)
+    } catch {
+      // ignore
     }
     return null
   }
@@ -961,13 +1127,14 @@ class UltraForceWindowManager {
       return this.userLightningPreferenceCache[hostKey]
     }
 
-    try {
-      const userInfo = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/chatter/users/me`)
-      const userId = userInfo?.id
-      if (!userId) {
-        return null
-      }
+    const userId = await this.getCurrentUserId()
+    if (!userId) {
+      this.userLightningPreferenceCache[hostKey] = true
+      this.state.userLightningPreference = true
+      return true
+    }
 
+    try {
       const soql = encodeURIComponent(`SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`)
       const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
       const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
@@ -977,10 +1144,13 @@ class UltraForceWindowManager {
         this.state.userLightningPreference = preference
         return preference
       }
-    } catch (error) {
-      logger.warn('Failed to fetch user Lightning preference:', error)
+    } catch {
+      // ignore
     }
-    return null
+
+    this.userLightningPreferenceCache[hostKey] = true
+    this.state.userLightningPreference = true
+    return true
   }
 
   private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<{ layoutId: string; objectDurableId: string } | null> {
@@ -1153,6 +1323,12 @@ class UltraForceWindowManager {
             targetUrl = `https://${setupHost}/lightning/setup/PublicGroups/page?address=%2Fsetup%2Fown%2Fgroupdetail.jsp%3Fid%3D${result.id}`
             break
           }
+          case 'Report':
+            targetUrl = `${baseUrl}/lightning/r/Report/${result.id}/view`
+            break
+          case 'Dashboard':
+            targetUrl = `${baseUrl}/lightning/r/Dashboard/${result.id}/view`
+            break
           default:
             targetUrl = `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
         }
@@ -1216,6 +1392,10 @@ class UltraForceWindowManager {
             break
           case 'Group':
             targetUrl = `${baseUrl}/setup/own/groupdetail.jsp?id=${result.id}&setupid=PublicGroups`
+            break
+          case 'Report':
+          case 'Dashboard':
+            targetUrl = `${baseUrl}/${result.id}`
             break
           default:
             targetUrl = `${baseUrl}/${result.id}`
@@ -1288,6 +1468,12 @@ class UltraForceWindowManager {
         case 'layouts':
           targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/PageLayouts/view`
           break
+        case 'recordtypes':
+          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/RecordTypes/view`
+          break
+        case 'validationrules':
+          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/ValidationRules/view`
+          break
         case 'details':
           targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/Details/view`
           break
@@ -1305,11 +1491,22 @@ class UltraForceWindowManager {
         case 'layouts':
           targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
           break
+        case 'recordtypes':
+          targetUrl = `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
+          break
+        case 'validationrules':
+          targetUrl = `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
+          break
         case 'details':
-          targetUrl = `${baseUrl}/${objectId}`
+          // Custom object DurableIds start with '01I' and work as direct URLs
+          // Standard object DurableIds are just object names (e.g., "Account") - use Fields as fallback
+          if (objectId && objectId.startsWith('01I')) {
+            targetUrl = `${baseUrl}/${objectId}`
+          } else {
+            targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+          }
           break
       }
-
     }
 
     if (targetUrl) {
