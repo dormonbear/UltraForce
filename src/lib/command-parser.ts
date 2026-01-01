@@ -9,6 +9,7 @@ export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels', isBuiltin: true },
   m: { key: 'm', types: ['CustomMetadataType', 'CustomSetting'], description: 'Custom Metadata & Settings', isBuiltin: true },
   q: { key: 'q', types: ['Queue', 'Group'], description: 'Queues & Public Groups', isBuiltin: true },
+  r: { key: 'r', types: ['Report', 'Dashboard'], description: 'Reports & Dashboards', isBuiltin: true },
   g: { key: 'g', types: [], description: 'Go to Setup', isBuiltin: true }
 }
 

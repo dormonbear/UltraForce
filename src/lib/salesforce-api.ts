@@ -3,7 +3,7 @@ import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
 import { trackApiRequest } from './api-stats'
-import { markTypeUnsupported, getUnsupportedTypes, markTypesChecked, needsPermissionCheck } from './unsupported-types'
+import { markTypeUnsupported, getUnsupportedTypes, markTypesChecked, needsPermissionCheck, clearUnsupportedTypesCache } from './unsupported-types'
 import {
   buildSearchIndex,
   searchIndex,
@@ -61,6 +61,12 @@ const METADATA_TYPES: Record<string, { query: string }> = {
   },
   Group: {
     query: `SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Regular' ORDER BY Name ASC LIMIT 2000`
+  },
+  Report: {
+    query: `SELECT Id, Name, DeveloperName, NamespacePrefix, FolderName, Description, LastModifiedDate, LastModifiedBy.Name FROM Report ORDER BY Name ASC LIMIT 100`
+  },
+  Dashboard: {
+    query: `SELECT Id, Title, DeveloperName, NamespacePrefix, FolderName, Description, LastModifiedDate, LastModifiedBy.Name FROM Dashboard ORDER BY Title ASC LIMIT 100`
   }
 }
 
@@ -622,7 +628,7 @@ async function fetchAllPages(
 }
 
 // Types that use regular REST API (not Tooling API)
-const REST_API_TYPES = ['CustomObject', 'CustomSetting', 'User']
+const REST_API_TYPES = ['CustomObject', 'CustomSetting', 'User', 'Report', 'Dashboard']
 
 async function fetchMetadataFromAPI(
   metadataType: string,
@@ -852,7 +858,9 @@ const PERMISSION_CHECK_MAP: Record<string, { object: string; useRestApi: boolean
   CustomMetadataType: { object: 'EntityDefinition', useRestApi: true },
   CustomSetting: { object: 'EntityDefinition', useRestApi: true },
   Queue: { object: 'Group', useRestApi: true },
-  Group: { object: 'Group', useRestApi: true }
+  Group: { object: 'Group', useRestApi: true },
+  Report: { object: 'Report', useRestApi: true },
+  Dashboard: { object: 'Dashboard', useRestApi: true }
 }
 
 // Types that require ViewSetup permission (Tooling API metadata)
@@ -927,6 +935,7 @@ export async function checkMetadataPermissions(sfHost: string): Promise<string[]
     }
   }
 
+  const unsupported: string[] = []
   await Promise.all(
     allTypes.map(async (type) => {
       const isSupported = await checkType(type)
@@ -980,6 +989,7 @@ export async function getCacheStats() {
 
 export async function clearMetadataCache(): Promise<void> {
   await MetadataCache.getInstance().clear()
+  await clearUnsupportedTypesCache()
   clearAllSearchIndexes()
 }
 
