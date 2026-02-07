@@ -75,7 +75,8 @@ export default [
         beforeEach: 'readonly',
         afterEach: 'readonly',
         beforeAll: 'readonly',
-        afterAll: 'readonly'
+        afterAll: 'readonly',
+        KeyboardEventInit: 'readonly'
       }
     }
   },
