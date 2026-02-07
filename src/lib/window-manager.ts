@@ -5,16 +5,8 @@ import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, isApiAvailable, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
 import { logger } from '~lib/logger'
-import type { SearchResult } from '~types'
+import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
-
-type NavigationMode = 'auto' | 'lightning' | 'classic'
-
-interface RecordContext {
-  objectApiName: string | null
-  recordId: string
-  recordTypeId?: string | null
-}
 
 interface WindowManagerState {
   isVisible: boolean

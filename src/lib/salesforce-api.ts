@@ -3,7 +3,8 @@ import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
 import { trackApiRequest } from './api-stats'
-import { markTypeUnsupported, getUnsupportedTypes, markTypesChecked, needsPermissionCheck, clearUnsupportedTypesCache } from './unsupported-types'
+import { normalizeHost, escapeSoql } from './domain-utils'
+import { markTypeUnsupported, getUnsupportedTypes as getUnsupportedTypesRaw, markTypesChecked, needsPermissionCheck, clearUnsupportedTypesCache } from './unsupported-types'
 import {
   buildSearchIndex,
   searchIndex,
@@ -75,22 +76,6 @@ export interface SearchOptions {
   hideManagedPackage?: boolean
 }
 
-function normalizeHost(host: string): string {
-  if (!host) return host
-  let normalized = host.replace(/^\./, '').replace(/^https?:\/\//, '')
-
-  normalized = normalized.replace(/\.lightning\.force\./, '.my.salesforce.')
-
-  // China: .sandbox.setup. -> .sandbox.my., .setup. -> .my.
-  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\./, '.sandbox.my.sfcrmproducts.')
-  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\./, '.sandbox.my.sfcrmapps.')
-  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmproducts\./, '.my.sfcrmproducts.')
-  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmapps\./, '.my.sfcrmapps.')
-
-  normalized = normalized.replace(/\.mcas\.ms$/, '')
-
-  return normalized
-}
 
 interface DotNotationResult {
   objectName: string
@@ -112,9 +97,6 @@ function parseDotNotation(query: string): DotNotationResult | null {
   return { objectName, fieldQuery, isCMDT }
 }
 
-function escapeSoql(input: string): string {
-  return input.replace(/'/g, "\\'")
-}
 
 export async function searchSalesforceMetadata(
   query: string,
@@ -983,10 +965,6 @@ export async function warmupMetadataCache(sfHost: string): Promise<void> {
   logger.debug('warmup:done', { types: typesToWarmup.length, ms: Date.now() - start })
 }
 
-export async function getCacheStats() {
-  return MetadataCache.getInstance().getStats()
-}
-
 export async function clearMetadataCache(): Promise<void> {
   await MetadataCache.getInstance().clear()
   await clearUnsupportedTypesCache()
@@ -996,8 +974,6 @@ export async function clearMetadataCache(): Promise<void> {
 export function getAvailableMetadataTypes(): string[] {
   return Object.keys(METADATA_TYPES)
 }
-
-import { getUnsupportedTypes as getUnsupportedTypesRaw } from './unsupported-types'
 
 export async function getUnsupportedTypes(sfHost: string): Promise<string[]> {
   return getUnsupportedTypesRaw(normalizeHost(sfHost))
@@ -1009,22 +985,6 @@ export async function getSupportedMetadataTypes(sfHost: string): Promise<string[
   return allTypes.filter(type => !unsupported.includes(type))
 }
 
-const SALESFORCE_PATTERNS = [
-  /https:\/\/.*\.salesforce\.com/,
-  /https:\/\/.*\.salesforce-setup\.com/,
-  /https:\/\/.*\.visual\.force\.com/,
-  /https:\/\/.*\.visualforce\.com/,
-  /https:\/\/.*\.lightning\.force\.com/,
-  /https:\/\/.*\.my\.salesforce\.com/,
-  /https:\/\/.*\.force\.com/,
-  /https:\/\/.*\.sfcrmapps\.cn/,
-  /https:\/\/.*\.sfcrmproducts\.cn/
-]
-
-export function isSalesforceDomain(url: string): boolean {
-  if (!url) return false
-  return SALESFORCE_PATTERNS.some((pattern) => pattern.test(url))
-}
 
 export interface CustomCommandOptions {
   soqlTemplate: string
