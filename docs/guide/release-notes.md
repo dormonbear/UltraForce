@@ -1,5 +1,25 @@
 # Release Notes
 
+## v0.1.1
+
+Release Date: 2026-02-07
+
+### Bug Fixes
+
+- **Keyboard Input on Lightning Pages**: Fixed issue where Salesforce Lightning shortcuts (e.g. 'e' for edit, 'd' for details) would intercept keystrokes, preventing character input in the search modal
+
+### Improvements
+
+- **Code Quality**: Extracted shared utilities (domain-utils), unified code style, removed dead code, consolidated duplicate type definitions
+- **Test Coverage**: Added 62 unit tests covering domain utilities and keyboard interceptor
+
+### Technical
+
+- Added Vitest test infrastructure with jsdom environment
+- Extracted `keyboard-interceptor` module with full keyboard event handling (printable chars, Backspace/Delete, Ctrl/Cmd shortcuts, navigation keys, IME composition)
+- Extracted `domain-utils` module (normalizeHost, isSalesforceDomain, escapeSoql)
+- Cleaned ~280 lines of dead code from auth.ts, types/index.ts, salesforce-api.ts
+
 ## v0.1.0
 
 Release Date: 2026-01-01
