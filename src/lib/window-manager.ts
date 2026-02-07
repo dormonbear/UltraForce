@@ -5,6 +5,7 @@ import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, isApiAvailable, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
 import { logger } from '~lib/logger'
+import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
@@ -505,42 +506,12 @@ class UltraForceWindowManager {
     this.state.isVisible = true
     this.log('Showing modal')
 
-    // Add capture-phase keyboard interceptor to block Salesforce shortcuts
-    // Strategy: Only block specific keys that Salesforce intercepts
-    this.keyboardInterceptor = (e: KeyboardEvent) => {
-      // Get our input element
-      const ourInput = this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement
-
-      // For '/' key - Salesforce intercepts this to open search
-      // Block completely and manually insert the character
-      if (e.key === '/' && e.type === 'keydown') {
-        e.stopPropagation()
-        e.stopImmediatePropagation()
-        e.preventDefault()
-
-        // Manually insert '/' at cursor position
-        if (ourInput) {
-          const start = ourInput.selectionStart || 0
-          const end = ourInput.selectionEnd || 0
-          const value = ourInput.value
-          ourInput.value = value.slice(0, start) + '/' + value.slice(end)
-          ourInput.selectionStart = ourInput.selectionEnd = start + 1
-          // Trigger input event for React state update
-          ourInput.dispatchEvent(new Event('input', { bubbles: true }))
-        }
-        return
-      }
-
-      // For other events of '/' key (keyup, keypress), just block
-      if (e.key === '/') {
-        e.stopPropagation()
-        e.stopImmediatePropagation()
-        e.preventDefault()
-        return
-      }
-
-      // Let all other keys pass through to Shadow DOM
-    }
+    // Capture-phase keyboard interceptor blocks Salesforce shortcuts
+    // and manually applies edits to our Shadow DOM input
+    this.keyboardInterceptor = createKeyboardInterceptor(
+      () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
+      () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null
+    )
 
     // Add to window level to intercept before document level handlers
     window.addEventListener('keydown', this.keyboardInterceptor, true)
