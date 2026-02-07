@@ -1,5 +1,5 @@
-import React, { Component, ErrorInfo } from "react"
-import { logger } from "~lib/logger"
+import React, { Component, ErrorInfo } from 'react'
+import { logger } from '~lib/logger'
 
 interface ErrorBoundaryState {
   hasError: boolean

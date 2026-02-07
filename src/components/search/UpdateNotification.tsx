@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 
 interface UpdateNotificationProps {
   version: string
@@ -7,6 +7,16 @@ interface UpdateNotificationProps {
 }
 
 const FIREWORK_EMOJIS = ['🎉', '🎊', '✨', '🚀', '⭐', '💫', '🌟', '🎆']
+
+function generateParticles() {
+  return Array.from({ length: 20 }, (_, i) => ({
+    id: i,
+    emoji: FIREWORK_EMOJIS[Math.floor(Math.random() * FIREWORK_EMOJIS.length)],
+    left: `${Math.random() * 100}%`,
+    delay: `${Math.random() * 0.5}s`,
+    duration: `${1.5 + Math.random() * 1}s`
+  }))
+}
 
 const UpdateNotification: React.FC<UpdateNotificationProps> = ({
   version,
@@ -20,15 +30,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
     return () => clearTimeout(timer)
   }, [])
 
-  const particles = useMemo(() => {
-    return Array.from({ length: 20 }, (_, i) => ({
-      id: i,
-      emoji: FIREWORK_EMOJIS[Math.floor(Math.random() * FIREWORK_EMOJIS.length)],
-      left: `${Math.random() * 100}%`,
-      delay: `${Math.random() * 0.5}s`,
-      duration: `${1.5 + Math.random() * 1}s`
-    }))
-  }, [])
+  const [particles] = useState(generateParticles)
 
   return (
     <div className={`update-celebration ${isVisible ? 'visible' : ''}`}>

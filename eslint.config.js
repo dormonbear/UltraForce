@@ -65,6 +65,21 @@ export default [
     }
   },
   {
+    files: ['**/*.test.{ts,tsx}', '**/test-setup.ts'],
+    languageOptions: {
+      globals: {
+        vi: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly'
+      }
+    }
+  },
+  {
     ignores: [
       'node_modules/**',
       'build/**',
