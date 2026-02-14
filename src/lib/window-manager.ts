@@ -1323,11 +1323,18 @@ class UltraForceWindowManager {
             targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
             break
           case 'CustomObject': {
-            const keyPrefix = result.metadata?.KeyPrefix
-            if (keyPrefix) {
-              targetUrl = `${baseUrl}/${keyPrefix}`
+            // Custom objects (DurableId '01I...') have a single Classic setup page
+            const objectDurableId = result.metadata?.DurableId
+            if (objectDurableId && objectDurableId.startsWith('01I')) {
+              targetUrl = `${baseUrl}/${objectDurableId}`
             } else {
-              targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
+              // Standard objects: use keyPrefix for list view, or field list as fallback
+              const keyPrefix = result.metadata?.KeyPrefix
+              if (keyPrefix) {
+                targetUrl = `${baseUrl}/${keyPrefix}`
+              } else {
+                targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
+              }
             }
             break
           }
@@ -1453,32 +1460,32 @@ class UltraForceWindowManager {
       }
     } else {
       // Classic URLs
-      switch (action) {
-        case 'list':
-          const keyPrefix = result.metadata?.KeyPrefix
-          targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          break
-        case 'fields':
-          targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          break
-        case 'layouts':
-          targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
-          break
-        case 'recordtypes':
-          targetUrl = `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
-          break
-        case 'validationrules':
-          targetUrl = `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
-          break
-        case 'details':
-          // Custom object DurableIds start with '01I' and work as direct URLs
-          // Standard object DurableIds are just object names (e.g., "Account") - use Fields as fallback
-          if (objectId && objectId.startsWith('01I')) {
-            targetUrl = `${baseUrl}/${objectId}`
-          } else {
+      // Custom objects (DurableId starts with '01I') have a single setup page at /{DurableId}
+      // that includes fields, page layouts, record types, etc.
+      // Standard objects use separate Classic setup URLs.
+      if (action === 'list') {
+        const keyPrefix = result.metadata?.KeyPrefix
+        targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+      } else if (objectId && objectId.startsWith('01I')) {
+        targetUrl = `${baseUrl}/${objectId}`
+      } else {
+        switch (action) {
+          case 'fields':
             targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          }
-          break
+            break
+          case 'layouts':
+            targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
+            break
+          case 'recordtypes':
+            targetUrl = `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
+            break
+          case 'validationrules':
+            targetUrl = `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
+            break
+          case 'details':
+            targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+            break
+        }
       }
     }
 
