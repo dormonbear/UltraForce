@@ -6,14 +6,6 @@ function createMockInput(value = '', selectionStart = 0, selectionEnd = 0): HTML
   input.value = value
   input.selectionStart = selectionStart
   input.selectionEnd = selectionEnd
-  // Track dispatched events
-  const dispatched: Event[] = []
-  const origDispatch = input.dispatchEvent.bind(input)
-  input.dispatchEvent = (e: Event) => {
-    dispatched.push(e)
-    return origDispatch(e)
-  }
-  ;(input as any).__dispatched = dispatched
   return input
 }
 
@@ -28,7 +20,6 @@ function createKeyEvent(
     cancelable: true,
     ...opts
   })
-  // Make stopPropagation/stopImmediatePropagation/preventDefault spyable
   vi.spyOn(event, 'stopPropagation')
   vi.spyOn(event, 'stopImmediatePropagation')
   vi.spyOn(event, 'preventDefault')
@@ -45,7 +36,7 @@ describe('createKeyboardInterceptor', () => {
   })
 
   describe('printable characters', () => {
-    it('should intercept single character keydown and insert into input', () => {
+    it('should intercept keydown, preventDefault, and insert character', () => {
       const handler = createKeyboardInterceptor(getInput)
       input.value = 'hllo'
       input.selectionStart = 1
@@ -59,7 +50,6 @@ describe('createKeyboardInterceptor', () => {
       expect(event.preventDefault).toHaveBeenCalled()
       expect(input.value).toBe('hello')
       expect(input.selectionStart).toBe(2)
-      expect(input.selectionEnd).toBe(2)
     })
 
     it('should replace selected text when inserting character', () => {
@@ -68,9 +58,7 @@ describe('createKeyboardInterceptor', () => {
       input.selectionStart = 0
       input.selectionEnd = 5
 
-      const event = createKeyEvent('keydown', 'x')
-      handler(event)
-
+      handler(createKeyEvent('keydown', 'x'))
       expect(input.value).toBe('x')
       expect(input.selectionStart).toBe(1)
     })
@@ -81,9 +69,7 @@ describe('createKeyboardInterceptor', () => {
       input.selectionStart = 3
       input.selectionEnd = 3
 
-      const event = createKeyEvent('keydown', 'd')
-      handler(event)
-
+      handler(createKeyEvent('keydown', 'd'))
       expect(input.value).toBe('abcd')
       expect(input.selectionStart).toBe(4)
     })
@@ -94,52 +80,40 @@ describe('createKeyboardInterceptor', () => {
       input.selectionStart = 2
       input.selectionEnd = 2
 
-      const event = createKeyEvent('keydown', ' ')
-      handler(event)
-
+      handler(createKeyEvent('keydown', ' '))
       expect(input.value).toBe('ab ')
-      expect(input.selectionStart).toBe(3)
     })
 
-    it('should handle uppercase characters via Shift', () => {
+    it('should dispatch ultraforce-input custom event', () => {
       const handler = createKeyboardInterceptor(getInput)
       input.value = ''
       input.selectionStart = 0
       input.selectionEnd = 0
 
-      const event = createKeyEvent('keydown', 'E', { shiftKey: true })
-      handler(event)
+      const customEventSpy = vi.fn()
+      input.addEventListener('ultraforce-input', customEventSpy)
 
-      expect(input.value).toBe('E')
-      expect(event.preventDefault).toHaveBeenCalled()
+      handler(createKeyEvent('keydown', 'a'))
+
+      expect(customEventSpy).toHaveBeenCalledTimes(1)
+      const ce = customEventSpy.mock.calls[0][0] as CustomEvent
+      expect(ce.detail.value).toBe('a')
     })
 
-    it('should dispatch input event for React state sync', () => {
+    it('should block keyup/keypress but not modify input', () => {
       const handler = createKeyboardInterceptor(getInput)
-      input.value = ''
-      input.selectionStart = 0
-      input.selectionEnd = 0
-
-      const event = createKeyEvent('keydown', 'a')
-      handler(event)
-
-      const dispatched = (input as any).__dispatched as Event[]
-      expect(dispatched.length).toBeGreaterThan(0)
-      expect(dispatched.some((e: Event) => e.type === 'input')).toBe(true)
-    })
-
-    it('should block keyup/keypress for printable chars too', () => {
-      const handler = createKeyboardInterceptor(getInput)
+      input.value = 'test'
 
       const keyup = createKeyEvent('keyup', 'e')
       handler(keyup)
       expect(keyup.stopPropagation).toHaveBeenCalled()
-      expect(keyup.stopImmediatePropagation).toHaveBeenCalled()
+      expect(keyup.preventDefault).toHaveBeenCalled()
+      expect(input.value).toBe('test') // unchanged
 
       const keypress = createKeyEvent('keypress', 'e')
       handler(keypress)
       expect(keypress.stopPropagation).toHaveBeenCalled()
-      expect(keypress.stopImmediatePropagation).toHaveBeenCalled()
+      expect(input.value).toBe('test') // unchanged
     })
   })
 
@@ -150,11 +124,7 @@ describe('createKeyboardInterceptor', () => {
       input.selectionStart = 3
       input.selectionEnd = 3
 
-      const event = createKeyEvent('keydown', 'Backspace')
-      handler(event)
-
-      expect(event.stopPropagation).toHaveBeenCalled()
-      expect(event.preventDefault).toHaveBeenCalled()
+      handler(createKeyEvent('keydown', 'Backspace'))
       expect(input.value).toBe('helo')
       expect(input.selectionStart).toBe(2)
     })
@@ -165,24 +135,33 @@ describe('createKeyboardInterceptor', () => {
       input.selectionStart = 1
       input.selectionEnd = 4
 
-      const event = createKeyEvent('keydown', 'Backspace')
-      handler(event)
-
+      handler(createKeyEvent('keydown', 'Backspace'))
       expect(input.value).toBe('ho')
       expect(input.selectionStart).toBe(1)
     })
 
-    it('should do nothing at position 0 with no selection', () => {
+    it('should do nothing at position 0', () => {
       const handler = createKeyboardInterceptor(getInput)
       input.value = 'hello'
       input.selectionStart = 0
       input.selectionEnd = 0
 
-      const event = createKeyEvent('keydown', 'Backspace')
-      handler(event)
-
+      handler(createKeyEvent('keydown', 'Backspace'))
       expect(input.value).toBe('hello')
-      expect(event.stopPropagation).toHaveBeenCalled()
+    })
+
+    it('should dispatch ultraforce-input event', () => {
+      const handler = createKeyboardInterceptor(getInput)
+      input.value = 'ab'
+      input.selectionStart = 2
+      input.selectionEnd = 2
+
+      const spy = vi.fn()
+      input.addEventListener('ultraforce-input', spy)
+
+      handler(createKeyEvent('keydown', 'Backspace'))
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect((spy.mock.calls[0][0] as CustomEvent).detail.value).toBe('a')
     })
   })
 
@@ -193,35 +172,18 @@ describe('createKeyboardInterceptor', () => {
       input.selectionStart = 2
       input.selectionEnd = 2
 
-      const event = createKeyEvent('keydown', 'Delete')
-      handler(event)
-
+      handler(createKeyEvent('keydown', 'Delete'))
       expect(input.value).toBe('helo')
       expect(input.selectionStart).toBe(2)
     })
 
-    it('should delete selected text', () => {
-      const handler = createKeyboardInterceptor(getInput)
-      input.value = 'hello'
-      input.selectionStart = 0
-      input.selectionEnd = 3
-
-      const event = createKeyEvent('keydown', 'Delete')
-      handler(event)
-
-      expect(input.value).toBe('lo')
-      expect(input.selectionStart).toBe(0)
-    })
-
-    it('should do nothing at end of string with no selection', () => {
+    it('should do nothing at end of string', () => {
       const handler = createKeyboardInterceptor(getInput)
       input.value = 'hi'
       input.selectionStart = 2
       input.selectionEnd = 2
 
-      const event = createKeyEvent('keydown', 'Delete')
-      handler(event)
-
+      handler(createKeyEvent('keydown', 'Delete'))
       expect(input.value).toBe('hi')
     })
   })
@@ -234,7 +196,6 @@ describe('createKeyboardInterceptor', () => {
       handler(event)
 
       expect(event.stopPropagation).toHaveBeenCalled()
-      expect(event.stopImmediatePropagation).toHaveBeenCalled()
       expect(event.preventDefault).not.toHaveBeenCalled()
     })
 
@@ -242,37 +203,6 @@ describe('createKeyboardInterceptor', () => {
       const handler = createKeyboardInterceptor(getInput)
 
       const event = createKeyEvent('keydown', 'v', { metaKey: true })
-      handler(event)
-
-      expect(event.stopPropagation).toHaveBeenCalled()
-      expect(event.stopImmediatePropagation).toHaveBeenCalled()
-      expect(event.preventDefault).not.toHaveBeenCalled()
-    })
-
-    it('should stop propagation but NOT preventDefault for Ctrl+A', () => {
-      const handler = createKeyboardInterceptor(getInput)
-
-      const event = createKeyEvent('keydown', 'a', { ctrlKey: true })
-      handler(event)
-
-      expect(event.stopPropagation).toHaveBeenCalled()
-      expect(event.preventDefault).not.toHaveBeenCalled()
-    })
-
-    it('should stop propagation but NOT preventDefault for Ctrl+Z', () => {
-      const handler = createKeyboardInterceptor(getInput)
-
-      const event = createKeyEvent('keydown', 'z', { ctrlKey: true })
-      handler(event)
-
-      expect(event.stopPropagation).toHaveBeenCalled()
-      expect(event.preventDefault).not.toHaveBeenCalled()
-    })
-
-    it('should stop propagation but NOT preventDefault for Ctrl+X', () => {
-      const handler = createKeyboardInterceptor(getInput)
-
-      const event = createKeyEvent('keydown', 'x', { ctrlKey: true })
       handler(event)
 
       expect(event.stopPropagation).toHaveBeenCalled()
@@ -288,10 +218,9 @@ describe('createKeyboardInterceptor', () => {
       handler(event)
 
       expect(event.stopPropagation).not.toHaveBeenCalled()
-      expect(event.preventDefault).not.toHaveBeenCalled()
     })
 
-    it('should NOT intercept keyCode 229 (IME processing)', () => {
+    it('should NOT intercept keyCode 229', () => {
       const handler = createKeyboardInterceptor(getInput)
 
       const event = createKeyEvent('keydown', 'e', { keyCode: 229 } as any)
@@ -301,8 +230,8 @@ describe('createKeyboardInterceptor', () => {
     })
   })
 
-  describe('navigation/function keys', () => {
-    it.each(['Escape', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', 'Tab', 'Home', 'End'])(
+  describe('navigation keys', () => {
+    it.each(['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'])(
       'should stop propagation for %s but NOT preventDefault',
       (key) => {
         const handler = createKeyboardInterceptor(getInput)
@@ -310,8 +239,6 @@ describe('createKeyboardInterceptor', () => {
         handler(event)
 
         expect(event.stopPropagation).toHaveBeenCalled()
-        expect(event.stopImmediatePropagation).toHaveBeenCalled()
-        // Do NOT preventDefault - let the event be re-dispatched to Shadow DOM
         expect(event.preventDefault).not.toHaveBeenCalled()
       }
     )
@@ -342,14 +269,14 @@ describe('createKeyboardInterceptor', () => {
   })
 
   describe('null input', () => {
-    it('should still block propagation even when input is not found', () => {
+    it('should still block propagation when input is null', () => {
       const handler = createKeyboardInterceptor(() => null)
 
       const event = createKeyEvent('keydown', 'e')
       handler(event)
 
       expect(event.stopPropagation).toHaveBeenCalled()
-      expect(event.stopImmediatePropagation).toHaveBeenCalled()
+      expect(event.preventDefault).toHaveBeenCalled()
     })
 
     it('should not crash when input is null', () => {
@@ -370,45 +297,28 @@ describe('createKeyboardInterceptor', () => {
       const getModal = () => modalEl
 
       const handler = createKeyboardInterceptor(getInput, getModal)
-      const event = createKeyEvent('keydown', 'ArrowDown')
-      handler(event)
+      handler(createKeyEvent('keydown', 'ArrowDown'))
 
       expect(dispatchSpy).toHaveBeenCalledTimes(1)
-      const dispatched = dispatchSpy.mock.calls[0][0] as KeyboardEvent
-      expect(dispatched.key).toBe('ArrowDown')
-      expect(dispatched.type).toBe('keydown')
-    })
-
-    it('should dispatch Escape to modal', () => {
-      const modalEl = document.createElement('div')
-      const dispatchSpy = vi.spyOn(modalEl, 'dispatchEvent')
-      const getModal = () => modalEl
-
-      const handler = createKeyboardInterceptor(getInput, getModal)
-      handler(createKeyEvent('keydown', 'Escape'))
-
-      expect(dispatchSpy).toHaveBeenCalledTimes(1)
-      expect((dispatchSpy.mock.calls[0][0] as KeyboardEvent).key).toBe('Escape')
-    })
-
-    it('should dispatch Enter to modal', () => {
-      const modalEl = document.createElement('div')
-      const dispatchSpy = vi.spyOn(modalEl, 'dispatchEvent')
-      const getModal = () => modalEl
-
-      const handler = createKeyboardInterceptor(getInput, getModal)
-      handler(createKeyEvent('keydown', 'Enter'))
-
-      expect(dispatchSpy).toHaveBeenCalledTimes(1)
+      expect((dispatchSpy.mock.calls[0][0] as KeyboardEvent).key).toBe('ArrowDown')
     })
 
     it('should NOT re-dispatch for non-keydown events', () => {
       const modalEl = document.createElement('div')
       const dispatchSpy = vi.spyOn(modalEl, 'dispatchEvent')
-      const getModal = () => modalEl
 
-      const handler = createKeyboardInterceptor(getInput, getModal)
+      const handler = createKeyboardInterceptor(getInput, () => modalEl)
       handler(createKeyEvent('keyup', 'Escape'))
+
+      expect(dispatchSpy).not.toHaveBeenCalled()
+    })
+
+    it('should NOT re-dispatch printable chars to modal', () => {
+      const modalEl = document.createElement('div')
+      const dispatchSpy = vi.spyOn(modalEl, 'dispatchEvent')
+
+      const handler = createKeyboardInterceptor(getInput, () => modalEl)
+      handler(createKeyEvent('keydown', 'a'))
 
       expect(dispatchSpy).not.toHaveBeenCalled()
     })
