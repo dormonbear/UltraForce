@@ -96,8 +96,8 @@ test.describe('Navigation - Classic Mode', () => {
   test('ASR_Hotel object in classic mode', async () => {
     const result = await uf.searchAndNavigateNewTab(':o ASR_Hotel')
     expect(result.opened).toBe(true)
-    // CustomObject may use Lightning list URL even in classic mode, or _classic redirect
-    expect(result.url).toMatch(/ASR_Hotel/)
+    // Classic: custom object uses DurableId (01I...) for setup page
+    expect(result.url).toMatch(/01I[a-zA-Z0-9]+/)
   })
 
   test('Dormon user in classic mode', async () => {
