@@ -2,10 +2,20 @@
  * Keyboard event interceptor for Shadow DOM input fields.
  *
  * Salesforce Lightning pages register capture-phase keyboard listeners
- * that consume keystrokes (e.g. 'e' triggers record edit). This module
- * intercepts events early, stops propagation to prevent Salesforce from
- * seeing them, and manually applies the edits to our input element.
+ * that consume keystrokes (e.g. 'e' triggers record edit, '/' opens search).
+ * Some pages (Console App) register handlers BEFORE our content script,
+ * meaning their handlers run first and may call preventDefault().
+ *
+ * Strategy:
+ * 1. Intercept at window capture phase, call stopPropagation + preventDefault
+ *    for printable characters/Backspace/Delete to block Salesforce
+ * 2. Manually modify input.value
+ * 3. Dispatch a custom 'ultraforce-input' event on the input element
+ *    (bypasses React's event delegation which is unreliable in Shadow DOM)
+ * 4. SearchInput listens for this custom event and calls onQueryChange directly
  */
+
+import { logger } from './logger'
 
 const MODIFIER_KEYS = new Set([
   'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'
@@ -22,22 +32,23 @@ function isPrintable(key: string): boolean {
   return key.length === 1
 }
 
-function insertText(input: HTMLInputElement, char: string): void {
+function insertChar(input: HTMLInputElement, char: string): string {
   const start = input.selectionStart ?? 0
   const end = input.selectionEnd ?? 0
   const before = input.value.slice(0, start)
   const after = input.value.slice(end)
-  input.value = before + char + after
+  const newValue = before + char + after
+  input.value = newValue
   const cursor = start + char.length
   input.selectionStart = cursor
   input.selectionEnd = cursor
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+  return newValue
 }
 
-function deleteText(
+function deleteChar(
   input: HTMLInputElement,
   direction: 'backward' | 'forward'
-): void {
+): string {
   const start = input.selectionStart ?? 0
   const end = input.selectionEnd ?? 0
 
@@ -47,19 +58,18 @@ function deleteText(
     input.value = before + after
     input.selectionStart = start
     input.selectionEnd = start
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    return
+    return input.value
   }
 
   if (direction === 'backward') {
-    if (start === 0) return
+    if (start === 0) return input.value
     const before = input.value.slice(0, start - 1)
     const after = input.value.slice(start)
     input.value = before + after
     input.selectionStart = start - 1
     input.selectionEnd = start - 1
   } else {
-    if (start >= input.value.length) return
+    if (start >= input.value.length) return input.value
     const before = input.value.slice(0, start)
     const after = input.value.slice(start + 1)
     input.value = before + after
@@ -67,7 +77,20 @@ function deleteText(
     input.selectionEnd = start
   }
 
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+  return input.value
+}
+
+/**
+ * Dispatch a custom event to notify SearchInput of the new value.
+ * This bypasses React's event delegation system entirely.
+ */
+function notifyValueChange(input: HTMLInputElement, value: string): void {
+  input.dispatchEvent(
+    new CustomEvent('ultraforce-input', {
+      detail: { value },
+      bubbles: false
+    })
+  )
 }
 
 export function createKeyboardInterceptor(
@@ -124,28 +147,35 @@ export function createKeyboardInterceptor(
     // Printable characters & Backspace/Delete: intercept fully
     e.stopPropagation()
     e.stopImmediatePropagation()
+    e.preventDefault()
 
     // Only modify input on keydown
     if (e.type !== 'keydown') return
 
     const input = getInput()
-    if (!input) return
+    if (!input || input.value === undefined) {
+      logger.debug('keyboard:no-input', { key: e.key, found: !!input })
+      return
+    }
 
     if (e.key === 'Backspace') {
-      e.preventDefault()
-      deleteText(input, 'backward')
+      const newValue = deleteChar(input, 'backward')
+      notifyValueChange(input, newValue)
+      logger.debug('keyboard:backspace', { value: newValue })
       return
     }
 
     if (e.key === 'Delete') {
-      e.preventDefault()
-      deleteText(input, 'forward')
+      const newValue = deleteChar(input, 'forward')
+      notifyValueChange(input, newValue)
+      logger.debug('keyboard:delete', { value: newValue })
       return
     }
 
     if (isPrintable(e.key) && !hasCtrlOrCmd) {
-      e.preventDefault()
-      insertText(input, e.key)
+      const newValue = insertChar(input, e.key)
+      notifyValueChange(input, newValue)
+      logger.debug('keyboard:insert', { key: e.key, value: newValue })
     }
   }
 }

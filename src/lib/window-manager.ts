@@ -506,7 +506,15 @@ class UltraForceWindowManager {
     this.state.isVisible = true
     this.log('Showing modal')
 
-    // Capture-phase keyboard interceptor blocks Salesforce shortcuts
+    // Signal to the main-world keyboard-shield script that the modal is open.
+    // keyboard-shield.ts monkey-patches addEventListener so that ALL page-level
+    // keyboard listeners (including Salesforce's) are suppressed when this
+    // attribute is present. This works because the shield runs at document_start
+    // in the MAIN world, wrapping listeners before Salesforce registers them.
+    document.documentElement.setAttribute('data-ultraforce-modal-open', '')
+    logger.debug('keyboard:shield activated')
+
+    // Capture-phase keyboard interceptor handles input for Shadow DOM
     // and manually applies edits to our Shadow DOM input
     this.keyboardInterceptor = createKeyboardInterceptor(
       () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
@@ -518,7 +526,6 @@ class UltraForceWindowManager {
     window.addEventListener('keyup', this.keyboardInterceptor, true)
     window.addEventListener('keypress', this.keyboardInterceptor, true)
     logger.debug('keyboard:interceptor added')
-
 
     await this.renderComponent()
     this.emit('show', this.state)
@@ -541,6 +548,9 @@ class UltraForceWindowManager {
       this.keyboardInterceptor = null
     }
 
+    // Tell the main-world keyboard-shield to stop suppressing page shortcuts
+    document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    logger.debug('keyboard:shield deactivated')
 
     if (this.reactRoot) {
       this.reactRoot.unmount()
