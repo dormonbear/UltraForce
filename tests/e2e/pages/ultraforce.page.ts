@@ -109,4 +109,27 @@ export class UltraForcePage {
   get rawContext(): BrowserContext {
     return this.context
   }
+
+  /**
+   * Tab on the currently selected result, then press Enter to navigate.
+   * Returns the new tab URL (if opened) for assertion.
+   */
+  async tabThenNavigateNewTab(
+    waitAfterTab: number = 3000
+  ): Promise<{ opened: boolean; url: string }> {
+    const pagesBefore = this.context.pages().length
+    await this.page.keyboard.press('Tab')
+    await this.page.waitForTimeout(waitAfterTab)
+    await this.page.keyboard.press('Enter')
+    await this.page.waitForTimeout(3000)
+
+    const pagesAfter = this.context.pages().length
+    if (pagesAfter > pagesBefore) {
+      const newPage = this.context.pages()[pagesAfter - 1]
+      const url = newPage.url()
+      await newPage.close()
+      return { opened: true, url }
+    }
+    return { opened: false, url: '' }
+  }
 }
