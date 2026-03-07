@@ -54,10 +54,8 @@ test.describe('Features', () => {
     // Tab to autocomplete into "ASR_xxx__c." (field search)
     // Then navigate a field result to verify fields loaded
     const result = await uf.tabThenNavigateNewTab(3000)
-    // If field results loaded, Enter opens a new tab
-    if (result.opened) {
-      expect(result.url).toContain('.salesforce.com')
-    }
+    expect(result.opened).toBe(true)
+    expect(result.url).toContain('.salesforce.com')
     await uf.closeModal()
   })
 
@@ -72,10 +70,8 @@ test.describe('Features', () => {
 
     // Now sub-menu should be showing. Tab on "Users" to drill into user list
     const result = await uf.tabThenNavigateNewTab(3000)
-    // Enter on a User result should open the user record
-    if (result.opened) {
-      expect(result.url).toContain('.salesforce.com')
-    }
+    expect(result.opened).toBe(true)
+    expect(result.url).toContain('.salesforce.com')
     await uf.closeModal()
   })
 
@@ -96,13 +92,12 @@ test.describe('Features', () => {
     await uf.wait(3000)
     const pagesAfter = uf.rawContext.pages().length
 
-    if (pagesAfter > pagesBefore) {
-      const newPage = uf.rawContext.pages()[pagesAfter - 1]
-      const url = newPage.url()
-      expect(url).toContain('Profiles')
-      expect(url).toContain('UserPermissions')
-      await newPage.close()
-    }
+    expect(pagesAfter).toBeGreaterThan(pagesBefore)
+    const newPage = uf.rawContext.pages()[pagesAfter - 1]
+    const url = newPage.url()
+    expect(url).toContain('Profiles')
+    expect(url).toContain('UserPermissions')
+    await newPage.close()
     await uf.closeModal()
   })
 
