@@ -1,0 +1,114 @@
+[
+  {
+    "attributes": {
+      "type": "User",
+      "url": "/services/data/v62.0/sobjects/User/005Dn000001abcdef"
+    },
+    "Id": "005Dn000001abcdef",
+    "Name": "Test Admin",
+    "Username": "admin@test.example.com",
+    "Email": "admin@test.example.com",
+    "FederationIdentifier": "admin@corp.example.com",
+    "IsActive": true,
+    "Profile": {
+      "attributes": {
+        "type": "Profile",
+        "url": "/services/data/v62.0/sobjects/Profile/00eDn000001abc"
+      },
+      "Name": "System Administrator"
+    },
+    "UserRole": {
+      "attributes": {
+        "type": "UserRole",
+        "url": "/services/data/v62.0/sobjects/UserRole/00EDn000001abc"
+      },
+      "Name": "CEO"
+    }
+  },
+  {
+    "attributes": {
+      "type": "User",
+      "url": "/services/data/v62.0/sobjects/User/005Dn000002ghijkl"
+    },
+    "Id": "005Dn000002ghijkl",
+    "Name": "Integration User",
+    "Username": "integration@test.example.com",
+    "Email": "integration@test.example.com",
+    "FederationIdentifier": null,
+    "IsActive": true,
+    "Profile": {
+      "attributes": {
+        "type": "Profile",
+        "url": "/services/data/v62.0/sobjects/Profile/00eDn000002def"
+      },
+      "Name": "Standard User"
+    },
+    "UserRole": null
+  },
+  {
+    "attributes": {
+      "type": "User",
+      "url": "/services/data/v62.0/sobjects/User/005Dn000003mnopqr"
+    },
+    "Id": "005Dn000003mnopqr",
+    "Name": "Inactive User",
+    "Username": "inactive@test.example.com",
+    "Email": "inactive@test.example.com",
+    "FederationIdentifier": null,
+    "IsActive": false,
+    "Profile": {
+      "attributes": {
+        "type": "Profile",
+        "url": "/services/data/v62.0/sobjects/Profile/00eDn000002def"
+      },
+      "Name": "Standard User"
+    },
+    "UserRole": null
+  },
+  {
+    "attributes": {
+      "type": "User",
+      "url": "/services/data/v62.0/sobjects/User/005Dn000004stuvwx"
+    },
+    "Id": "005Dn000004stuvwx",
+    "Name": "Sales Rep",
+    "Username": "salesrep@test.example.com",
+    "Email": "salesrep@test.example.com",
+    "FederationIdentifier": "salesrep@corp.example.com",
+    "IsActive": true,
+    "Profile": {
+      "attributes": {
+        "type": "Profile",
+        "url": "/services/data/v62.0/sobjects/Profile/00eDn000003ghi"
+      },
+      "Name": "Custom Sales Profile"
+    },
+    "UserRole": {
+      "attributes": {
+        "type": "UserRole",
+        "url": "/services/data/v62.0/sobjects/UserRole/00EDn000002def"
+      },
+      "Name": "Sales Manager"
+    }
+  },
+  {
+    "attributes": {
+      "type": "User",
+      "url": "/services/data/v62.0/sobjects/User/005Dn000005yzabcd"
+    },
+    "Id": "005Dn000005yzabcd",
+    "Name": "Developer User",
+    "Username": "developer@test.example.com",
+    "Email": "developer@test.example.com",
+    "FederationIdentifier": null,
+    "IsActive": true,
+    "Profile": {
+      "attributes": {
+        "type": "Profile",
+        "url": "/services/data/v62.0/sobjects/Profile/00eDn000001abc"
+      },
+      "Name": "System Administrator"
+    },
+    "UserRole": null
+  }
+]

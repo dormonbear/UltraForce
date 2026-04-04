@@ -1,0 +1,52 @@
+[
+  {
+    "attributes": {
+      "type": "EntityDefinition",
+      "url": "/services/data/v62.0/sobjects/EntityDefinition/Account"
+    },
+    "QualifiedApiName": "Account",
+    "Label": "Account",
+    "DurableId": "Account",
+    "KeyPrefix": "001"
+  },
+  {
+    "attributes": {
+      "type": "EntityDefinition",
+      "url": "/services/data/v62.0/sobjects/EntityDefinition/ASR_Hotel__c"
+    },
+    "QualifiedApiName": "ASR_Hotel__c",
+    "Label": "Hotel",
+    "DurableId": "01IDn000000abcd",
+    "KeyPrefix": "a00"
+  },
+  {
+    "attributes": {
+      "type": "EntityDefinition",
+      "url": "/services/data/v62.0/sobjects/EntityDefinition/ASR_Order__c"
+    },
+    "QualifiedApiName": "ASR_Order__c",
+    "Label": "Order",
+    "DurableId": "01IDn000000efgh",
+    "KeyPrefix": "a01"
+  },
+  {
+    "attributes": {
+      "type": "EntityDefinition",
+      "url": "/services/data/v62.0/sobjects/EntityDefinition/ASR_Flight_Booking__c"
+    },
+    "QualifiedApiName": "ASR_Flight_Booking__c",
+    "Label": "Flight Booking",
+    "DurableId": "01IDn000000ijkl",
+    "KeyPrefix": "a02"
+  },
+  {
+    "attributes": {
+      "type": "EntityDefinition",
+      "url": "/services/data/v62.0/sobjects/EntityDefinition/Contact"
+    },
+    "QualifiedApiName": "Contact",
+    "Label": "Contact",
+    "DurableId": "Contact",
+    "KeyPrefix": "003"
+  }
+]
