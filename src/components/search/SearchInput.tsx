@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react'
+import React, { forwardRef, useEffect, useRef, useCallback } from 'react'
 
 type OrgType = 'production' | 'sandbox' | 'scratch' | 'developer' | 'unknown'
 
@@ -53,6 +53,41 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
 
+    // Internal ref to attach native event listener
+    const internalRef = useRef<HTMLInputElement | null>(null)
+
+    // Stable callback ref to avoid re-registering listener on every render
+    const onQueryChangeRef = useRef(onQueryChange)
+    useEffect(() => {
+      onQueryChangeRef.current = onQueryChange
+    }, [onQueryChange])
+
+    // Merge forwarded ref and internal ref
+    const setRefs = useCallback((el: HTMLInputElement | null) => {
+      internalRef.current = el
+      if (typeof ref === 'function') {
+        ref(el)
+      } else if (ref) {
+        (ref as React.MutableRefObject<HTMLInputElement | null>).current = el
+      }
+    }, [ref])
+
+    // Listen for custom 'ultraforce-input' events from the keyboard interceptor.
+    // This bypasses React's event delegation which doesn't work reliably
+    // in Shadow DOM for programmatically dispatched events.
+    useEffect(() => {
+      const el = internalRef.current
+      if (!el) return
+
+      const handler = (e: Event) => {
+        const value = (e as CustomEvent).detail?.value ?? ''
+        onQueryChangeRef.current(value)
+      }
+
+      el.addEventListener('ultraforce-input', handler)
+      return () => el.removeEventListener('ultraforce-input', handler)
+    }, [])
+
     return (
       <div className="search-input-section">
         <svg
@@ -66,7 +101,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
         <input
-          ref={ref}
+          ref={setRefs}
           type="text"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}

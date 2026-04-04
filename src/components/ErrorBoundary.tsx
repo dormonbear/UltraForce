@@ -1,5 +1,5 @@
-import React, { Component, ErrorInfo } from "react"
-import { logger } from "~lib/logger"
+import React, { Component, ErrorInfo } from 'react'
+import { logger } from '~lib/logger'
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -9,7 +9,7 @@ interface ErrorBoundaryState {
 }
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode
+  children?: React.ReactNode
   fallback?: React.ReactNode
   onError?: (error: Error, errorInfo: ErrorInfo) => void
 }
