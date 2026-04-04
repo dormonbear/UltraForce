@@ -9,10 +9,10 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUN-01**: All 6 TypeScript compilation errors are resolved and `tsc --noEmit` passes cleanly
-- [ ] **FOUN-02**: @vitest/coverage-v8 is installed and configured to report coverage (threshold enforcement deferred per D-07 decision)
-- [ ] **FOUN-03**: ESLint `no-explicit-any` rule is enabled as warning across the codebase
-- [ ] **FOUN-04**: vitest-chrome is installed and replaces hand-rolled Chrome API mocks in test-setup.ts
+- [x] **FOUN-01**: All 6 TypeScript compilation errors are resolved and `tsc --noEmit` passes cleanly
+- [x] **FOUN-02**: @vitest/coverage-v8 is installed and configured to report coverage (threshold enforcement deferred per D-07 decision)
+- [x] **FOUN-03**: ESLint `no-explicit-any` rule is enabled as warning across the codebase
+- [x] **FOUN-04**: vitest-chrome is installed and replaces hand-rolled Chrome API mocks in test-setup.ts
 
 ### Module Decomposition
 
@@ -82,10 +82,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUN-01 | Phase 1 | Pending |
-| FOUN-02 | Phase 1 | Pending |
-| FOUN-03 | Phase 1 | Pending |
-| FOUN-04 | Phase 1 | Pending |
+| FOUN-01 | Phase 1 | Complete |
+| FOUN-02 | Phase 1 | Complete |
+| FOUN-03 | Phase 1 | Complete |
+| FOUN-04 | Phase 1 | Complete |
 | MODL-01 | Phase 2 | Pending |
 | MODL-02 | Phase 2 | Pending |
 | MODL-03 | Phase 2 | Pending |

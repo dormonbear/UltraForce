@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Fix TS errors, coverage tooling, ESLint any-warning, vitest-chrome migration
+- [x] 01-01-PLAN.md -- Fix TS errors, coverage tooling, ESLint any-warning, vitest-chrome migration
 - [ ] 01-02-PLAN.md -- Characterization tests for window-manager.ts and salesforce-api.ts
 
 ### Phase 2: Module Extraction & Type Safety
