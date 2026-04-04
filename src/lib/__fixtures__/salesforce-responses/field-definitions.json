@@ -1,0 +1,92 @@
+[
+  {
+    "attributes": {
+      "type": "FieldDefinition",
+      "url": "/services/data/v62.0/tooling/sobjects/FieldDefinition/Account.Name"
+    },
+    "Id": "000000000000000AAA",
+    "DurableId": "Account.Name",
+    "QualifiedApiName": "Name",
+    "Label": "Account Name",
+    "DataType": "Name",
+    "EntityDefinition": {
+      "attributes": {
+        "type": "EntityDefinition",
+        "url": "/services/data/v62.0/sobjects/EntityDefinition/Account"
+      },
+      "QualifiedApiName": "Account"
+    }
+  },
+  {
+    "attributes": {
+      "type": "FieldDefinition",
+      "url": "/services/data/v62.0/tooling/sobjects/FieldDefinition/Account.Industry"
+    },
+    "Id": "000000000000001AAA",
+    "DurableId": "Account.Industry",
+    "QualifiedApiName": "Industry",
+    "Label": "Industry",
+    "DataType": "Picklist",
+    "EntityDefinition": {
+      "attributes": {
+        "type": "EntityDefinition",
+        "url": "/services/data/v62.0/sobjects/EntityDefinition/Account"
+      },
+      "QualifiedApiName": "Account"
+    }
+  },
+  {
+    "attributes": {
+      "type": "FieldDefinition",
+      "url": "/services/data/v62.0/tooling/sobjects/FieldDefinition/Account.Phone"
+    },
+    "Id": "000000000000002AAA",
+    "DurableId": "Account.Phone",
+    "QualifiedApiName": "Phone",
+    "Label": "Phone",
+    "DataType": "Phone",
+    "EntityDefinition": {
+      "attributes": {
+        "type": "EntityDefinition",
+        "url": "/services/data/v62.0/sobjects/EntityDefinition/Account"
+      },
+      "QualifiedApiName": "Account"
+    }
+  },
+  {
+    "attributes": {
+      "type": "FieldDefinition",
+      "url": "/services/data/v62.0/tooling/sobjects/FieldDefinition/Account.Website"
+    },
+    "Id": "000000000000003AAA",
+    "DurableId": "Account.Website",
+    "QualifiedApiName": "Website",
+    "Label": "Website",
+    "DataType": "Url",
+    "EntityDefinition": {
+      "attributes": {
+        "type": "EntityDefinition",
+        "url": "/services/data/v62.0/sobjects/EntityDefinition/Account"
+      },
+      "QualifiedApiName": "Account"
+    }
+  },
+  {
+    "attributes": {
+      "type": "FieldDefinition",
+      "url": "/services/data/v62.0/tooling/sobjects/FieldDefinition/Account.AnnualRevenue"
+    },
+    "Id": "000000000000004AAA",
+    "DurableId": "Account.AnnualRevenue",
+    "QualifiedApiName": "AnnualRevenue",
+    "Label": "Annual Revenue",
+    "DataType": "Currency",
+    "EntityDefinition": {
+      "attributes": {
+        "type": "EntityDefinition",
+        "url": "/services/data/v62.0/sobjects/EntityDefinition/Account"
+      },
+      "QualifiedApiName": "Account"
+    }
+  }
+]

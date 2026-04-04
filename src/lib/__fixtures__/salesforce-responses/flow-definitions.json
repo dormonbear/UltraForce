@@ -1,0 +1,52 @@
+[
+  {
+    "attributes": {
+      "type": "Flow",
+      "url": "/services/data/v62.0/tooling/sobjects/Flow/301Dn000000abcd"
+    },
+    "Id": "301Dn000000abcd",
+    "MasterLabel": "CreateCase",
+    "VersionNumber": 3,
+    "Status": "Active"
+  },
+  {
+    "attributes": {
+      "type": "Flow",
+      "url": "/services/data/v62.0/tooling/sobjects/Flow/301Dn000000efgh"
+    },
+    "Id": "301Dn000000efgh",
+    "MasterLabel": "CreateBooking",
+    "VersionNumber": 1,
+    "Status": "Active"
+  },
+  {
+    "attributes": {
+      "type": "Flow",
+      "url": "/services/data/v62.0/tooling/sobjects/Flow/301Dn000000ijkl"
+    },
+    "Id": "301Dn000000ijkl",
+    "MasterLabel": "AddToCart",
+    "VersionNumber": 2,
+    "Status": "Draft"
+  },
+  {
+    "attributes": {
+      "type": "Flow",
+      "url": "/services/data/v62.0/tooling/sobjects/Flow/301Dn000000mnop"
+    },
+    "Id": "301Dn000000mnop",
+    "MasterLabel": "FetchAccountData",
+    "VersionNumber": 5,
+    "Status": "Active"
+  },
+  {
+    "attributes": {
+      "type": "Flow",
+      "url": "/services/data/v62.0/tooling/sobjects/Flow/301Dn000000qrst"
+    },
+    "Id": "301Dn000000qrst",
+    "MasterLabel": "SendWelcomeEmail",
+    "VersionNumber": 1,
+    "Status": "Obsolete"
+  }
+]

@@ -1,0 +1,87 @@
+[
+  {
+    "attributes": {
+      "type": "ApexClass",
+      "url": "/services/data/v62.0/tooling/sobjects/ApexClass/01pDn00000abcde"
+    },
+    "Id": "01pDn00000abcde",
+    "Name": "WeatherService",
+    "NamespacePrefix": null,
+    "LastModifiedDate": "2025-12-15T10:30:00.000+0000",
+    "LastModifiedBy": {
+      "attributes": {
+        "type": "User",
+        "url": "/services/data/v62.0/sobjects/User/005Dn000001abc"
+      },
+      "Name": "Test User"
+    }
+  },
+  {
+    "attributes": {
+      "type": "ApexClass",
+      "url": "/services/data/v62.0/tooling/sobjects/ApexClass/01pDn00000fghij"
+    },
+    "Id": "01pDn00000fghij",
+    "Name": "PaymentGatewayController",
+    "NamespacePrefix": null,
+    "LastModifiedDate": "2025-11-20T08:15:00.000+0000",
+    "LastModifiedBy": {
+      "attributes": {
+        "type": "User",
+        "url": "/services/data/v62.0/sobjects/User/005Dn000001abc"
+      },
+      "Name": "Test User"
+    }
+  },
+  {
+    "attributes": {
+      "type": "ApexClass",
+      "url": "/services/data/v62.0/tooling/sobjects/ApexClass/01pDn00000klmno"
+    },
+    "Id": "01pDn00000klmno",
+    "Name": "ExperienceController",
+    "NamespacePrefix": null,
+    "LastModifiedDate": "2025-10-05T14:22:00.000+0000",
+    "LastModifiedBy": {
+      "attributes": {
+        "type": "User",
+        "url": "/services/data/v62.0/sobjects/User/005Dn000001abc"
+      },
+      "Name": "Test User"
+    }
+  },
+  {
+    "attributes": {
+      "type": "ApexClass",
+      "url": "/services/data/v62.0/tooling/sobjects/ApexClass/01pDn00000pqrst"
+    },
+    "Id": "01pDn00000pqrst",
+    "Name": "ManagedPkgClass",
+    "NamespacePrefix": "sfpkg",
+    "LastModifiedDate": "2025-09-01T12:00:00.000+0000",
+    "LastModifiedBy": {
+      "attributes": {
+        "type": "User",
+        "url": "/services/data/v62.0/sobjects/User/005Dn000001abc"
+      },
+      "Name": "Test User"
+    }
+  },
+  {
+    "attributes": {
+      "type": "ApexClass",
+      "url": "/services/data/v62.0/tooling/sobjects/ApexClass/01pDn00000uvwxy"
+    },
+    "Id": "01pDn00000uvwxy",
+    "Name": "AccountTriggerHandler",
+    "NamespacePrefix": null,
+    "LastModifiedDate": "2025-08-15T09:45:00.000+0000",
+    "LastModifiedBy": {
+      "attributes": {
+        "type": "User",
+        "url": "/services/data/v62.0/sobjects/User/005Dn000001abc"
+      },
+      "Name": "Test User"
+    }
+  }
+]
