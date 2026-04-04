@@ -1,30 +1,16 @@
 /// <reference types="vitest/globals" />
 import '@testing-library/jest-dom/vitest'
+import { chrome } from 'vitest-chrome/lib/index.esm.js'
 
-// Mock chrome API for tests
-const chromeMock = {
-  storage: {
-    local: {
-      get: vi.fn().mockResolvedValue({}),
-      set: vi.fn().mockResolvedValue(undefined),
-      remove: vi.fn().mockResolvedValue(undefined)
-    }
-  },
-  cookies: {
-    get: vi.fn().mockResolvedValue(null)
-  },
-  runtime: {
-    sendMessage: vi.fn(),
-    onMessage: {
-      addListener: vi.fn()
-    },
-    getManifest: vi.fn().mockReturnValue({ version: '0.1.0' })
-  },
-  tabs: {
-    query: vi.fn().mockResolvedValue([]),
-    create: vi.fn(),
-    sendMessage: vi.fn()
-  }
-}
+// vitest-chrome provides typed mocks for all Chrome APIs
+// but functions have NO default implementation -- configure defaults
+// that existing tests depend on
+Object.assign(global, { chrome })
 
-vi.stubGlobal('chrome', chromeMock)
+// Restore default behaviors that existing tests expect
+chrome.storage.local.get.mockResolvedValue({})
+chrome.storage.local.set.mockResolvedValue(undefined)
+chrome.storage.local.remove.mockResolvedValue(undefined)
+chrome.cookies.get.mockResolvedValue(null)
+chrome.runtime.getManifest.mockReturnValue({ version: '0.1.0' } as chrome.runtime.Manifest)
+chrome.tabs.query.mockResolvedValue([])
