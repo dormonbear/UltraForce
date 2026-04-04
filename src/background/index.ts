@@ -3,6 +3,8 @@
  * Handles cookie-based authentication for Salesforce API access
  */
 
+import { STORAGE_KEYS, storageSet } from '~lib/storage-service'
+
 import { logger } from '~lib/logger'
 
 // Salesforce domains to search for session cookies
@@ -19,12 +21,10 @@ const SF_DOMAINS = [
 // Initialize extension
 chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
-    await chrome.storage.local.set({
-      settings: {
-        searchLimit: 1000,
-        autoSearch: true,
-        showDebug: false
-      }
+    await storageSet(STORAGE_KEYS.LEGACY_SETTINGS, {
+      searchLimit: 1000,
+      autoSearch: true,
+      showDebug: false
     })
   }
 })

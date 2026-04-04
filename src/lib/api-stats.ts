@@ -1,31 +1,21 @@
-const STORAGE_KEY = 'ultraforce_api_stats'
+import { STORAGE_KEYS, storageGet, storageSet, storageRemove, type ApiStatsData } from './storage-service'
 
-interface StoredStats {
-  totalRequests: number
-  requestLog: number[] // timestamps of requests
-}
-
-async function loadStats(): Promise<StoredStats> {
-  try {
-    const result = await chrome.storage.local.get([STORAGE_KEY])
-    const stored = result[STORAGE_KEY]
-    if (!stored) {
-      return { totalRequests: 0, requestLog: [] }
-    }
-    return {
-      totalRequests: stored.totalRequests || 0,
-      requestLog: stored.requestLog || []
-    }
-  } catch {
+async function loadStats(): Promise<ApiStatsData> {
+  const stored = await storageGet<ApiStatsData>(STORAGE_KEYS.API_STATS)
+  if (!stored) {
     return { totalRequests: 0, requestLog: [] }
+  }
+  return {
+    totalRequests: stored.totalRequests || 0,
+    requestLog: stored.requestLog || []
   }
 }
 
-async function saveStats(stats: StoredStats): Promise<void> {
+async function saveStats(stats: ApiStatsData): Promise<void> {
   try {
-    await chrome.storage.local.set({ [STORAGE_KEY]: stats })
+    await storageSet(STORAGE_KEYS.API_STATS, stats)
   } catch {
-    // Ignore storage errors
+    // Ignore storage errors for stats
   }
 }
 
@@ -66,9 +56,5 @@ export async function getApiStats(): Promise<ApiStatsDisplay> {
 }
 
 export async function resetAllStats(): Promise<void> {
-  try {
-    await chrome.storage.local.remove([STORAGE_KEY])
-  } catch {
-    // Ignore
-  }
+  await storageRemove(STORAGE_KEYS.API_STATS)
 }

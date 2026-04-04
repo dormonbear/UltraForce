@@ -12,6 +12,7 @@ import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } fr
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { logger } from '~lib/logger'
+import { STORAGE_KEYS, storageGet, storageSet, type SearchSettings } from '~lib/storage-service'
 import type { ObjectAction } from './ResultItem'
 
 // Salesforce ID validation: 15 or 18 alphanumeric characters
@@ -96,9 +97,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const result = await chrome.storage.local.get(['ultraforce_search_settings'])
-        if (result.ultraforce_search_settings?.selectedTypes) {
-          // Clean up orphan types that don't belong to complete groups
+        const s = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
+        if (s?.selectedTypes) {
           const validGroups = [
             ['ApexClass', 'ApexTrigger'],
             ['ApexPage', 'ApexComponent'],
@@ -111,41 +111,23 @@ const SearchModal: React.FC<SearchModalProps> = ({
             ['PermissionSet'],
             ['Profile']
           ]
-          const loadedTypes = result.ultraforce_search_settings.selectedTypes as string[]
+          const loadedTypes = s.selectedTypes as string[]
           const cleanedTypes = loadedTypes.filter((type) => {
             const group = validGroups.find((g) => g.includes(type))
             if (!group) return false
-            // For single-item groups, always valid
             if (group.length === 1) return true
-            // For multi-item groups, all items must be present
             return group.every((t) => loadedTypes.includes(t))
           })
           setSelectedTypes(cleanedTypes.length > 0 ? cleanedTypes : ['CustomObject', 'CustomField'])
         }
-        if (result.ultraforce_search_settings?.shortcutKey) {
-          setShortcutKey(result.ultraforce_search_settings.shortcutKey)
-        }
-        if (result.ultraforce_search_settings?.closeOnNavigate !== undefined) {
-          setCloseOnNavigate(result.ultraforce_search_settings.closeOnNavigate)
-        }
-        if (result.ultraforce_search_settings?.autoLoadFields !== undefined) {
-          setAutoLoadFields(result.ultraforce_search_settings.autoLoadFields)
-        }
-        if (result.ultraforce_search_settings?.navigationMode) {
-          setNavigationMode(result.ultraforce_search_settings.navigationMode)
-        }
-        if (result.ultraforce_search_settings?.fuzzySearch !== undefined) {
-          setFuzzySearch(result.ultraforce_search_settings.fuzzySearch)
-        }
-        if (result.ultraforce_search_settings?.hideManagedPackage !== undefined) {
-          setHideManagedPackage(result.ultraforce_search_settings.hideManagedPackage)
-        }
-        if (result.ultraforce_search_settings?.maxResultsPerType !== undefined) {
-          setMaxResultsPerType(result.ultraforce_search_settings.maxResultsPerType)
-        }
-        if (result.ultraforce_search_settings?.customCommands) {
-          setCustomCommands(result.ultraforce_search_settings.customCommands)
-        }
+        if (s?.shortcutKey) setShortcutKey(s.shortcutKey)
+        if (s?.closeOnNavigate !== undefined) setCloseOnNavigate(s.closeOnNavigate)
+        if (s?.autoLoadFields !== undefined) setAutoLoadFields(s.autoLoadFields)
+        if (s?.navigationMode) setNavigationMode(s.navigationMode)
+        if (s?.fuzzySearch !== undefined) setFuzzySearch(s.fuzzySearch)
+        if (s?.hideManagedPackage !== undefined) setHideManagedPackage(s.hideManagedPackage)
+        if (s?.maxResultsPerType !== undefined) setMaxResultsPerType(s.maxResultsPerType)
+        if (s?.customCommands) setCustomCommands(s.customCommands)
         setSettingsLoaded(true)
       } catch (error) {
         logger.error('settings:load:failed', error)
@@ -177,7 +159,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           customCommands,
           lastUpdated: Date.now()
         }
-        await chrome.storage.local.set({ ultraforce_search_settings: settings })
+        await storageSet(STORAGE_KEYS.SEARCH_SETTINGS, settings)
       } catch (error) {
         logger.error('settings:save:failed', error)
       }

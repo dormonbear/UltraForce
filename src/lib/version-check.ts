@@ -1,23 +1,14 @@
-const VERSION_CHECK_KEY = 'ultraforce_version_check'
+import { STORAGE_KEYS, storageGet, storageSet, type VersionCheckState } from './storage-service'
 
 export const RELEASE_NOTES_URL = 'https://ultraforce.dormon.net/guide/release-notes'
-
-interface VersionCheckState {
-  lastVersion: string
-  hasShownNotification: boolean
-}
 
 function getCurrentVersion(): string {
   return chrome.runtime.getManifest().version
 }
 
 async function getVersionCheckState(): Promise<VersionCheckState> {
-  try {
-    const result = await chrome.storage.local.get([VERSION_CHECK_KEY])
-    return result[VERSION_CHECK_KEY] || { lastVersion: '', hasShownNotification: false }
-  } catch {
-    return { lastVersion: '', hasShownNotification: false }
-  }
+  const state = await storageGet<VersionCheckState>(STORAGE_KEYS.VERSION_CHECK)
+  return state || { lastVersion: '', hasShownNotification: false }
 }
 
 export async function checkForUpdate(): Promise<{
@@ -39,10 +30,11 @@ export async function checkForUpdate(): Promise<{
 export async function markNotificationAsShown(): Promise<void> {
   const currentVersion = getCurrentVersion()
   try {
-    await chrome.storage.local.set({
-      [VERSION_CHECK_KEY]: { lastVersion: currentVersion, hasShownNotification: true }
+    await storageSet(STORAGE_KEYS.VERSION_CHECK, {
+      lastVersion: currentVersion,
+      hasShownNotification: true
     })
   } catch {
-    // ignore
+    // Ignore storage errors
   }
 }

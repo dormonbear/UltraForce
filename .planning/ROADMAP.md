@@ -55,16 +55,16 @@ Plans:
 ### Phase 3: State Migration
 **Goal**: Application state is managed through React-friendly Zustand stores and a centralized storage service, making state testable and predictable
 **Depends on**: Phase 2
-**Requirements**: STAT-01, STAT-02, STAT-03
+**Requirements**: STAT-01, STAT-02 (STAT-03 completed in Phase 2)
 **Success Criteria** (what must be TRUE):
   1. Search state, settings, and session data are managed by Zustand stores (not WindowManager singleton)
   2. All chrome.storage.local calls go through a single storage service module
-  3. sfRest returns typed responses (`sfRest<T>()`) instead of `Promise<any>`
-**Plans**: TBD
+  3. ~~sfRest returns typed responses~~ (already done in Phase 02-03)
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md -- Centralized storage service + migrate non-settings call sites (api-stats, version-check, unsupported-types, error-boundary, metadata-cache)
+- [ ] 03-02-PLAN.md -- Zustand stores (settings, session, search) + update SearchModal/WM consumers
 
 ### Phase 4: Cleanup & Coverage
 **Goal**: Technical debt artifacts are removed and the codebase meets the 80% coverage target with comprehensive E2E test coverage

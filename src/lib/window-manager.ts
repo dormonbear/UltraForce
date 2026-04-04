@@ -5,6 +5,7 @@ import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
+import { STORAGE_KEYS, storageGet, onStorageChanged, offStorageChanged, type SearchSettings } from '~lib/storage-service'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
 import {
@@ -236,13 +237,9 @@ class UltraForceWindowManager {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     })
 
-    const handleStorageChange = (
-      changes: { [key: string]: chrome.storage.StorageChange },
-      areaName: string
-    ) => {
-      if (areaName !== 'local') return
-      if (changes.ultraforce_search_settings) {
-        const newSettings = changes.ultraforce_search_settings.newValue
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+      if (changes[STORAGE_KEYS.SEARCH_SETTINGS]) {
+        const newSettings = changes[STORAGE_KEYS.SEARCH_SETTINGS].newValue as SearchSettings | undefined
         if (newSettings?.closeOnNavigate !== undefined) {
           this.state.closeOnNavigate = newSettings.closeOnNavigate
           this.log('closeOnNavigate updated:', this.state.closeOnNavigate)
@@ -258,9 +255,9 @@ class UltraForceWindowManager {
       }
     }
 
-    chrome.storage.onChanged.addListener(handleStorageChange)
+    onStorageChanged(handleStorageChange)
     this.cleanupFunctions.push(() => {
-      chrome.storage.onChanged.removeListener(handleStorageChange)
+      offStorageChanged(handleStorageChange)
     })
   }
 
@@ -283,16 +280,15 @@ class UltraForceWindowManager {
         }
       }
 
-      // Load settings
-      const result = await chrome.storage.local.get(['ultraforce_search_settings'])
-      if (result.ultraforce_search_settings?.closeOnNavigate !== undefined) {
-        this.state.closeOnNavigate = result.ultraforce_search_settings.closeOnNavigate
+      const settings = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
+      if (settings?.closeOnNavigate !== undefined) {
+        this.state.closeOnNavigate = settings.closeOnNavigate
       }
-      if (result.ultraforce_search_settings?.navigationMode) {
-        this.state.navigationMode = result.ultraforce_search_settings.navigationMode
+      if (settings?.navigationMode) {
+        this.state.navigationMode = settings.navigationMode
       }
-      if (result.ultraforce_search_settings?.fuzzySearch !== undefined) {
-        this.state.fuzzySearch = result.ultraforce_search_settings.fuzzySearch
+      if (settings?.fuzzySearch !== undefined) {
+        this.state.fuzzySearch = settings.fuzzySearch
       }
     } catch (error) {
       logger.warn('Failed to load state:', error)

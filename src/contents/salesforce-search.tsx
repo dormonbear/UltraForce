@@ -3,6 +3,7 @@ import UltraForceWindowManager from '~lib/window-manager'
 import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermissions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
+import { STORAGE_KEYS, storageGet, onStorageChanged, offStorageChanged, type SearchSettings } from '~lib/storage-service'
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -72,9 +73,9 @@ class UltraForceContentScript {
 
   private async loadShortcutSettings(): Promise<void> {
     try {
-      const result = await chrome.storage.local.get(['ultraforce_search_settings'])
-      if (result.ultraforce_search_settings?.shortcutKey) {
-        this.shortcutKey = result.ultraforce_search_settings.shortcutKey
+      const settings = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
+      if (settings?.shortcutKey) {
+        this.shortcutKey = settings.shortcutKey
       }
     } catch (error) {
       logger.error('Failed to load shortcut settings:', error)
@@ -132,8 +133,8 @@ class UltraForceContentScript {
 
   private setupStorageListener(): void {
     this.storageListener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes.ultraforce_search_settings?.newValue) {
-        const newSettings = changes.ultraforce_search_settings.newValue
+      if (changes[STORAGE_KEYS.SEARCH_SETTINGS]?.newValue) {
+        const newSettings = changes[STORAGE_KEYS.SEARCH_SETTINGS].newValue as SearchSettings
         if (newSettings.shortcutKey && newSettings.shortcutKey !== this.shortcutKey) {
           this.shortcutKey = newSettings.shortcutKey
           this.setupKeyboardShortcuts()
@@ -141,7 +142,7 @@ class UltraForceContentScript {
       }
     }
 
-    chrome.storage.onChanged.addListener(this.storageListener)
+    onStorageChanged(this.storageListener)
   }
 
   private setupMessageListener(): void {
@@ -242,7 +243,7 @@ class UltraForceContentScript {
       }
 
       if (this.storageListener) {
-        chrome.storage.onChanged.removeListener(this.storageListener)
+        offStorageChanged(this.storageListener)
         this.storageListener = null
       }
 
