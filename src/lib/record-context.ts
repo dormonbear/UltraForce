@@ -42,7 +42,7 @@ export async function fetchRecordTypeId(
   recordId: string
 ): Promise<string | null> {
   try {
-    const record = await sfRest(
+    const record = await sfRest<{ RecordTypeId?: string }>(
       sfHost,
       `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`
     )
@@ -70,12 +70,12 @@ export async function resolveObjectApiNameFromRecord(
   }
 
   try {
-    const resp = await sfRest(sfHost, `/services/data/v${API_VERSION}/sobjects/`)
+    const resp = await sfRest<{ sobjects?: Array<{ keyPrefix?: string; name?: string }> }>(sfHost, `/services/data/v${API_VERSION}/sobjects/`)
     if (resp?.sobjects) {
       if (!sobjectPrefixCache[hostKey]) {
         sobjectPrefixCache[hostKey] = {}
       }
-      resp.sobjects.forEach((obj: any) => {
+      resp.sobjects.forEach((obj) => {
         if (obj.keyPrefix && obj.name) {
           sobjectPrefixCache[hostKey][obj.keyPrefix] = obj.name
         }
@@ -101,7 +101,7 @@ export async function getCurrentUserId(sfHost: string): Promise<string | null> {
 
   try {
     const apex = encodeURIComponent('throw new System.TypeException(UserInfo.getUserId());')
-    const resp = await sfRest(
+    const resp = await sfRest<{ exceptionMessage?: string }>(
       sfHost,
       `/services/data/v${API_VERSION}/tooling/executeAnonymous/?anonymousBody=${apex}`
     )
@@ -129,7 +129,7 @@ export async function getCurrentUserProfileId(sfHost: string): Promise<string | 
 
   try {
     const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
-    const resp = await sfRest(sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+    const resp = await sfRest<{ records?: Array<{ ProfileId?: string }> }>(sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
     const profileId = resp?.records?.[0]?.ProfileId
     if (profileId) {
       currentUserProfileIdCache[hostKey] = profileId
@@ -157,7 +157,7 @@ export async function getUserLightningPreference(sfHost: string): Promise<boolea
     const soql = encodeURIComponent(
       `SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`
     )
-    const resp = await sfRest(sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+    const resp = await sfRest<{ records?: Array<{ UserPreferencesLightningExperiencePreferred?: boolean }> }>(sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
     const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
 
     if (typeof preference === 'boolean') {
@@ -181,7 +181,7 @@ export async function getLayoutAssignment(
   let objectDurableId: string | null = null
   try {
     const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
-    const entityResp = await sfRest(
+    const entityResp = await sfRest<{ records?: Array<{ DurableId?: string }> }>(
       sfHost,
       `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`
     )
@@ -203,7 +203,7 @@ export async function getLayoutAssignment(
 
   for (const q of queries) {
     try {
-      const resp = await sfRest(
+      const resp = await sfRest<{ records?: Array<{ LayoutId?: string }> }>(
         sfHost,
         `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(q)}`
       )
@@ -229,7 +229,7 @@ export async function handleFieldsNavigation(
 
   if (useLightning) {
     const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
-    const entityResp = await sfRest(
+    const entityResp = await sfRest<{ records?: Array<{ DurableId?: string }> }>(
       sfHost,
       `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`
     )
@@ -255,7 +255,7 @@ export async function handleRecordTypeNavigation(
 
   if (useLightning) {
     const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
-    const entityResp = await sfRest(
+    const entityResp = await sfRest<{ records?: Array<{ DurableId?: string }> }>(
       sfHost,
       `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`
     )
@@ -281,7 +281,7 @@ export async function getCurrentRecordLayoutInfo(
   try {
     let recordTypeId: string | null = null
     try {
-      const record = await sfRest(
+      const record = await sfRest<{ RecordTypeId?: string }>(
         sfHost,
         `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`
       )

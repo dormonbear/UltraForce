@@ -4,6 +4,7 @@
 import { sfRest, API_VERSION } from './auth'
 import { MetadataCache } from './metadata-cache'
 import { METADATA_TYPES } from './metadata-types'
+import type { SfEntityDefinition, SfFieldDefinition } from './metadata-types'
 import { logger } from './logger'
 import { markTypeUnsupported } from './unsupported-types'
 import { normalizeHost, escapeSoql } from './domain-utils'
@@ -11,8 +12,15 @@ import { buildSearchIndex, hasSearchIndex } from './fuzzy-search'
 
 export interface FetchOptions {
   maxRecords?: number
-  onBatch?: (records: any[]) => Promise<void>
+  onBatch?: (records: Record<string, unknown>[]) => Promise<void>
   skipLocalCollection?: boolean
+}
+
+interface SfQueryResponse<T> {
+  records: T[]
+  totalSize?: number
+  done: boolean
+  nextRecordsUrl?: string
 }
 
 // Types that use regular REST API (not Tooling API)
@@ -21,25 +29,25 @@ const REST_API_TYPES = ['CustomObject', 'CustomSetting', 'User', 'Report', 'Dash
 // Types that should always fetch fresh data (no cache)
 const REALTIME_TYPES: string[] = ['CustomLabel']
 
-export async function fetchAllPages(
+export async function fetchAllPages<T extends Record<string, unknown> = Record<string, unknown>>(
   sfHost: string,
   initialPath: string,
   options: FetchOptions = {}
-): Promise<any[]> {
+): Promise<T[]> {
   const {
     maxRecords = Infinity,
     onBatch,
     skipLocalCollection = false
   } = options
 
-  const allRecords: any[] = []
+  const allRecords: T[] = []
   let path: string | null = initialPath
   let totalSize: number | null = null
   let fetchedCount = 0
 
   while (path) {
-    const data = await sfRest(sfHost, path)
-    const records = data.records || []
+    const data: SfQueryResponse<T> = await sfRest<SfQueryResponse<T>>(sfHost, path)
+    const records: T[] = data.records || []
 
     if (totalSize === null && data.totalSize !== undefined) {
       totalSize = data.totalSize
@@ -52,7 +60,7 @@ export async function fetchAllPages(
       fetchedCount += batchToProcess.length
 
       if (onBatch) {
-        await onBatch(batchToProcess)
+        await onBatch(batchToProcess as unknown as Record<string, unknown>[])
       }
 
       if (!skipLocalCollection) {
@@ -83,7 +91,7 @@ export async function fetchAllPages(
 export async function fetchMetadataFromAPI(
   metadataType: string,
   sfHost: string
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
 
   if (metadataType === 'CustomMetadataType') {
@@ -109,8 +117,9 @@ export async function fetchMetadataFromAPI(
     const records = await fetchAllPages(host, queryPath)
     logger.debug('fetch:metadata', { type: metadataType, count: records.length, ms: Date.now() - start })
     return records
-  } catch (error: any) {
-    if (error.message?.includes('INVALID_TYPE') || error.message?.includes('not supported')) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('INVALID_TYPE') || message.includes('not supported')) {
       logger.warn('fetch:metadata:unsupported', { type: metadataType, host })
       await markTypeUnsupported(host, metadataType)
       return []
@@ -119,16 +128,22 @@ export async function fetchMetadataFromAPI(
   }
 }
 
-async function fetchCustomMetadataTypes(sfHost: string): Promise<any[]> {
+interface CmdtTypeRecord extends Record<string, unknown> {
+  DurableId: string
+  QualifiedApiName: string
+  Label: string
+}
+
+async function fetchCustomMetadataTypes(sfHost: string): Promise<Record<string, unknown>[]> {
   const start = Date.now()
   const typeQuery = `SELECT DurableId, QualifiedApiName, Label, NamespacePrefix FROM EntityDefinition WHERE QualifiedApiName LIKE '%__mdt' ORDER BY QualifiedApiName ASC LIMIT 500`
   const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(typeQuery)}`
 
   logger.debug('fetch:cmdt:types', { query: typeQuery })
-  const types = await fetchAllPages(sfHost, queryPath)
-  logger.debug('fetch:cmdt:types:result', { count: types.length, types: types.map((t: any) => t.QualifiedApiName) })
+  const types = await fetchAllPages<CmdtTypeRecord>(sfHost, queryPath)
+  logger.debug('fetch:cmdt:types:result', { count: types.length, types: types.map((t) => t.QualifiedApiName) })
 
-  const allRecords: any[] = []
+  const allRecords: Record<string, unknown>[] = []
   for (const t of types) {
     allRecords.push({
       ...t,
@@ -143,16 +158,24 @@ async function fetchCustomMetadataTypes(sfHost: string): Promise<any[]> {
   return allRecords
 }
 
-async function fetchCustomSettings(sfHost: string): Promise<any[]> {
+interface CustomSettingRecord extends Record<string, unknown> {
+  DurableId: string
+  QualifiedApiName: string
+  DeveloperName: string
+  Label: string
+  NamespacePrefix: string | null
+}
+
+async function fetchCustomSettings(sfHost: string): Promise<Record<string, unknown>[]> {
   const start = Date.now()
   const typeQuery = `SELECT DurableId, QualifiedApiName, DeveloperName, Label, NamespacePrefix FROM EntityDefinition WHERE IsCustomSetting = true ORDER BY QualifiedApiName ASC LIMIT 2000`
   const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(typeQuery)}`
 
   logger.debug('fetch:custom-setting:types', { query: typeQuery })
-  const types = await fetchAllPages(sfHost, queryPath)
+  const types = await fetchAllPages<CustomSettingRecord>(sfHost, queryPath)
   logger.debug('fetch:custom-setting:types:result', { count: types.length })
 
-  const allRecords: any[] = []
+  const allRecords: Record<string, unknown>[] = []
   for (const t of types) {
     allRecords.push({
       ...t,
@@ -166,10 +189,19 @@ async function fetchCustomSettings(sfHost: string): Promise<any[]> {
   return allRecords
 }
 
+interface FieldRecord extends Record<string, unknown> {
+  Id: string
+  DurableId: string
+  QualifiedApiName: string
+  Label: string
+  DataType: string
+  EntityDefinition: { QualifiedApiName: string } | null
+}
+
 export async function fetchFieldsForObject(
   objectApiName: string,
   sfHost: string
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
   const escapedName = escapeSoql(objectApiName)
@@ -177,8 +209,8 @@ export async function fetchFieldsForObject(
   const queryPath = `/services/data/v${API_VERSION}/tooling/query?q=${encodeURIComponent(query)}`
 
   try {
-    const records = await fetchAllPages(host, queryPath)
-    const fields = records.map((field: any) => ({
+    const records = await fetchAllPages<FieldRecord>(host, queryPath)
+    const fields = records.map((field) => ({
       ...field,
       MasterLabel: field.Label,
       ObjectApiName: field.EntityDefinition?.QualifiedApiName || objectApiName
@@ -192,18 +224,25 @@ export async function fetchFieldsForObject(
   }
 }
 
+interface CmdtRecord extends Record<string, unknown> {
+  Id: string
+  DeveloperName: string
+  MasterLabel: string
+  NamespacePrefix: string | null
+}
+
 export async function fetchRecordsForCMDT(
   cmdtApiName: string,
   sfHost: string
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
   const query = `SELECT Id, DeveloperName, MasterLabel, NamespacePrefix FROM ${cmdtApiName} ORDER BY MasterLabel ASC LIMIT 2000`
   const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(query)}`
 
   try {
-    const records = await fetchAllPages(host, queryPath)
-    const enrichedRecords = records.map((record: any) => ({
+    const records = await fetchAllPages<CmdtRecord>(host, queryPath)
+    const enrichedRecords = records.map((record) => ({
       ...record,
       _parentType: cmdtApiName,
       _parentLabel: cmdtApiName.replace('__mdt', '').replace(/_/g, ' '),
@@ -219,18 +258,24 @@ export async function fetchRecordsForCMDT(
   }
 }
 
+interface CustomSettingDataRecord extends Record<string, unknown> {
+  Id: string
+  Name: string
+  SetupOwnerId: string
+}
+
 export async function fetchRecordsForCustomSetting(
   settingApiName: string,
   sfHost: string
-): Promise<any[]> {
+): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
   const query = `SELECT Id, Name, SetupOwnerId FROM ${settingApiName} ORDER BY Name ASC`
   const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(query)}`
 
   try {
-    const records = await fetchAllPages(host, queryPath)
-    const enrichedRecords = records.map((record: any) => ({
+    const records = await fetchAllPages<CustomSettingDataRecord>(host, queryPath)
+    const enrichedRecords = records.map((record) => ({
       ...record,
       _parentType: settingApiName,
       _parentLabel: settingApiName.replace('__c', '').replace(/_/g, ' '),
@@ -288,7 +333,7 @@ export async function getMetadataWithCache(
   metadataType: string,
   sfHost: string,
   forceRefresh = false
-): Promise<{ data: any[]; fromCache: boolean }> {
+): Promise<{ data: Record<string, unknown>[]; fromCache: boolean }> {
   const cache = MetadataCache.getInstance()
   const cacheKey = normalizeHost(sfHost)
 

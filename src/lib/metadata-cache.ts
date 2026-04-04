@@ -8,7 +8,7 @@ const CACHE_CONFIG = {
 }
 
 interface CacheItem {
-  data: any[]
+  data: Record<string, unknown>[]
   timestamp: number
   version: string
   orgId: string
@@ -20,7 +20,7 @@ function getCacheKey(orgId: string, metadataType: string): string {
   return `metadata_${orgId}_${metadataType}`
 }
 
-function generateDataHash(data: any[]): string {
+function generateDataHash(data: Record<string, unknown>[]): string {
   const str = JSON.stringify(data.map((item) => ({ id: item.Id, name: item.Name })))
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -33,7 +33,7 @@ function generateDataHash(data: any[]): string {
 
 export class MetadataCache {
   private static instance: MetadataCache
-  private refreshPromises = new Map<string, Promise<any[]>>()
+  private refreshPromises = new Map<string, Promise<Record<string, unknown>[]>>()
 
   private constructor() {}
 
@@ -44,7 +44,7 @@ export class MetadataCache {
     return MetadataCache.instance
   }
 
-  async get(orgId: string, metadataType: string): Promise<any[] | null> {
+  async get(orgId: string, metadataType: string): Promise<Record<string, unknown>[] | null> {
     try {
       const key = getCacheKey(orgId, metadataType)
       const result = await chrome.storage.local.get(key)
@@ -75,13 +75,13 @@ export class MetadataCache {
     }
   }
 
-  async set(orgId: string, metadataType: string, data: any[]): Promise<void> {
+  async set(orgId: string, metadataType: string, data: Record<string, unknown>[]): Promise<void> {
     try {
       const key = getCacheKey(orgId, metadataType)
 
       // For CustomLabel, strip Value field to reduce storage size
       const cacheData = metadataType === 'CustomLabel'
-        ? data.map(({ Value: _Value, ...rest }) => rest)
+        ? data.map(({ Value: _Value, ...rest }: Record<string, unknown>) => rest)
         : data
 
       const cacheItem: CacheItem = {
@@ -95,16 +95,17 @@ export class MetadataCache {
 
       await chrome.storage.local.set({ [key]: cacheItem })
       await this.cleanupIfNeeded()
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Handle quota exceeded error
-      if (error?.message?.includes('quota') || error?.message?.includes('QUOTA')) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (errorMessage.includes('quota') || errorMessage.includes('QUOTA')) {
         logger.warn('cache:quota-exceeded', { orgId, metadataType })
         await this.cleanupForQuota()
         // Retry once after cleanup
         try {
           const key = getCacheKey(orgId, metadataType)
           const cacheData = metadataType === 'CustomLabel'
-            ? data.map(({ Value: _Value, ...rest }) => rest)
+            ? data.map(({ Value: _Value, ...rest }: Record<string, unknown>) => rest)
             : data
           const cacheItem: CacheItem = {
             data: cacheData,
@@ -176,7 +177,7 @@ export class MetadataCache {
       const result = await chrome.storage.local.get(null)
       const cacheEntries = Object.entries(result)
         .filter(([key]) => key.startsWith('metadata_'))
-        .map(([key, value]: [string, any]) => {
+        .map(([key, value]) => {
           const cacheItem = value as CacheItem
           return {
             key,
@@ -203,7 +204,7 @@ export class MetadataCache {
     const key = `${orgId}_${metadataType}`
     if (this.refreshPromises.has(key)) return
 
-    const refreshPromise = new Promise<any[]>((resolve) => {
+    const refreshPromise = new Promise<Record<string, unknown>[]>((resolve) => {
       setTimeout(() => {
         try {
           document.dispatchEvent(
