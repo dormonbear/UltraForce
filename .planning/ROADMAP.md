@@ -28,11 +28,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `vitest run --coverage` reports coverage percentages and enforces 80% threshold (current code may be below, but the gate exists)
   3. ESLint warns on `any` usage across the codebase (no build failures, just warnings)
   4. Characterization tests exist for window-manager.ts and salesforce-api.ts that document current behavior
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Fix TS errors, coverage tooling, ESLint any-warning, vitest-chrome migration
+- [ ] 01-02-PLAN.md -- Characterization tests for window-manager.ts and salesforce-api.ts
 
 ### Phase 2: Module Extraction & Type Safety
 **Goal**: The two god classes are decomposed into focused, tested modules with explicit types replacing all any usage
