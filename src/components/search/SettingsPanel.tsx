@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import type { CustomCommand } from '~types'
+import type { CustomCommand, NavigationMode } from '~types'
 import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands, filterCommandsBySupported } from '~lib/command-parser'
 import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
 import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~lib/salesforce-api'
-
-type NavigationMode = 'auto' | 'lightning' | 'classic'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -269,6 +267,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               description: cmd.description || '',
               soql: cmd.soql,
               useToolingApi: cmd.useToolingApi || false,
+              isBuiltin: false,
               nameField: cmd.nameField,
               descriptionFields: cmd.descriptionFields
             }
@@ -687,4 +686,3 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 }
 
 export default SettingsPanel
-export type { NavigationMode }

@@ -39,7 +39,7 @@ export default [
       // TypeScript
       ...tsPlugin.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-empty-function': 'off',
@@ -62,6 +62,22 @@ export default [
       'no-empty': ['error', { allowEmptyCatch: true }],
       'no-case-declarations': 'off',
       'no-useless-escape': 'warn'
+    }
+  },
+  {
+    files: ['**/*.test.{ts,tsx}', '**/test-setup.ts'],
+    languageOptions: {
+      globals: {
+        vi: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        KeyboardEventInit: 'readonly'
+      }
     }
   },
   {

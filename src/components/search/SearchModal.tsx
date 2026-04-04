@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import type { SearchResult, CustomCommand } from '~types'
+import type { SearchResult, CustomCommand, NavigationMode, RecordContext } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
-import SettingsPanel, { type NavigationMode } from './SettingsPanel'
+import SettingsPanel from './SettingsPanel'
 import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
@@ -18,12 +18,6 @@ import type { ObjectAction } from './ResultItem'
 function isSalesforceId(str: string): boolean {
   const trimmed = str.trim()
   return /^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$/.test(trimmed)
-}
-
-interface RecordContext {
-  objectApiName: string | null
-  recordId: string
-  recordTypeId?: string | null
 }
 
 interface SearchModalProps {
