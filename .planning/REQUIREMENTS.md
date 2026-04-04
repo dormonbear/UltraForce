@@ -17,7 +17,7 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 ### Module Decomposition
 
 - [x] **MODL-01**: window-manager.ts is split into url-builder, navigation, record-context, setup-shortcuts, and core orchestration modules (each under 400 lines)
-- [ ] **MODL-02**: salesforce-api.ts is split into metadata-types, metadata-fetcher, and orchestration facade modules (each under 400 lines)
+- [x] **MODL-02**: salesforce-api.ts is split into metadata-types, metadata-fetcher, search-orchestrator, custom-command, and orchestration facade modules (each under 400 lines)
 - [x] **MODL-03**: Event emitter uses typed event map interface instead of `Set<Function>`
 - [x] **MODL-04**: All existing E2E tests pass after each module extraction (no regressions)
 
@@ -25,7 +25,7 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 
 - [x] **TEST-01**: Characterization tests capture current behavior of window-manager.ts and salesforce-api.ts before refactoring
 - [x] **TEST-02**: Unit tests exist for all extracted modules from window-manager.ts (url-builder, navigation, record-context, setup-shortcuts)
-- [ ] **TEST-03**: Unit tests exist for all extracted modules from salesforce-api.ts (metadata-types, metadata-fetcher)
+- [x] **TEST-03**: Unit tests exist for all extracted modules from salesforce-api.ts (metadata-types, metadata-fetcher)
 - [x] **TEST-04**: Component tests exist for SearchModal.tsx covering keyboard navigation, settings persistence, fuzzy toggle, and error states
 - [x] **TEST-05**: Unit tests exist for metadata-cache.ts covering TTL expiry, quota-exceeded retry, cleanup eviction, and background refresh deduplication
 - [ ] **TEST-06**: E2E tests cover all core user flows: search, navigation, command system, field search, profile sub-menu
@@ -87,12 +87,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUN-03 | Phase 1 | Complete |
 | FOUN-04 | Phase 1 | Complete |
 | MODL-01 | Phase 2 | Complete |
-| MODL-02 | Phase 2 | Pending |
+| MODL-02 | Phase 2 | Complete |
 | MODL-03 | Phase 2 | Complete |
 | MODL-04 | Phase 2 | Complete |
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 2 | Complete |
-| TEST-03 | Phase 2 | Pending |
+| TEST-03 | Phase 2 | Complete |
 | TEST-04 | Phase 2 | Complete |
 | TEST-05 | Phase 2 | Complete |
 | TEST-06 | Phase 4 | Pending |
