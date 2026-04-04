@@ -2,8 +2,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
-import { searchSalesforceMetadata, executeCustomCommand, isApiAvailable, type CustomCommandOptions } from '~lib/salesforce-api'
-import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
+import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
+import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
@@ -15,6 +15,18 @@ import {
   shouldUseLightning
 } from '~lib/url-builder'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
+import { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl } from '~lib/navigation'
+import type { NavigationContext } from '~lib/navigation'
+import {
+  fetchRecordTypeId as fetchRecordTypeIdFn,
+  resolveObjectApiNameFromRecord as resolveObjectApiNameFromRecordFn,
+  getCurrentRecordLayoutInfo as getCurrentRecordLayoutInfoFn,
+  getCurrentUserProfileId as getCurrentUserProfileIdFn,
+  getUserLightningPreference as getUserLightningPreferenceFn,
+  getLayoutAssignment as getLayoutAssignmentFn,
+  handleFieldsNavigation as handleFieldsNavigationFn,
+  handleRecordTypeNavigation as handleRecordTypeNavigationFn
+} from '~lib/record-context'
 import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
@@ -22,6 +34,17 @@ import type { ObjectAction } from '~components/search/ResultItem'
 export { getSetupHost, buildSetupUrl, resolveSetupShortcutPath, getCurrentRecordFromUrl, shouldUseLightning } from '~lib/url-builder'
 export { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 export type { SetupShortcut } from '~lib/setup-shortcuts'
+export { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl, KEY_PREFIX_MAP } from '~lib/navigation'
+export type { NavigationContext } from '~lib/navigation'
+export {
+  fetchRecordTypeId,
+  getCurrentRecordLayoutInfo,
+  resolveObjectApiNameFromRecord,
+  getCurrentUserId,
+  getCurrentUserProfileId,
+  getUserLightningPreference,
+  getLayoutAssignment
+} from '~lib/record-context'
 
 interface WindowManagerState {
   isVisible: boolean
@@ -47,30 +70,6 @@ interface WindowManagerOptions {
 const CONTAINER_PREFIX = 'ultraforce-modal'
 const CLEANUP_DELAY = 100
 const MAX_CLEANUP_ATTEMPTS = 3
-const GLOBAL_DESCRIBE_CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
-
-// Standard object key prefixes for Classic URL object resolution
-const KEY_PREFIX_MAP: Record<string, string> = {
-  '001': 'Account',
-  '003': 'Contact',
-  '005': 'User',
-  '006': 'Opportunity',
-  '00Q': 'Lead',
-  '00T': 'Task',
-  '00U': 'Event',
-  '00O': 'Report',
-  '00a': 'Asset',
-  '00e': 'UserProfileFeed',
-  '00l': 'EmailTemplate',
-  '00N': 'CustomField',
-  '00P': 'Document',
-  '00S': 'Solution',
-  '012': 'RecordType',
-  '500': 'Case',
-  '701': 'Campaign',
-  '800': 'Order',
-  '801': 'OrderItem'
-}
 
 class UltraForceWindowManager {
   private static instance: UltraForceWindowManager | null = null
@@ -104,10 +103,6 @@ class UltraForceWindowManager {
   }
 
   private eventEmitter = new TypedEventEmitter<Record<string, any>>()
-  private sobjectPrefixCache: Record<string, Record<string, string>> = {}
-  private sobjectCacheTimestamp: Record<string, number> = {}
-  private currentUserProfileId: Record<string, string> = {}
-  private userLightningPreferenceCache: Record<string, boolean> = {}
   private keyboardInterceptor: ((e: KeyboardEvent) => void) | null = null
 
   private constructor(options: WindowManagerOptions = {}) {
@@ -616,18 +611,11 @@ class UltraForceWindowManager {
   }
 
   private async fetchRecordTypeId(objectApiName: string | null, recordId: string): Promise<void> {
-    if (!this.state.sfHost || !objectApiName) {
-      return
-    }
-
-    try {
-      const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
-      if (record?.RecordTypeId && this.state.recordContext) {
-        this.state.recordContext.recordTypeId = record.RecordTypeId
-        await this.renderComponent()
-      }
-    } catch {
-      // Record may not have RecordType field
+    if (!this.state.sfHost || !objectApiName) return
+    const recordTypeId = await fetchRecordTypeIdFn(this.state.sfHost, objectApiName, recordId)
+    if (recordTypeId && this.state.recordContext) {
+      this.state.recordContext.recordTypeId = recordTypeId
+      await this.renderComponent()
     }
   }
 
@@ -637,31 +625,15 @@ class UltraForceWindowManager {
       await this.renderComponent()
       return
     }
-
-    // Show loading state
     this.state.isLoading = true
     await this.renderComponent()
-
     try {
-      const objectApiName = this.state.recordContext.objectApiName
-      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
-
-      let url: string | null = null
-
-      if (useLightning) {
-        // Get object DurableId for Lightning URL
-        const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
-        const entityResp = await sfRest(this.state.sfHost!, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
-        const objectDurableId = entityResp?.records?.[0]?.DurableId
-
-        if (objectDurableId) {
-          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${objectDurableId}/FieldsAndRelationships/view`)
-        }
-      } else {
-        // Classic URL: /p/setup/layout/LayoutFieldList?type={objectApiName}&setupid={objectApiName}Fields&retURL=%2Fui%2Fsetup%2FSetup%3Fsetupid%3D{objectApiName}
-        url = `https://${this.state.sfHost}/p/setup/layout/LayoutFieldList?type=${objectApiName}&setupid=${objectApiName}Fields&retURL=%2Fui%2Fsetup%2FSetup%3Fsetupid%3D${objectApiName}`
-      }
-
+      const url = await handleFieldsNavigationFn(
+        this.state.sfHost!,
+        this.state.recordContext.objectApiName,
+        this.state.navigationMode,
+        this.state.userLightningPreference
+      )
       if (url) {
         this.state.isLoading = false
         window.open(url, '_blank')
@@ -672,7 +644,6 @@ class UltraForceWindowManager {
         }
         return
       }
-
       this.state.searchError = 'Could not determine Fields URL.'
       this.state.isLoading = false
       await this.renderComponent()
@@ -690,32 +661,16 @@ class UltraForceWindowManager {
       await this.renderComponent()
       return
     }
-
-    // Show loading state
     this.state.isLoading = true
     await this.renderComponent()
-
     try {
-      const objectApiName = this.state.recordContext.objectApiName
-      const recordTypeId = this.state.recordContext.recordTypeId
-      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
-
-      let url: string | null = null
-
-      if (useLightning) {
-        // Get object DurableId for Lightning URL
-        const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
-        const entityResp = await sfRest(this.state.sfHost!, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
-        const objectDurableId = entityResp?.records?.[0]?.DurableId
-
-        if (objectDurableId) {
-          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${objectDurableId}/RecordTypes/${recordTypeId}/view`)
-        }
-      } else {
-        // Classic URL: /setup/ui/recordtypefields.jsp?id={recordTypeId}&type={objectApiName}&setupid={objectApiName}Records
-        url = `https://${this.state.sfHost}/setup/ui/recordtypefields.jsp?id=${recordTypeId}&type=${objectApiName}&setupid=${objectApiName}Records`
-      }
-
+      const url = await handleRecordTypeNavigationFn(
+        this.state.sfHost!,
+        this.state.recordContext.objectApiName,
+        this.state.recordContext.recordTypeId,
+        this.state.navigationMode,
+        this.state.userLightningPreference
+      )
       if (url) {
         this.state.isLoading = false
         window.open(url, '_blank')
@@ -726,7 +681,6 @@ class UltraForceWindowManager {
         }
         return
       }
-
       this.state.searchError = 'Could not determine RecordType URL.'
       this.state.isLoading = false
       await this.renderComponent()
@@ -739,33 +693,19 @@ class UltraForceWindowManager {
   }
 
   private async handlePageLayoutNavigation(): Promise<void> {
-    // Show loading state
     this.state.isLoading = true
     await this.renderComponent()
-
     try {
-      const layoutInfo = await this.getCurrentRecordLayoutInfo()
-      if (layoutInfo) {
-        const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
-        let url: string | null
-
-        if (useLightning) {
-          url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
+      const result = await this.getCurrentRecordLayoutUrl()
+      if (result) {
+        this.state.isLoading = false
+        window.open(result.url, '_blank')
+        if (this.state.closeOnNavigate) {
+          this.hide()
         } else {
-          // Classic URL: /layouteditor/layoutEditor.apexp?type=Account&lid=00h0I000006U7pu&retURL=%2F{recordId}
-          url = `https://${this.state.sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
+          await this.renderComponent()
         }
-
-        if (url) {
-          this.state.isLoading = false
-          window.open(url, '_blank')
-          if (this.state.closeOnNavigate) {
-            this.hide()
-          } else {
-            await this.renderComponent()
-          }
-          return
-        }
+        return
       }
       this.state.searchError = 'Could not determine page layout for this record.'
       this.state.isLoading = false
@@ -779,229 +719,31 @@ class UltraForceWindowManager {
   }
 
   private async getCurrentRecordLayoutUrl(): Promise<{ objectApiName: string; url: string } | null> {
-    const layoutInfo = await this.getCurrentRecordLayoutInfo()
-    if (!layoutInfo) return null
-
-    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
-    let url: string | null
-
-    if (useLightning) {
-      url = buildSetupUrl(this.state.sfHost!, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
-    } else {
-      url = `https://${this.state.sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
-    }
-
-    if (!url) return null
-
-    return {
-      objectApiName: layoutInfo.objectApiName,
-      url
-    }
-  }
-
-  private async getCurrentRecordLayoutInfo(): Promise<{ objectApiName: string; objectDurableId: string; layoutId: string; recordId: string } | null> {
     const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
-    const objectApiName = fromUrlObject || (recordId ? await this.resolveObjectApiNameFromRecord(recordId) : null)
-
-    if (!this.state.sfHost || !objectApiName || !recordId) {
-      return null
-    }
-
-    try {
-      let recordTypeId: string | null = null
-      try {
-        const record = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/${objectApiName}/${recordId}?fields=RecordTypeId`)
-        recordTypeId = record?.RecordTypeId || null
-      } catch {
-        // Record may not have RecordType field
-      }
-
-      const profileId = await this.getCurrentUserProfileId()
-      if (!profileId) {
-        return null
-      }
-
-      const layoutResult = await this.getLayoutAssignment(objectApiName, profileId, recordTypeId)
-      if (!layoutResult) {
-        return null
-      }
-
-      return { objectApiName, objectDurableId: layoutResult.objectDurableId, layoutId: layoutResult.layoutId, recordId }
-    } catch (error) {
-      logger.warn('Failed to resolve current record layout:', error)
-      return null
-    }
+    const objectApiName = fromUrlObject || (recordId && this.state.sfHost ? await resolveObjectApiNameFromRecordFn(this.state.sfHost, recordId) : null)
+    if (!this.state.sfHost || !objectApiName || !recordId) return null
+    const layoutInfo = await getCurrentRecordLayoutInfoFn(this.state.sfHost, objectApiName, recordId)
+    if (!layoutInfo) return null
+    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
+    const url = useLightning
+      ? buildSetupUrl(this.state.sfHost, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
+      : `https://${this.state.sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
+    if (!url) return null
+    return { objectApiName: layoutInfo.objectApiName, url }
   }
 
   private async resolveObjectApiNameFromRecord(recordId: string): Promise<string | null> {
-    const prefix = recordId.slice(0, 3)
-    if (KEY_PREFIX_MAP[prefix]) {
-      return KEY_PREFIX_MAP[prefix]
-    }
-    if (!this.state.sfHost) {
-      return null
-    }
-
-    const hostKey = this.state.sfHost
-    const hostCache = this.sobjectPrefixCache[hostKey] || {}
-    const cacheTs = this.sobjectCacheTimestamp[hostKey] || 0
-
-    if (hostCache[prefix] && Date.now() - cacheTs < GLOBAL_DESCRIBE_CACHE_DURATION) {
-      return hostCache[prefix]
-    }
-
-    try {
-      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/sobjects/`)
-      if (resp?.sobjects) {
-        if (!this.sobjectPrefixCache[hostKey]) {
-          this.sobjectPrefixCache[hostKey] = {}
-        }
-        resp.sobjects.forEach((obj: any) => {
-          if (obj.keyPrefix && obj.name) {
-            this.sobjectPrefixCache[hostKey][obj.keyPrefix] = obj.name
-          }
-        })
-        this.sobjectCacheTimestamp[hostKey] = Date.now()
-      }
-      return this.sobjectPrefixCache[hostKey]?.[prefix] || null
-    } catch (error) {
-      logger.warn('Failed to resolve object from key prefix:', error)
-      return null
-    }
-  }
-
-  private currentUserId: Record<string, string> = {}
-
-  private async getCurrentUserId(): Promise<string | null> {
-    if (!this.state.sfHost) {
-      return null
-    }
-
-    const hostKey = this.state.sfHost
-    if (this.currentUserId[hostKey]) {
-      return this.currentUserId[hostKey]
-    }
-
-    // Skip if API is not available
-    if (!isApiAvailable(this.state.sfHost)) {
-      return null
-    }
-
-    try {
-      const apex = encodeURIComponent('throw new System.TypeException(UserInfo.getUserId());')
-      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/executeAnonymous/?anonymousBody=${apex}`)
-      const userId = resp?.exceptionMessage?.replace('System.TypeException: ', '')
-      if (userId && userId.startsWith('005')) {
-        this.currentUserId[hostKey] = userId
-        return userId
-      }
-    } catch {
-      // User may not have Author Apex permission
-    }
-    return null
-  }
-
-  private async getCurrentUserProfileId(): Promise<string | null> {
-    if (!this.state.sfHost) {
-      return null
-    }
-
-    const hostKey = this.state.sfHost
-    if (this.currentUserProfileId[hostKey]) {
-      return this.currentUserProfileId[hostKey]
-    }
-
-    const userId = await this.getCurrentUserId()
-    if (!userId) {
-      return null
-    }
-
-    try {
-      const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
-      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
-      const profileId = resp?.records?.[0]?.ProfileId
-      if (profileId) {
-        this.currentUserProfileId[hostKey] = profileId
-        return profileId
-      }
-    } catch {
-      // ignore
-    }
-    return null
+    if (!this.state.sfHost) return null
+    return resolveObjectApiNameFromRecordFn(this.state.sfHost, recordId)
   }
 
   private async getUserLightningPreference(): Promise<boolean | null> {
-    if (!this.state.sfHost) {
-      return null
+    if (!this.state.sfHost) return null
+    const pref = await getUserLightningPreferenceFn(this.state.sfHost)
+    if (pref !== null) {
+      this.state.userLightningPreference = pref
     }
-
-    const hostKey = this.state.sfHost
-    if (hostKey in this.userLightningPreferenceCache) {
-      return this.userLightningPreferenceCache[hostKey]
-    }
-
-    const userId = await this.getCurrentUserId()
-    if (!userId) {
-      this.userLightningPreferenceCache[hostKey] = true
-      this.state.userLightningPreference = true
-      return true
-    }
-
-    try {
-      const soql = encodeURIComponent(`SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`)
-      const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
-      const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
-
-      if (typeof preference === 'boolean') {
-        this.userLightningPreferenceCache[hostKey] = preference
-        this.state.userLightningPreference = preference
-        return preference
-      }
-    } catch {
-      // ignore
-    }
-
-    this.userLightningPreferenceCache[hostKey] = true
-    this.state.userLightningPreference = true
-    return true
-  }
-
-  private async getLayoutAssignment(objectApiName: string, profileId: string, recordTypeId: string | null): Promise<{ layoutId: string; objectDurableId: string } | null> {
-    if (!this.state.sfHost) {
-      return null
-    }
-
-    let objectDurableId: string | null = null
-    try {
-      const entityQuery = `SELECT DurableId FROM EntityDefinition WHERE QualifiedApiName='${objectApiName}' LIMIT 1`
-      const entityResp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(entityQuery)}`)
-      objectDurableId = entityResp?.records?.[0]?.DurableId || null
-    } catch (error) {
-      logger.warn('EntityDefinition query failed:', error)
-    }
-
-    if (!objectDurableId) {
-      return null
-    }
-
-    const queries = [
-      recordTypeId ? `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId='${recordTypeId}' LIMIT 1` : null,
-      `SELECT LayoutId FROM ProfileLayout WHERE TableEnumOrId='${objectDurableId}' AND ProfileId='${profileId}' AND RecordTypeId = NULL LIMIT 1`
-    ].filter(Boolean) as string[]
-
-    for (const q of queries) {
-      try {
-        const resp = await sfRest(this.state.sfHost, `/services/data/v${API_VERSION}/tooling/query/?q=${encodeURIComponent(q)}`)
-        const layoutId = resp?.records?.[0]?.LayoutId
-        if (layoutId) {
-          return { layoutId, objectDurableId }
-        }
-      } catch (error) {
-        logger.warn('ProfileLayout query failed:', error)
-      }
-    }
-
-    return null
+    return pref
   }
 
   private handleNavigationModeChange(mode: NavigationMode): void {
@@ -1024,308 +766,15 @@ class UltraForceWindowManager {
     this.log(`Result clicked: ${result.name} (${result.type})`)
     this.emit('resultClick', result)
 
-    // Setup shortcuts are absolute URLs
-    if (result.type === 'SetupShortcut' && result.url) {
-      window.open(result.url, '_blank')
-      if (this.state.closeOnNavigate) {
-        this.hide()
-      }
-      return
+    const navContext: NavigationContext = {
+      sfHost: this.state.sfHost,
+      navigationMode: this.state.navigationMode,
+      userLightningPreference: this.state.userLightningPreference
     }
-
-    // Navigate to the result
-    if (this.state.sfHost && result.id) {
-      const baseUrl = `https://${this.state.sfHost}`
-      const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
-      let targetUrl = ''
-
-      if (useLightning) {
-        // Lightning Experience URLs
-        switch (result.type) {
-          case 'ApexClass':
-            targetUrl = `${baseUrl}/lightning/setup/ApexClasses/page?address=%2F${result.id}`
-            break
-          case 'ApexTrigger':
-            targetUrl = `${baseUrl}/lightning/setup/ApexTriggers/page?address=%2F${result.id}`
-            break
-          case 'ApexPage':
-            targetUrl = `${baseUrl}/lightning/setup/ApexPages/page?address=%2F${result.id}`
-            break
-          case 'ApexComponent':
-            targetUrl = `${baseUrl}/lightning/setup/ApexComponents/page?address=%2F${result.id}`
-            break
-          case 'LightningComponentBundle':
-            targetUrl = `${baseUrl}/lightning/setup/LightningComponentBundles/page?address=%2F${result.id}`
-            break
-          case 'AuraDefinitionBundle':
-            targetUrl = `${baseUrl}/lightning/setup/AuraBundles/page?address=%2F${result.id}`
-            break
-          case 'Flow':
-            targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
-            break
-          case 'User': {
-            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            targetUrl = `https://${setupHost}/lightning/setup/ManageUsers/page?address=%2F${result.id}%3Fnoredirect%3D1%26isUserEntityOverride%3D1`
-            break
-          }
-          case 'CustomObject':
-            targetUrl = `${baseUrl}/lightning/o/${result.metadata?.QualifiedApiName}/list`
-            break
-          case 'CustomField': {
-            const objectName = result.metadata?.ObjectApiName || result.metadata?.EntityDefinition?.QualifiedApiName
-            // DurableId format: "Account.00N5j000002uztP" - extract the ID after the dot
-            const durableId = result.metadata?.DurableId || ''
-            const fieldId = durableId.includes('.') ? durableId.split('.')[1] : durableId
-            if (objectName && fieldId) {
-              const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-              targetUrl = `https://${setupHost}/lightning/setup/ObjectManager/${objectName}/FieldsAndRelationships/${fieldId}/view`
-            }
-            break
-          }
-          case 'PermissionSet':
-            targetUrl = `${baseUrl}/lightning/setup/PermSets/page?address=%2F${result.id}`
-            break
-          case 'Profile':
-            targetUrl = `${baseUrl}/lightning/setup/EnhancedProfiles/page?address=%2F${result.id}`
-            break
-          case 'ProfileSubMenu':
-            // Tab-only navigation, no click action
-            return
-          case 'ObjectPermission': {
-            const setupHostObj = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                   ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const objProfileId = result.metadata?.profileId
-            // Custom objects use DurableId (01Ixx), standard objects use API name
-            const objectRef = result.metadata?.objectRef || result.name
-            const objAddr = encodeURIComponent(`/${objProfileId}?s=ObjectsAndTabs&o=${objectRef}`)
-            targetUrl = `https://${setupHostObj}/lightning/setup/Profiles/page?address=${objAddr}`
-            break
-          }
-          case 'FieldPermission': {
-            const setupHostField = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                     ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const fieldProfileId = result.metadata?.profileId
-            const fieldSobjectType = result.metadata?.SobjectType
-            const fieldAddr = encodeURIComponent(`/${fieldProfileId}?s=FieldPermissions&o=${fieldSobjectType}`)
-            targetUrl = `https://${setupHostField}/lightning/setup/Profiles/page?address=${fieldAddr}`
-            break
-          }
-          case 'CustomPermissionAccess': {
-            const setupHostCP = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const cpProfileId = result.metadata?.profileId
-            const cpAddr = encodeURIComponent(`/${cpProfileId}?s=CustomPermissions`)
-            targetUrl = `https://${setupHostCP}/lightning/setup/Profiles/page?address=${cpAddr}`
-            break
-          }
-          case 'ApexClassAccess': {
-            const setupHostAC = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const acProfileId = result.metadata?.profileId
-            const acAddr = encodeURIComponent(`/${acProfileId}?s=ApexClassAccess`)
-            targetUrl = `https://${setupHostAC}/lightning/setup/Profiles/page?address=${acAddr}`
-            break
-          }
-          case 'VFPageAccess': {
-            const setupHostVF = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const vfProfileId = result.metadata?.profileId
-            const vfAddr = encodeURIComponent(`/${vfProfileId}?s=ApexPageAccess`)
-            targetUrl = `https://${setupHostVF}/lightning/setup/Profiles/page?address=${vfAddr}`
-            break
-          }
-          case 'ConnectedAppAccess': {
-            const setupHostCA = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const caProfileId = result.metadata?.profileId
-            const caAddr = encodeURIComponent(`/${caProfileId}?s=ConnectedAppSettings`)
-            targetUrl = `https://${setupHostCA}/lightning/setup/Profiles/page?address=${caAddr}`
-            break
-          }
-          case 'AssignedAppAccess': {
-            const setupHostAA = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const aaProfileId = result.metadata?.profileId
-            const aaAddr = encodeURIComponent(`/${aaProfileId}?s=ObjectsAndTabs`)
-            targetUrl = `https://${setupHostAA}/lightning/setup/Profiles/page?address=${aaAddr}`
-            break
-          }
-          case 'ProfileSetupLink': {
-            const setupHostPSL = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                   ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const pslProfileId = result.metadata?.profileId
-            const pslSection = result.metadata?.section
-            const pslAddr = encodeURIComponent(`/${pslProfileId}?s=${pslSection}`)
-            targetUrl = `https://${setupHostPSL}/lightning/setup/Profiles/page?address=${pslAddr}`
-            break
-          }
-          case 'CustomLabel':
-            targetUrl = `${baseUrl}/lightning/setup/ExternalStrings/page?address=%2F${result.id}`
-            break
-          case 'CustomMetadataType': {
-            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            // Use metadata.Id for the actual Salesforce record ID (result.id may be index key like "Type__mdt.RecordName")
-            const recordId = result.metadata?.Id || result.metadata?.DurableId || result.id
-            if (result.metadata?._isTypeDefinition) {
-              // Type definition page: /lightning/setup/CustomMetadata/page?address=%2F01Ixxxxx
-              targetUrl = `https://${setupHost}/lightning/setup/CustomMetadata/page?address=%2F${recordId}`
-            } else {
-              // Record page: /lightning/setup/CustomMetadata/page?address=%2Fm0Axxxxx
-              targetUrl = `https://${setupHost}/lightning/setup/CustomMetadata/page?address=%2F${recordId}`
-            }
-            break
-          }
-          case 'CustomSetting': {
-            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            const settingId = result.metadata?.DurableId || result.id
-            if (result.metadata?._isSettingDefinition) {
-              // Setting definition page
-              targetUrl = `https://${setupHost}/lightning/setup/CustomSettings/page?address=%2Fsetup%2Fui%2FviewCustomSettings.apexp%3Fid%3D${settingId}`
-            } else {
-              // Setting record page
-              targetUrl = `https://${setupHost}/lightning/setup/CustomSettings/page?address=%2F${result.id}`
-            }
-            break
-          }
-          case 'CustomQuery':
-            // Custom query results - navigate to record directly
-            targetUrl = `${baseUrl}/lightning/r/sObject/${result.id}/view`
-            break
-          case 'Queue': {
-            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            targetUrl = `https://${setupHost}/lightning/setup/Queues/page?address=%2Fp%2Fown%2FQueue%2Fd%3Fid%3D${result.id}`
-            break
-          }
-          case 'Group': {
-            const setupHost = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
-                                                ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
-            targetUrl = `https://${setupHost}/lightning/setup/PublicGroups/page?address=%2Fsetup%2Fown%2Fgroupdetail.jsp%3Fid%3D${result.id}`
-            break
-          }
-          case 'Report':
-            targetUrl = `${baseUrl}/lightning/r/Report/${result.id}/view`
-            break
-          case 'Dashboard':
-            targetUrl = `${baseUrl}/lightning/r/Dashboard/${result.id}/view`
-            break
-          default:
-            targetUrl = `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
-        }
-      } else {
-        // Classic URLs
-        switch (result.type) {
-          case 'ApexClass':
-          case 'ApexTrigger':
-          case 'ApexPage':
-          case 'ApexComponent':
-          case 'LightningComponentBundle':
-          case 'AuraDefinitionBundle':
-          case 'User':
-          case 'PermissionSet':
-          case 'Profile':
-            targetUrl = `${baseUrl}/${result.id}`
-            break
-          case 'ProfileSubMenu':
-            // Tab-only navigation, no click action
-            return
-          case 'ObjectPermission': {
-            const classicObjRef = result.metadata?.objectRef || result.name
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs&o=${classicObjRef}`
-            break
-          }
-          case 'FieldPermission':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=FieldPermissions&o=${result.metadata?.SobjectType}`
-            break
-          case 'CustomPermissionAccess':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=CustomPermissions`
-            break
-          case 'ApexClassAccess':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ApexClassAccess`
-            break
-          case 'VFPageAccess':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ApexPageAccess`
-            break
-          case 'ConnectedAppAccess':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ConnectedAppSettings`
-            break
-          case 'AssignedAppAccess':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs`
-            break
-          case 'ProfileSetupLink':
-            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=${result.metadata?.section}`
-            break
-          case 'Flow':
-            targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
-            break
-          case 'CustomObject': {
-            // Custom objects (DurableId '01I...') have a single Classic setup page
-            const objectDurableId = result.metadata?.DurableId
-            if (objectDurableId && objectDurableId.startsWith('01I')) {
-              targetUrl = `${baseUrl}/${objectDurableId}`
-            } else {
-              // Standard objects: use keyPrefix for list view, or field list as fallback
-              const keyPrefix = result.metadata?.KeyPrefix
-              if (keyPrefix) {
-                targetUrl = `${baseUrl}/${keyPrefix}`
-              } else {
-                targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
-              }
-            }
-            break
-          }
-          case 'CustomField': {
-            const durableId = result.metadata?.DurableId || ''
-            const fieldId = durableId.includes('.') ? durableId.split('.')[1] : durableId
-            if (fieldId) {
-              targetUrl = `${baseUrl}/${fieldId}`
-            }
-            break
-          }
-          case 'CustomLabel':
-            targetUrl = `${baseUrl}/${result.id}`
-            break
-          case 'CustomMetadataType': {
-            // Use metadata.Id for the actual Salesforce record ID (result.id may be index key like "Type__mdt.RecordName")
-            const classicRecordId = result.metadata?.Id || result.metadata?.DurableId || result.id
-            targetUrl = `${baseUrl}/${classicRecordId}`
-            break
-          }
-          case 'CustomSetting': {
-            const settingId = result.metadata?.DurableId || result.id
-            if (result.metadata?._isSettingDefinition) {
-              targetUrl = `${baseUrl}/setup/ui/viewCustomSettings.apexp?id=${settingId}`
-            } else {
-              targetUrl = `${baseUrl}/${result.id}`
-            }
-            break
-          }
-          case 'CustomQuery':
-            targetUrl = `${baseUrl}/${result.id}`
-            break
-          case 'Queue':
-            targetUrl = `${baseUrl}/p/own/Queue/d?id=${result.id}&setupid=Queues`
-            break
-          case 'Group':
-            targetUrl = `${baseUrl}/setup/own/groupdetail.jsp?id=${result.id}&setupid=PublicGroups`
-            break
-          case 'Report':
-          case 'Dashboard':
-            targetUrl = `${baseUrl}/${result.id}`
-            break
-          default:
-            targetUrl = `${baseUrl}/${result.id}`
-        }
-
-      }
-
+    const targetUrl = buildNavigationUrl(result, navContext)
+    if (targetUrl) {
       window.open(targetUrl, '_blank')
     }
-
     if (this.state.closeOnNavigate) {
       this.hide()
     }
@@ -1333,9 +782,14 @@ class UltraForceWindowManager {
 
   private handleIdNavigate(id: string): void {
     this.log(`Direct ID navigation: ${id}`)
-    if (this.state.sfHost) {
-      const baseUrl = `https://${this.state.sfHost}`
-      window.open(`${baseUrl}/${id}`, '_blank')
+    const navContext: NavigationContext = {
+      sfHost: this.state.sfHost,
+      navigationMode: this.state.navigationMode,
+      userLightningPreference: this.state.userLightningPreference
+    }
+    const targetUrl = buildIdNavigationUrl(id, navContext)
+    if (targetUrl) {
+      window.open(targetUrl, '_blank')
     }
     if (this.state.closeOnNavigate) {
       this.hide()
@@ -1346,89 +800,12 @@ class UltraForceWindowManager {
     this.log(`Action clicked: ${action} for ${result.name}`)
     this.emit('actionClick', { result, action })
 
-    if (!this.state.sfHost) {
-      this.log('Missing sfHost for action navigation')
-      return
+    const navContext: NavigationContext = {
+      sfHost: this.state.sfHost,
+      navigationMode: this.state.navigationMode,
+      userLightningPreference: this.state.userLightningPreference
     }
-
-    const baseUrl = `https://${this.state.sfHost}`
-
-    // Handle preview action for ApexPage
-    if (action === 'preview' && result.type === 'ApexPage') {
-      const pageName = result.namespace
-        ? `${result.namespace}__${result.name}`
-        : result.name
-      const previewUrl = `${baseUrl}/apex/${pageName}`
-      window.open(previewUrl, '_blank')
-      if (this.state.closeOnNavigate) {
-        this.hide()
-      }
-      return
-    }
-
-    if (!result.metadata?.DurableId) {
-      this.log('Missing DurableId for action navigation')
-      return
-    }
-
-    const objectId = result.metadata.DurableId
-    const objectApiName = result.metadata.QualifiedApiName
-    const useLightning = shouldUseLightning(this.state.navigationMode, this.state.userLightningPreference)
-    let targetUrl = ''
-
-    if (useLightning) {
-      // Lightning Experience URLs
-      switch (action) {
-        case 'list':
-          targetUrl = `${baseUrl}/lightning/o/${objectApiName}/list`
-          break
-        case 'fields':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/FieldsAndRelationships/view`
-          break
-        case 'layouts':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/PageLayouts/view`
-          break
-        case 'recordtypes':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/RecordTypes/view`
-          break
-        case 'validationrules':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/ValidationRules/view`
-          break
-        case 'details':
-          targetUrl = `${baseUrl}/lightning/setup/ObjectManager/${objectId}/Details/view`
-          break
-      }
-    } else {
-      // Classic URLs
-      // Custom objects (DurableId starts with '01I') have a single setup page at /{DurableId}
-      // that includes fields, page layouts, record types, etc.
-      // Standard objects use separate Classic setup URLs.
-      if (action === 'list') {
-        const keyPrefix = result.metadata?.KeyPrefix
-        targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-      } else if (objectId && objectId.startsWith('01I')) {
-        targetUrl = `${baseUrl}/${objectId}`
-      } else {
-        switch (action) {
-          case 'fields':
-            targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-            break
-          case 'layouts':
-            targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
-            break
-          case 'recordtypes':
-            targetUrl = `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
-            break
-          case 'validationrules':
-            targetUrl = `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
-            break
-          case 'details':
-            targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-            break
-        }
-      }
-    }
-
+    const targetUrl = buildActionUrl(result, action, navContext)
     if (targetUrl) {
       window.open(targetUrl, '_blank')
       if (this.state.closeOnNavigate) {
