@@ -82,38 +82,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUN-01 | - | Pending |
-| FOUN-02 | - | Pending |
-| FOUN-03 | - | Pending |
-| FOUN-04 | - | Pending |
-| MODL-01 | - | Pending |
-| MODL-02 | - | Pending |
-| MODL-03 | - | Pending |
-| MODL-04 | - | Pending |
-| TEST-01 | - | Pending |
-| TEST-02 | - | Pending |
-| TEST-03 | - | Pending |
-| TEST-04 | - | Pending |
-| TEST-05 | - | Pending |
-| TEST-06 | - | Pending |
-| TEST-07 | - | Pending |
-| STAT-01 | - | Pending |
-| STAT-02 | - | Pending |
-| STAT-03 | - | Pending |
-| TYPE-01 | - | Pending |
-| TYPE-02 | - | Pending |
-| TYPE-03 | - | Pending |
-| CLEN-01 | - | Pending |
-| CLEN-02 | - | Pending |
-| CLEN-03 | - | Pending |
-| CLEN-04 | - | Pending |
-| CLEN-05 | - | Pending |
+| FOUN-01 | Phase 1 | Pending |
+| FOUN-02 | Phase 1 | Pending |
+| FOUN-03 | Phase 1 | Pending |
+| FOUN-04 | Phase 1 | Pending |
+| MODL-01 | Phase 2 | Pending |
+| MODL-02 | Phase 2 | Pending |
+| MODL-03 | Phase 2 | Pending |
+| MODL-04 | Phase 2 | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 2 | Pending |
+| TEST-03 | Phase 2 | Pending |
+| TEST-04 | Phase 2 | Pending |
+| TEST-05 | Phase 2 | Pending |
+| TEST-06 | Phase 4 | Pending |
+| TEST-07 | Phase 4 | Pending |
+| STAT-01 | Phase 3 | Pending |
+| STAT-02 | Phase 3 | Pending |
+| STAT-03 | Phase 3 | Pending |
+| TYPE-01 | Phase 2 | Pending |
+| TYPE-02 | Phase 2 | Pending |
+| TYPE-03 | Phase 2 | Pending |
+| CLEN-01 | Phase 4 | Pending |
+| CLEN-02 | Phase 4 | Pending |
+| CLEN-03 | Phase 4 | Pending |
+| CLEN-04 | Phase 4 | Pending |
+| CLEN-05 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-04*
-*Last updated: 2026-04-04 after initial definition*
+*Last updated: 2026-04-04 after roadmap creation*
