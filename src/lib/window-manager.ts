@@ -5,16 +5,9 @@ import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, isApiAvailable, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession, sfRest, API_VERSION } from '~lib/auth'
 import { logger } from '~lib/logger'
-import type { SearchResult } from '~types'
+import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
+import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
-
-type NavigationMode = 'auto' | 'lightning' | 'classic'
-
-interface RecordContext {
-  objectApiName: string | null
-  recordId: string
-  recordTypeId?: string | null
-}
 
 interface WindowManagerState {
   isVisible: boolean
@@ -513,49 +506,26 @@ class UltraForceWindowManager {
     this.state.isVisible = true
     this.log('Showing modal')
 
-    // Add capture-phase keyboard interceptor to block Salesforce shortcuts
-    // Strategy: Only block specific keys that Salesforce intercepts
-    this.keyboardInterceptor = (e: KeyboardEvent) => {
-      // Get our input element
-      const ourInput = this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement
+    // Signal to the main-world keyboard-shield script that the modal is open.
+    // keyboard-shield.ts monkey-patches addEventListener so that ALL page-level
+    // keyboard listeners (including Salesforce's) are suppressed when this
+    // attribute is present. This works because the shield runs at document_start
+    // in the MAIN world, wrapping listeners before Salesforce registers them.
+    document.documentElement.setAttribute('data-ultraforce-modal-open', '')
+    logger.debug('keyboard:shield activated')
 
-      // For '/' key - Salesforce intercepts this to open search
-      // Block completely and manually insert the character
-      if (e.key === '/' && e.type === 'keydown') {
-        e.stopPropagation()
-        e.stopImmediatePropagation()
-        e.preventDefault()
-
-        // Manually insert '/' at cursor position
-        if (ourInput) {
-          const start = ourInput.selectionStart || 0
-          const end = ourInput.selectionEnd || 0
-          const value = ourInput.value
-          ourInput.value = value.slice(0, start) + '/' + value.slice(end)
-          ourInput.selectionStart = ourInput.selectionEnd = start + 1
-          // Trigger input event for React state update
-          ourInput.dispatchEvent(new Event('input', { bubbles: true }))
-        }
-        return
-      }
-
-      // For other events of '/' key (keyup, keypress), just block
-      if (e.key === '/') {
-        e.stopPropagation()
-        e.stopImmediatePropagation()
-        e.preventDefault()
-        return
-      }
-
-      // Let all other keys pass through to Shadow DOM
-    }
+    // Capture-phase keyboard interceptor handles input for Shadow DOM
+    // and manually applies edits to our Shadow DOM input
+    this.keyboardInterceptor = createKeyboardInterceptor(
+      () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
+      () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null
+    )
 
     // Add to window level to intercept before document level handlers
     window.addEventListener('keydown', this.keyboardInterceptor, true)
     window.addEventListener('keyup', this.keyboardInterceptor, true)
     window.addEventListener('keypress', this.keyboardInterceptor, true)
     logger.debug('keyboard:interceptor added')
-
 
     await this.renderComponent()
     this.emit('show', this.state)
@@ -578,6 +548,9 @@ class UltraForceWindowManager {
       this.keyboardInterceptor = null
     }
 
+    // Tell the main-world keyboard-shield to stop suppressing page shortcuts
+    document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    logger.debug('keyboard:shield deactivated')
 
     if (this.reactRoot) {
       this.reactRoot.unmount()
@@ -1277,6 +1250,77 @@ class UltraForceWindowManager {
           case 'Profile':
             targetUrl = `${baseUrl}/lightning/setup/EnhancedProfiles/page?address=%2F${result.id}`
             break
+          case 'ProfileSubMenu':
+            // Tab-only navigation, no click action
+            return
+          case 'ObjectPermission': {
+            const setupHostObj = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                   ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const objProfileId = result.metadata?.profileId
+            // Custom objects use DurableId (01Ixx), standard objects use API name
+            const objectRef = result.metadata?.objectRef || result.name
+            const objAddr = encodeURIComponent(`/${objProfileId}?s=ObjectsAndTabs&o=${objectRef}`)
+            targetUrl = `https://${setupHostObj}/lightning/setup/Profiles/page?address=${objAddr}`
+            break
+          }
+          case 'FieldPermission': {
+            const setupHostField = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                     ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const fieldProfileId = result.metadata?.profileId
+            const fieldSobjectType = result.metadata?.SobjectType
+            const fieldAddr = encodeURIComponent(`/${fieldProfileId}?s=FieldPermissions&o=${fieldSobjectType}`)
+            targetUrl = `https://${setupHostField}/lightning/setup/Profiles/page?address=${fieldAddr}`
+            break
+          }
+          case 'CustomPermissionAccess': {
+            const setupHostCP = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const cpProfileId = result.metadata?.profileId
+            const cpAddr = encodeURIComponent(`/${cpProfileId}?s=CustomPermissions`)
+            targetUrl = `https://${setupHostCP}/lightning/setup/Profiles/page?address=${cpAddr}`
+            break
+          }
+          case 'ApexClassAccess': {
+            const setupHostAC = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const acProfileId = result.metadata?.profileId
+            const acAddr = encodeURIComponent(`/${acProfileId}?s=ApexClassAccess`)
+            targetUrl = `https://${setupHostAC}/lightning/setup/Profiles/page?address=${acAddr}`
+            break
+          }
+          case 'VFPageAccess': {
+            const setupHostVF = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const vfProfileId = result.metadata?.profileId
+            const vfAddr = encodeURIComponent(`/${vfProfileId}?s=ApexPageAccess`)
+            targetUrl = `https://${setupHostVF}/lightning/setup/Profiles/page?address=${vfAddr}`
+            break
+          }
+          case 'ConnectedAppAccess': {
+            const setupHostCA = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const caProfileId = result.metadata?.profileId
+            const caAddr = encodeURIComponent(`/${caProfileId}?s=ConnectedAppSettings`)
+            targetUrl = `https://${setupHostCA}/lightning/setup/Profiles/page?address=${caAddr}`
+            break
+          }
+          case 'AssignedAppAccess': {
+            const setupHostAA = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const aaProfileId = result.metadata?.profileId
+            const aaAddr = encodeURIComponent(`/${aaProfileId}?s=ObjectsAndTabs`)
+            targetUrl = `https://${setupHostAA}/lightning/setup/Profiles/page?address=${aaAddr}`
+            break
+          }
+          case 'ProfileSetupLink': {
+            const setupHostPSL = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                   ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const pslProfileId = result.metadata?.profileId
+            const pslSection = result.metadata?.section
+            const pslAddr = encodeURIComponent(`/${pslProfileId}?s=${pslSection}`)
+            targetUrl = `https://${setupHostPSL}/lightning/setup/Profiles/page?address=${pslAddr}`
+            break
+          }
           case 'CustomLabel':
             targetUrl = `${baseUrl}/lightning/setup/ExternalStrings/page?address=%2F${result.id}`
             break
@@ -1346,15 +1390,51 @@ class UltraForceWindowManager {
           case 'Profile':
             targetUrl = `${baseUrl}/${result.id}`
             break
+          case 'ProfileSubMenu':
+            // Tab-only navigation, no click action
+            return
+          case 'ObjectPermission': {
+            const classicObjRef = result.metadata?.objectRef || result.name
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs&o=${classicObjRef}`
+            break
+          }
+          case 'FieldPermission':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=FieldPermissions&o=${result.metadata?.SobjectType}`
+            break
+          case 'CustomPermissionAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=CustomPermissions`
+            break
+          case 'ApexClassAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ApexClassAccess`
+            break
+          case 'VFPageAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ApexPageAccess`
+            break
+          case 'ConnectedAppAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ConnectedAppSettings`
+            break
+          case 'AssignedAppAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs`
+            break
+          case 'ProfileSetupLink':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=${result.metadata?.section}`
+            break
           case 'Flow':
             targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
             break
           case 'CustomObject': {
-            const keyPrefix = result.metadata?.KeyPrefix
-            if (keyPrefix) {
-              targetUrl = `${baseUrl}/${keyPrefix}`
+            // Custom objects (DurableId '01I...') have a single Classic setup page
+            const objectDurableId = result.metadata?.DurableId
+            if (objectDurableId && objectDurableId.startsWith('01I')) {
+              targetUrl = `${baseUrl}/${objectDurableId}`
             } else {
-              targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
+              // Standard objects: use keyPrefix for list view, or field list as fallback
+              const keyPrefix = result.metadata?.KeyPrefix
+              if (keyPrefix) {
+                targetUrl = `${baseUrl}/${keyPrefix}`
+              } else {
+                targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
+              }
             }
             break
           }
@@ -1480,32 +1560,32 @@ class UltraForceWindowManager {
       }
     } else {
       // Classic URLs
-      switch (action) {
-        case 'list':
-          const keyPrefix = result.metadata?.KeyPrefix
-          targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          break
-        case 'fields':
-          targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          break
-        case 'layouts':
-          targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
-          break
-        case 'recordtypes':
-          targetUrl = `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
-          break
-        case 'validationrules':
-          targetUrl = `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
-          break
-        case 'details':
-          // Custom object DurableIds start with '01I' and work as direct URLs
-          // Standard object DurableIds are just object names (e.g., "Account") - use Fields as fallback
-          if (objectId && objectId.startsWith('01I')) {
-            targetUrl = `${baseUrl}/${objectId}`
-          } else {
+      // Custom objects (DurableId starts with '01I') have a single setup page at /{DurableId}
+      // that includes fields, page layouts, record types, etc.
+      // Standard objects use separate Classic setup URLs.
+      if (action === 'list') {
+        const keyPrefix = result.metadata?.KeyPrefix
+        targetUrl = keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+      } else if (objectId && objectId.startsWith('01I')) {
+        targetUrl = `${baseUrl}/${objectId}`
+      } else {
+        switch (action) {
+          case 'fields':
             targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
-          }
-          break
+            break
+          case 'layouts':
+            targetUrl = `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
+            break
+          case 'recordtypes':
+            targetUrl = `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
+            break
+          case 'validationrules':
+            targetUrl = `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
+            break
+          case 'details':
+            targetUrl = `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+            break
+        }
       }
     }
 
@@ -1603,7 +1683,8 @@ class UltraForceWindowManager {
         navigationMode: 'auto',
         fuzzySearch: true,
         searchError: null,
-        userLightningPreference: null
+        userLightningPreference: null,
+        recordContext: null
       }
 
       this.log('WindowManager destroyed successfully')

@@ -51,6 +51,9 @@
   "exclude": [
     "node_modules",
     "build",
-    "dist"
+    "dist",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "src/test-setup.ts"
   ]
 }
