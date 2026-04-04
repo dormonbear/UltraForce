@@ -22,8 +22,9 @@ async function loadState(): Promise<UnsupportedTypesState> {
   if (cache) return cache
   try {
     const result = await chrome.storage.local.get([STORAGE_KEY])
-    cache = result[STORAGE_KEY] || {}
-    return cache
+    const state: UnsupportedTypesState = result[STORAGE_KEY] ?? {}
+    cache = state
+    return state
   } catch {
     return {}
   }

@@ -267,6 +267,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               description: cmd.description || '',
               soql: cmd.soql,
               useToolingApi: cmd.useToolingApi || false,
+              isBuiltin: false,
               nameField: cmd.nameField,
               descriptionFields: cmd.descriptionFields
             }
