@@ -98,7 +98,7 @@ import {
   refreshMetadataCache,
   checkMetadataPermissions
 } from './salesforce-api'
-import { getSession } from './auth'
+import { getSession, sfRest } from './auth'
 import { MetadataCache } from './metadata-cache'
 import {
   buildSearchIndex,
@@ -110,6 +110,7 @@ import {
 import { needsPermissionCheck } from './unsupported-types'
 
 const mockGetSession = vi.mocked(getSession)
+const mockSfRest = vi.mocked(sfRest)
 const mockCache = MetadataCache.getInstance()
 const mockBuildSearchIndex = vi.mocked(buildSearchIndex)
 const mockSearchIndex = vi.mocked(searchIndex)
@@ -168,14 +169,11 @@ describe('salesforce-api', () => {
       mockHasSearchIndex.mockReturnValue(false)
       mockSearchIndex.mockReturnValue([])
 
-      // Mock fetch for API call
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: apexClassFixtures.length,
-          done: true,
-          records: apexClassFixtures
-        })
+      // Mock sfRest for API call (fetchAllPages now uses sfRest)
+      mockSfRest.mockResolvedValue({
+        totalSize: apexClassFixtures.length,
+        done: true,
+        records: apexClassFixtures
       })
 
       const result = await searchSalesforceMetadata('weather', ['ApexClass'], TEST_HOST)
@@ -192,11 +190,8 @@ describe('salesforce-api', () => {
       vi.mocked(mockCache.get).mockResolvedValue(null)
       mockHasSearchIndex.mockReturnValue(false)
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: () => Promise.resolve('[{"message":"INVALID_TYPE: sObject type not supported"}]')
-      })
+      // sfRest throws on error responses (like sfRest does internally)
+      mockSfRest.mockRejectedValue(new Error('API Error 400: [{"message":"INVALID_TYPE: sObject type not supported"}]'))
 
       const result = await searchSalesforceMetadata('test', ['ApexClass'], TEST_HOST)
 
@@ -211,13 +206,10 @@ describe('salesforce-api', () => {
       mockSearchIndex.mockReturnValue([])
 
       // Different response for each type
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [apexClassFixtures[0]]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [apexClassFixtures[0]]
       })
 
       const result = await searchSalesforceMetadata('test', ['ApexClass', 'Flow'], TEST_HOST)
@@ -266,14 +258,11 @@ describe('salesforce-api', () => {
     })
 
     it('should handle User type with real-time SOQL search', async () => {
-      // User search uses fetchAllPages directly (not cache/index)
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: userFixtures.length,
-          done: true,
-          records: userFixtures
-        })
+      // User search uses fetchAllPages -> sfRest (not cache/index)
+      mockSfRest.mockResolvedValue({
+        totalSize: userFixtures.length,
+        done: true,
+        records: userFixtures
       })
 
       const result = await searchSalesforceMetadata('Admin', ['User'], TEST_HOST)
@@ -283,19 +272,16 @@ describe('salesforce-api', () => {
     })
 
     it('should handle Queue type with real-time SOQL search', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [{
-            attributes: { type: 'Group' },
-            Id: '00GDn000001abcde',
-            Name: 'Support Queue',
-            DeveloperName: 'Support_Queue',
-            Email: 'support@test.example.com'
-          }]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [{
+          attributes: { type: 'Group' },
+          Id: '00GDn000001abcde',
+          Name: 'Support Queue',
+          DeveloperName: 'Support_Queue',
+          Email: 'support@test.example.com'
+        }]
       })
 
       const result = await searchSalesforceMetadata('Support', ['Queue'], TEST_HOST)
@@ -304,18 +290,15 @@ describe('salesforce-api', () => {
     })
 
     it('should handle Group type with real-time SOQL search', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [{
-            attributes: { type: 'Group' },
-            Id: '00GDn000002fghij',
-            Name: 'All Employees',
-            DeveloperName: 'All_Employees'
-          }]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [{
+          attributes: { type: 'Group' },
+          Id: '00GDn000002fghij',
+          Name: 'All Employees',
+          DeveloperName: 'All_Employees'
+        }]
       })
 
       const result = await searchSalesforceMetadata('All', ['Group'], TEST_HOST)
@@ -337,13 +320,10 @@ describe('salesforce-api', () => {
     it('should handle dot-notation field search', async () => {
       // Field search: "Account.Name"
       mockHasSearchIndex.mockReturnValue(false)
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: fieldDefFixtures.length,
-          done: true,
-          records: fieldDefFixtures
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: fieldDefFixtures.length,
+        done: true,
+        records: fieldDefFixtures
       })
       mockSearchIndex.mockReturnValue([])
 
@@ -355,13 +335,10 @@ describe('salesforce-api', () => {
     it('should handle empty query returning empty results', async () => {
       vi.mocked(mockCache.get).mockResolvedValue(null)
       mockHasSearchIndex.mockReturnValue(false)
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 0,
-          done: true,
-          records: []
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 0,
+        done: true,
+        records: []
       })
       mockSearchIndex.mockReturnValue([])
 
@@ -379,14 +356,11 @@ describe('salesforce-api', () => {
       nameField: 'Name'
     }
 
-    it('should execute SOQL query via fetch', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [apexClassFixtures[0]]
-        })
+    it('should execute SOQL query via sfRest', async () => {
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [apexClassFixtures[0]]
       })
 
       const results = await executeCustomCommand(baseOptions, TEST_HOST)
@@ -397,13 +371,10 @@ describe('salesforce-api', () => {
     })
 
     it('should format results using descriptionFields from command config', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [userFixtures[0]]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [userFixtures[0]]
       })
 
       const results = await executeCustomCommand({
@@ -431,24 +402,17 @@ describe('salesforce-api', () => {
     })
 
     it('should throw formatted error on API error', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: () => Promise.resolve('[{"message":"INVALID_FIELD: No such column Name"}]')
-      })
+      mockSfRest.mockRejectedValue(new Error('API Error 400: [{"message":"INVALID_FIELD: No such column Name"}]'))
 
       await expect(executeCustomCommand(baseOptions, TEST_HOST))
         .rejects.toThrow('SOQL Error')
     })
 
     it('should handle empty result set', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 0,
-          done: true,
-          records: []
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 0,
+        done: true,
+        records: []
       })
 
       const results = await executeCustomCommand(baseOptions, TEST_HOST)
@@ -457,13 +421,10 @@ describe('salesforce-api', () => {
     })
 
     it('should use getFieldValue for dot-notation field paths', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [userFixtures[0]]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [userFixtures[0]]
       })
 
       const results = await executeCustomCommand({
@@ -477,13 +438,10 @@ describe('salesforce-api', () => {
     })
 
     it('should replace {query} placeholder in SOQL template', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 0,
-          done: true,
-          records: []
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 0,
+        done: true,
+        records: []
       })
 
       await executeCustomCommand({
@@ -491,10 +449,10 @@ describe('salesforce-api', () => {
         searchQuery: 'TestSearch'
       }, TEST_HOST)
 
-      // Verify fetch was called with the interpolated query
-      expect(mockFetch).toHaveBeenCalled()
-      const fetchUrl = mockFetch.mock.calls[0][0] as string
-      expect(fetchUrl).toContain('TestSearch')
+      // Verify sfRest was called with the interpolated query path
+      expect(mockSfRest).toHaveBeenCalled()
+      const queryPath = mockSfRest.mock.calls[0][1] as string
+      expect(queryPath).toContain('TestSearch')
     })
   })
 
@@ -518,13 +476,10 @@ describe('salesforce-api', () => {
       mockHasSearchIndex.mockReturnValue(false)
       mockSearchIndex.mockReturnValue([])
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [apexClassFixtures[0]]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [apexClassFixtures[0]]
       })
 
       await warmupMetadataCache(TEST_HOST)
@@ -547,13 +502,10 @@ describe('salesforce-api', () => {
       vi.mocked(getUnsupportedRaw).mockResolvedValue(['ApexClass', 'Flow'])
 
       vi.mocked(mockCache.get).mockResolvedValue(null)
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 0,
-          done: true,
-          records: []
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 0,
+        done: true,
+        records: []
       })
 
       await warmupMetadataCache(TEST_HOST)
@@ -650,13 +602,10 @@ describe('salesforce-api', () => {
 
   describe('refreshMetadataCache', () => {
     it('should delete old cache and rebuild with fresh data', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: apexClassFixtures.length,
-          done: true,
-          records: apexClassFixtures
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: apexClassFixtures.length,
+        done: true,
+        records: apexClassFixtures
       })
 
       await refreshMetadataCache('ApexClass', TEST_HOST)
@@ -676,37 +625,31 @@ describe('salesforce-api', () => {
     })
   })
 
-  describe('fetchAllPages (tested indirectly)', () => {
+  describe('fetchAllPages (tested indirectly via sfRest)', () => {
     it('should handle pagination with nextRecordsUrl', async () => {
       vi.mocked(mockCache.get).mockResolvedValue(null)
       mockHasSearchIndex.mockReturnValue(false)
       mockSearchIndex.mockReturnValue([])
 
       // First page
-      mockFetch
+      mockSfRest
         .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({
-            totalSize: 4,
-            done: false,
-            records: apexClassFixtures.slice(0, 2),
-            nextRecordsUrl: '/services/data/v62.0/query/01gDn0000abcde-2000'
-          })
+          totalSize: 4,
+          done: false,
+          records: apexClassFixtures.slice(0, 2),
+          nextRecordsUrl: '/services/data/v62.0/query/01gDn0000abcde-2000'
         })
         // Second page
         .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({
-            totalSize: 4,
-            done: true,
-            records: apexClassFixtures.slice(2, 4)
-          })
+          totalSize: 4,
+          done: true,
+          records: apexClassFixtures.slice(2, 4)
         })
 
       const result = await searchSalesforceMetadata('test', ['ApexClass'], TEST_HOST)
 
-      // Should have made 2 fetch calls for pagination
-      expect(mockFetch).toHaveBeenCalledTimes(2)
+      // Should have made 2 sfRest calls for pagination
+      expect(mockSfRest).toHaveBeenCalledTimes(2)
       expect(result).toHaveProperty('ApexClass')
     })
 
@@ -715,30 +658,23 @@ describe('salesforce-api', () => {
       mockHasSearchIndex.mockReturnValue(false)
       mockSearchIndex.mockReturnValue([])
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 2,
-          done: true,
-          records: apexClassFixtures.slice(0, 2)
-        })
+      mockSfRest.mockResolvedValueOnce({
+        totalSize: 2,
+        done: true,
+        records: apexClassFixtures.slice(0, 2)
       })
 
       await searchSalesforceMetadata('test', ['ApexClass'], TEST_HOST)
 
-      // Only one fetch call since done=true
-      expect(mockFetch).toHaveBeenCalledTimes(1)
+      // Only one sfRest call since done=true (no nextRecordsUrl)
+      expect(mockSfRest).toHaveBeenCalledTimes(1)
     })
 
     it('should throw on 401 session expired', async () => {
       vi.mocked(mockCache.get).mockResolvedValue(null)
       mockHasSearchIndex.mockReturnValue(false)
 
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 401,
-        text: () => Promise.resolve('Session expired')
-      })
+      mockSfRest.mockRejectedValue(new Error('Session expired. Please refresh the page and try again.'))
 
       // The error is caught inside searchMetadataTypes, so it returns empty
       const result = await searchSalesforceMetadata('test', ['ApexClass'], TEST_HOST)
@@ -748,11 +684,7 @@ describe('salesforce-api', () => {
 
   describe('formatCustomCommandError (tested indirectly)', () => {
     it('should include error message and suggestion for API errors', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        text: () => Promise.resolve('[{"message":"INVALID_FIELD: SELECT Invalid FROM Account"}]')
-      })
+      mockSfRest.mockRejectedValue(new Error('API Error 400: [{"message":"INVALID_FIELD: SELECT Invalid FROM Account"}]'))
 
       await expect(executeCustomCommand({
         soqlTemplate: 'SELECT Invalid FROM Account',
@@ -763,11 +695,7 @@ describe('salesforce-api', () => {
     })
 
     it('should handle non-JSON error responses', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        text: () => Promise.resolve('Internal Server Error')
-      })
+      mockSfRest.mockRejectedValue(new Error('API Error 500: Internal Server Error'))
 
       await expect(executeCustomCommand({
         soqlTemplate: 'SELECT Id FROM Account',
@@ -780,19 +708,16 @@ describe('salesforce-api', () => {
 
   describe('buildCustomResultDescription (tested indirectly)', () => {
     it('should join field values with separator', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [{
-            Id: '001abc',
-            Name: 'Test Account',
-            Industry: 'Technology',
-            Phone: '555-1234',
-            attributes: { type: 'Account' }
-          }]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [{
+          Id: '001abc',
+          Name: 'Test Account',
+          Industry: 'Technology',
+          Phone: '555-1234',
+          attributes: { type: 'Account' }
+        }]
       })
 
       const results = await executeCustomCommand({
@@ -808,18 +733,15 @@ describe('salesforce-api', () => {
     })
 
     it('should use first column value as name (buildResultName)', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [{
-            Id: '301abc',
-            MasterLabel: 'My Flow',
-            Status: 'Active',
-            attributes: { type: 'Flow' }
-          }]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [{
+          Id: '301abc',
+          MasterLabel: 'My Flow',
+          Status: 'Active',
+          attributes: { type: 'Flow' }
+        }]
       })
 
       const results = await executeCustomCommand({
@@ -835,13 +757,10 @@ describe('salesforce-api', () => {
 
   describe('getNestedValue (tested indirectly)', () => {
     it('should traverse dot-notation paths', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [userFixtures[0]]
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [userFixtures[0]]
       })
 
       const results = await executeCustomCommand({
@@ -857,13 +776,10 @@ describe('salesforce-api', () => {
     })
 
     it('should return empty string for null path segments', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
-          totalSize: 1,
-          done: true,
-          records: [userFixtures[1]] // Integration User has null UserRole
-        })
+      mockSfRest.mockResolvedValue({
+        totalSize: 1,
+        done: true,
+        records: [userFixtures[1]] // Integration User has null UserRole
       })
 
       const results = await executeCustomCommand({
