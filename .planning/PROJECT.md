@@ -31,13 +31,13 @@ Fast, reliable metadata search and navigation that works across all Salesforce d
 - [ ] Introduce centralized storage service to replace scattered chrome.storage calls
 - [ ] Replace pervasive `any` types with explicit Salesforce API record interfaces
 - [ ] Make sfRest generic: `sfRest<T = unknown>()` instead of `Promise<any>`
-- [ ] Fix all 6 known TypeScript errors (ErrorBoundary children, recordContext, cookieStoreId, isBuiltin, null assignment)
+- :white_check_mark: Fix all 6 known TypeScript errors (ErrorBoundary children, recordContext, cookieStoreId, isBuiltin, null assignment) — Validated in Phase 1: Foundation & Safety Net
 - [ ] Add typed event emitter to replace `Set<Function>` pattern
 - [ ] Route all HTTP calls through sfRest (eliminate inline fetch in fetchAllPages)
 - [ ] Replace anonymous Apex user ID hack with standard REST endpoint
 - [ ] Remove DEBUG_FORCE_SHOW flag; use build-time env var if needed
-- [ ] Add unit tests for window-manager.ts (zero coverage currently)
-- [ ] Add unit tests for salesforce-api.ts (zero coverage currently)
+- :white_check_mark: Add characterization tests for window-manager.ts (66 tests) — Validated in Phase 1: Foundation & Safety Net
+- :white_check_mark: Add characterization tests for salesforce-api.ts (54 tests) — Validated in Phase 1: Foundation & Safety Net
 - [ ] Add unit tests for metadata-cache.ts (TTL, quota, refresh dedup)
 - [ ] Add component tests for SearchModal.tsx (keyboard nav, settings, error states)
 - [ ] Achieve 80%+ overall unit test coverage
@@ -104,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-04 after initialization*
+*Last updated: 2026-04-04 after Phase 1 completion*
