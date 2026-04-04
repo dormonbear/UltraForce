@@ -15,6 +15,19 @@ import {
   clearAllSearchIndexes,
   parseSearchQuery
 } from './fuzzy-search'
+import {
+  parseProfileDotNotation,
+  buildProfileSubMenu,
+  queryProfileUsers,
+  queryProfileObjectPermissions,
+  queryProfileFieldPermissions,
+  queryProfileCustomPermissions,
+  queryProfileApexClassAccess,
+  queryProfileVFPageAccess,
+  queryProfileConnectedApps,
+  queryProfileAssignedApps,
+  filterProfileSubData
+} from './profile-search'
 
 // Re-exports from extracted modules
 export { METADATA_TYPES, type SearchOptions } from './metadata-types'
@@ -158,6 +171,82 @@ export async function searchSalesforceMetadata(
       }
     }
 
+    // Profile sub-data search: "System Administrator." or "System Administrator.Users.john"
+    if (!isCMDT && selectedTypes.includes('Profile')) {
+      // Get cached profiles from search index
+      const cachedProfiles = searchIndex('', 'Profile', apiHost, { useFuzzy: false, hideManagedPackage: false })
+        .map((r) => ({ id: r.id, name: r.name }))
+
+      const profileDot = parseProfileDotNotation(query, cachedProfiles)
+      if (profileDot) {
+        const { profileId, profileName, subCategory, filter } = profileDot
+
+        if (!subCategory) {
+          // Single dot: show sub-menu (optionally filtered)
+          logger.debug('search:profile-submenu', { profile: profileName })
+          let subMenu = buildProfileSubMenu(profileId, profileName)
+          if (filter) {
+            subMenu = subMenu.filter((item) =>
+              item.name.toLowerCase().includes(filter.toLowerCase())
+            )
+          }
+          results['Profile'] = subMenu
+        } else {
+          // Two dots: query sub-data
+          logger.debug('search:profile-subdata', { profile: profileName, subCategory, filter })
+
+          let subResults: SearchResult[] = []
+          switch (subCategory) {
+            case 'Users':
+              subResults = await queryProfileUsers(profileId, apiHost, session.key)
+              break
+            case 'ObjectPermissions':
+              subResults = await queryProfileObjectPermissions(profileId, apiHost, session.key)
+              break
+            case 'FieldPermissions':
+              subResults = await queryProfileFieldPermissions(profileId, apiHost, session.key)
+              break
+            case 'CustomPermissions':
+              subResults = await queryProfileCustomPermissions(profileId, apiHost, session.key)
+              break
+            case 'ApexClassAccess':
+              subResults = await queryProfileApexClassAccess(profileId, apiHost, session.key)
+              break
+            case 'VFPageAccess':
+              subResults = await queryProfileVFPageAccess(profileId, apiHost, session.key)
+              break
+            case 'ConnectedApps':
+              subResults = await queryProfileConnectedApps(profileId, apiHost, session.key)
+              break
+            case 'AssignedApps':
+              subResults = await queryProfileAssignedApps(profileId, apiHost, session.key)
+              break
+          }
+
+          // Inject profileName and subCategory into metadata for Tab completion
+          subResults = subResults.map((r) => ({
+            ...r,
+            metadata: { ...r.metadata, profileName, _subCategory: subCategory }
+          }))
+
+          if (filter) {
+            subResults = filterProfileSubData(subResults, filter)
+          }
+          results['Profile'] = subResults
+        }
+
+        // Other types use original query
+        const otherTypes = selectedTypes.filter((t) => t !== 'Profile')
+        if (otherTypes.length > 0) {
+          const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, useFuzzy, hideManagedPackage)
+          Object.assign(results, otherResults)
+        }
+
+        return results
+      }
+    }
+
+    // Field search: "Account.Name" or "account."
     if (!isCMDT && selectedTypes.includes('CustomField')) {
       logger.debug('search:field', { object: objectName, query: fieldQuery })
 

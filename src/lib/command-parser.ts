@@ -120,6 +120,13 @@ export function validateCommandKey(key: string): { valid: boolean; error?: strin
   return { valid: true }
 }
 
+export function getCommandPrefix(parsed: ParsedCommand): string {
+  if (parsed.isCommand && parsed.commandKey) {
+    return `:${parsed.commandKey} `
+  }
+  return ''
+}
+
 export function mergeCommands(
   customCommands: Record<string, CustomCommand>
 ): Record<string, SearchCommand> {

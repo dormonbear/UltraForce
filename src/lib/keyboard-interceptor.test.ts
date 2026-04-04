@@ -231,7 +231,7 @@ describe('createKeyboardInterceptor', () => {
   })
 
   describe('navigation keys', () => {
-    it.each(['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'])(
+    it.each(['Escape', 'ArrowDown', 'ArrowUp', 'Enter'])(
       'should stop propagation for %s but NOT preventDefault',
       (key) => {
         const handler = createKeyboardInterceptor(getInput)
@@ -242,6 +242,15 @@ describe('createKeyboardInterceptor', () => {
         expect(event.preventDefault).not.toHaveBeenCalled()
       }
     )
+
+    it('should stop propagation AND preventDefault for Tab', () => {
+      const handler = createKeyboardInterceptor(getInput)
+      const event = createKeyEvent('keydown', 'Tab')
+      handler(event)
+
+      expect(event.stopPropagation).toHaveBeenCalled()
+      expect(event.preventDefault).toHaveBeenCalled()
+    })
   })
 
   describe('modifier-only keys', () => {

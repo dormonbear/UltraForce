@@ -8,7 +8,7 @@ import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
-import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
+import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { logger } from '~lib/logger'
@@ -425,41 +425,68 @@ const SearchModal: React.FC<SearchModalProps> = ({
         event.preventDefault()
         if (visibleResults[selectedIndex]) {
           const selectedResult = visibleResults[selectedIndex]
+          const prefix = getCommandPrefix(parsedCommand)
           if (selectedResult.type === 'CustomObject') {
             const objectApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-            setQuery(`${objectApiName}.`)
+            setQuery(`${prefix}${objectApiName}.`)
           } else if (selectedResult.type === 'CustomField') {
             const objectApiName = selectedResult.metadata?.ObjectApiName || selectedResult.metadata?.EntityDefinition?.QualifiedApiName
             const fieldApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
             if (objectApiName) {
-              setQuery(`${objectApiName}.${fieldApiName}`)
+              setQuery(`${prefix}${objectApiName}.${fieldApiName}`)
             }
           } else if (selectedResult.type === 'CustomMetadataType') {
             if (selectedResult.metadata?._isTypeDefinition) {
               // Type definition: autocomplete to "Type__mdt." to search records
               const cmdtApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-              setQuery(`${cmdtApiName}.`)
+              setQuery(`${prefix}${cmdtApiName}.`)
             } else {
               // Record: autocomplete to "ParentType__mdt.RecordName"
               const parentType = selectedResult.metadata?._parentType
               const recordName = selectedResult.metadata?.DeveloperName || selectedResult.name
               if (parentType) {
-                setQuery(`${parentType}.${recordName}`)
+                setQuery(`${prefix}${parentType}.${recordName}`)
               }
             }
           } else if (selectedResult.type === 'CustomSetting') {
             if (selectedResult.metadata?._isSettingDefinition) {
               // Setting definition: autocomplete to "Setting__c." to search records
               const settingApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-              setQuery(`${settingApiName}.`)
+              setQuery(`${prefix}${settingApiName}.`)
             } else {
               // Record: autocomplete to "ParentSetting__c.RecordName"
               const parentType = selectedResult.metadata?._parentType
               const recordName = selectedResult.metadata?.Name || selectedResult.name
               if (parentType) {
-                setQuery(`${parentType}.${recordName}`)
+                setQuery(`${prefix}${parentType}.${recordName}`)
               }
             }
+          } else if (selectedResult.type === 'Profile') {
+            // Profile: autocomplete to "ProfileName." to show sub-menu
+            const profileName = selectedResult.name
+            setQuery(`${prefix}${profileName}.`)
+          } else if (selectedResult.type === 'ProfileSubMenu') {
+            // Sub-menu item: autocomplete to "ProfileName.SubCategory."
+            const { profileName, subCategory } = selectedResult.metadata || {}
+            if (profileName && subCategory) {
+              setQuery(`${prefix}${profileName}.${subCategory}.`)
+            }
+          } else if (
+            selectedResult.type === 'ObjectPermission' ||
+            selectedResult.type === 'FieldPermission' ||
+            selectedResult.type === 'CustomPermissionAccess' ||
+            selectedResult.type === 'ApexClassAccess' ||
+            selectedResult.type === 'VFPageAccess' ||
+            selectedResult.type === 'ConnectedAppAccess' ||
+            selectedResult.type === 'AssignedAppAccess'
+          ) {
+            // Sub-data item: autocomplete to "ProfileName.SubCategory.ItemName" for filtering
+            const { profileName, _subCategory } = selectedResult.metadata || {}
+            if (profileName && _subCategory) {
+              setQuery(`${prefix}${profileName}.${_subCategory}.${selectedResult.name}`)
+            }
+          } else if (selectedResult.type === 'ProfileSetupLink') {
+            // Navigate-only link: Enter navigates, Tab does nothing special
           }
         }
         break

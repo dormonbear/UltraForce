@@ -117,6 +117,10 @@ export function createKeyboardInterceptor(
     if (NAVIGATION_KEYS.has(e.key)) {
       e.stopPropagation()
       e.stopImmediatePropagation()
+      // Tab must preventDefault to stop browser focus switching
+      if (e.key === 'Tab') {
+        e.preventDefault()
+      }
 
       if (e.type === 'keydown' && getModal) {
         const modal = getModal()
