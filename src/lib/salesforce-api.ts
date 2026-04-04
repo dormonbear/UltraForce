@@ -1,33 +1,23 @@
-// Salesforce API facade - orchestration layer
-// Delegates to metadata-types and metadata-fetcher for type definitions and data fetching
+// Salesforce API facade - thin re-export layer + API availability and permission checking
+// Delegates to search-orchestrator, custom-command, metadata-types, and metadata-fetcher
 
-import type { SearchResult } from '~types'
 import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
-import { normalizeHost, escapeSoql } from './domain-utils'
-import { getUnsupportedTypes as getUnsupportedTypesRaw, markTypesChecked, needsPermissionCheck, clearUnsupportedTypesCache } from './unsupported-types'
+import { normalizeHost } from './domain-utils'
+import {
+  getUnsupportedTypes as getUnsupportedTypesRaw,
+  markTypesChecked,
+  needsPermissionCheck,
+  clearUnsupportedTypesCache
+} from './unsupported-types'
 import {
   buildSearchIndex,
-  searchIndex,
-  hasSearchIndex,
   clearSearchIndex,
-  clearAllSearchIndexes,
-  parseSearchQuery
+  clearAllSearchIndexes
 } from './fuzzy-search'
-import {
-  parseProfileDotNotation,
-  buildProfileSubMenu,
-  queryProfileUsers,
-  queryProfileObjectPermissions,
-  queryProfileFieldPermissions,
-  queryProfileCustomPermissions,
-  queryProfileApexClassAccess,
-  queryProfileVFPageAccess,
-  queryProfileConnectedApps,
-  queryProfileAssignedApps,
-  filterProfileSubData
-} from './profile-search'
+import { getMetadataWithCache, fetchMetadataFromAPI } from './metadata-fetcher'
+import { METADATA_TYPES } from './metadata-types'
 
 // Re-exports from extracted modules
 export { METADATA_TYPES, type SearchOptions } from './metadata-types'
@@ -60,405 +50,8 @@ export {
   fetchRecordsForCMDT,
   fetchRecordsForCustomSetting
 } from './metadata-fetcher'
-
-import { METADATA_TYPES } from './metadata-types'
-import {
-  fetchAllPages,
-  fetchMetadataFromAPI,
-  ensureCMDTRecordIndex,
-  ensureCustomSettingRecordIndex,
-  ensureFieldIndex,
-  ensureMetadataIndex,
-  getMetadataWithCache
-} from './metadata-fetcher'
-
-// Record interfaces for realtime search queries
-
-interface SfUserSearchRecord extends Record<string, unknown> {
-  Id: string
-  Name: string
-  Username: string
-  Email: string
-  FederationIdentifier: string | null
-  IsActive: boolean
-  Profile: { Name: string } | null
-  UserRole: { Name: string } | null
-}
-
-interface SfGroupSearchRecord extends Record<string, unknown> {
-  Id: string
-  Name: string
-  DeveloperName: string
-  Email?: string
-}
-
-interface SfCustomQueryRecord extends Record<string, unknown> {
-  Id?: string
-  DurableId?: string
-}
-
-// --- Orchestration functions ---
-
-interface DotNotationResult {
-  objectName: string
-  fieldQuery: string
-  isCMDT: boolean
-}
-
-function parseDotNotation(query: string): DotNotationResult | null {
-  const dotIndex = query.indexOf('.')
-  if (dotIndex === -1) return null
-
-  const objectName = query.substring(0, dotIndex).trim()
-  const fieldQuery = query.substring(dotIndex + 1).trim()
-
-  if (objectName.length === 0) return null
-
-  const isCMDT = objectName.toLowerCase().endsWith('__mdt')
-
-  return { objectName, fieldQuery, isCMDT }
-}
-
-export async function searchSalesforceMetadata(
-  query: string,
-  selectedTypes: string[],
-  sfHost: string,
-  options: { useFuzzy?: boolean; hideManagedPackage?: boolean } = {}
-): Promise<Record<string, SearchResult[]>> {
-  const { useFuzzy = true, hideManagedPackage = true } = options
-
-  if (!sfHost) {
-    logger.error('searchSalesforceMetadata: missing sfHost')
-    return {}
-  }
-
-  const session = await getSession(sfHost)
-  if (!session) {
-    logger.error('searchSalesforceMetadata: no session', { host: sfHost })
-    return {}
-  }
-
-  const apiHost = normalizeHost(session.hostname)
-  const results: Record<string, SearchResult[]> = {}
-  const dotNotation = parseDotNotation(query)
-
-  if (dotNotation) {
-    const { objectName, fieldQuery, isCMDT } = dotNotation
-
-    if (isCMDT && selectedTypes.includes('CustomMetadataType')) {
-      logger.debug('search:cmdt-record', { cmdt: objectName, query: fieldQuery })
-
-      try {
-        await ensureCMDTRecordIndex(objectName, apiHost)
-        if (hasSearchIndex(`CMDTRecord:${objectName}`, apiHost)) {
-          results['CustomMetadataType'] = searchIndex(fieldQuery, `CMDTRecord:${objectName}`, apiHost, { useFuzzy, hideManagedPackage })
-        } else {
-          results['CustomMetadataType'] = []
-        }
-      } catch (error) {
-        logger.error('search:cmdt-record failed', { cmdt: objectName, error })
-        results['CustomMetadataType'] = []
-      }
-
-      const otherTypes = selectedTypes.filter((t) => t !== 'CustomMetadataType')
-      if (otherTypes.length > 0) {
-        const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, useFuzzy, hideManagedPackage)
-        Object.assign(results, otherResults)
-      }
-
-      return results
-    }
-
-    if (!isCMDT && selectedTypes.includes('CustomSetting')) {
-      const isCustomSetting = await checkIsCustomSetting(objectName, apiHost)
-      if (isCustomSetting) {
-        logger.debug('search:custom-setting-record', { setting: objectName, query: fieldQuery })
-
-        try {
-          await ensureCustomSettingRecordIndex(objectName, apiHost)
-          if (hasSearchIndex(`CustomSettingRecord:${objectName}`, apiHost)) {
-            results['CustomSetting'] = searchIndex(fieldQuery, `CustomSettingRecord:${objectName}`, apiHost, { useFuzzy, hideManagedPackage })
-          } else {
-            results['CustomSetting'] = []
-          }
-        } catch (error) {
-          logger.error('search:custom-setting-record failed', { setting: objectName, error })
-          results['CustomSetting'] = []
-        }
-
-        const otherTypes = selectedTypes.filter((t) => t !== 'CustomSetting')
-        if (otherTypes.length > 0) {
-          const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, useFuzzy, hideManagedPackage)
-          Object.assign(results, otherResults)
-        }
-
-        return results
-      }
-    }
-
-    // Profile sub-data search: "System Administrator." or "System Administrator.Users.john"
-    if (!isCMDT && selectedTypes.includes('Profile')) {
-      // Get cached profiles from search index
-      const cachedProfiles = searchIndex('', 'Profile', apiHost, { useFuzzy: false, hideManagedPackage: false })
-        .map((r) => ({ id: r.id, name: r.name }))
-
-      const profileDot = parseProfileDotNotation(query, cachedProfiles)
-      if (profileDot) {
-        const { profileId, profileName, subCategory, filter } = profileDot
-
-        if (!subCategory) {
-          // Single dot: show sub-menu (optionally filtered)
-          logger.debug('search:profile-submenu', { profile: profileName })
-          let subMenu = buildProfileSubMenu(profileId, profileName)
-          if (filter) {
-            subMenu = subMenu.filter((item) =>
-              item.name.toLowerCase().includes(filter.toLowerCase())
-            )
-          }
-          results['Profile'] = subMenu
-        } else {
-          // Two dots: query sub-data
-          logger.debug('search:profile-subdata', { profile: profileName, subCategory, filter })
-
-          let subResults: SearchResult[] = []
-          switch (subCategory) {
-            case 'Users':
-              subResults = await queryProfileUsers(profileId, apiHost, session.key)
-              break
-            case 'ObjectPermissions':
-              subResults = await queryProfileObjectPermissions(profileId, apiHost, session.key)
-              break
-            case 'FieldPermissions':
-              subResults = await queryProfileFieldPermissions(profileId, apiHost, session.key)
-              break
-            case 'CustomPermissions':
-              subResults = await queryProfileCustomPermissions(profileId, apiHost, session.key)
-              break
-            case 'ApexClassAccess':
-              subResults = await queryProfileApexClassAccess(profileId, apiHost, session.key)
-              break
-            case 'VFPageAccess':
-              subResults = await queryProfileVFPageAccess(profileId, apiHost, session.key)
-              break
-            case 'ConnectedApps':
-              subResults = await queryProfileConnectedApps(profileId, apiHost, session.key)
-              break
-            case 'AssignedApps':
-              subResults = await queryProfileAssignedApps(profileId, apiHost, session.key)
-              break
-          }
-
-          // Inject profileName and subCategory into metadata for Tab completion
-          subResults = subResults.map((r) => ({
-            ...r,
-            metadata: { ...r.metadata, profileName, _subCategory: subCategory }
-          }))
-
-          if (filter) {
-            subResults = filterProfileSubData(subResults, filter)
-          }
-          results['Profile'] = subResults
-        }
-
-        // Other types use original query
-        const otherTypes = selectedTypes.filter((t) => t !== 'Profile')
-        if (otherTypes.length > 0) {
-          const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, useFuzzy, hideManagedPackage)
-          Object.assign(results, otherResults)
-        }
-
-        return results
-      }
-    }
-
-    // Field search: "Account.Name" or "account."
-    if (!isCMDT && selectedTypes.includes('CustomField')) {
-      logger.debug('search:field', { object: objectName, query: fieldQuery })
-
-      try {
-        await ensureFieldIndex(objectName, apiHost)
-        if (hasSearchIndex(`Field:${objectName}`, apiHost)) {
-          results['CustomField'] = searchIndex(fieldQuery, `Field:${objectName}`, apiHost, { useFuzzy, hideManagedPackage })
-        } else {
-          results['CustomField'] = []
-        }
-      } catch (error) {
-        logger.error('search:field failed', { object: objectName, error })
-        results['CustomField'] = []
-      }
-
-      const otherTypes = selectedTypes.filter((t) => t !== 'CustomField')
-      if (otherTypes.length > 0) {
-        const otherResults = await searchMetadataTypes(query, otherTypes, apiHost, useFuzzy, hideManagedPackage)
-        Object.assign(results, otherResults)
-      }
-
-      return results
-    }
-  }
-
-  if (selectedTypes.includes('User') && query.trim()) {
-    try {
-      const userResults = await searchUsersRealtime(query, apiHost)
-      results['User'] = userResults
-    } catch (error) {
-      logger.error('search:user failed', { error })
-      results['User'] = []
-    }
-  }
-
-  if (selectedTypes.includes('Queue') && query.trim()) {
-    try {
-      const queueResults = await searchGroupsRealtime(query, 'Queue', apiHost)
-      results['Queue'] = queueResults
-    } catch (error) {
-      logger.error('search:queue failed', { error })
-      results['Queue'] = []
-    }
-  }
-
-  if (selectedTypes.includes('Group') && query.trim()) {
-    try {
-      const groupResults = await searchGroupsRealtime(query, 'Regular', apiHost)
-      results['Group'] = groupResults
-    } catch (error) {
-      logger.error('search:group failed', { error })
-      results['Group'] = []
-    }
-  }
-
-  const typesToSearch = selectedTypes.filter((t) => t !== 'CustomField' && t !== 'User' && t !== 'Queue' && t !== 'Group')
-  if (typesToSearch.length > 0) {
-    const otherResults = await searchMetadataTypes(query, typesToSearch, apiHost, useFuzzy, hideManagedPackage)
-    Object.assign(results, otherResults)
-  }
-
-  return results
-}
-
-async function searchUsersRealtime(
-  searchTerm: string,
-  sfHost: string
-): Promise<SearchResult[]> {
-  const host = normalizeHost(sfHost)
-  const start = Date.now()
-  const escaped = escapeSoql(searchTerm)
-  const searchPattern = `%${escaped}%`
-
-  const query = `SELECT Id, Name, Username, Email, FederationIdentifier, IsActive, Profile.Name, UserRole.Name FROM User WHERE Name LIKE '${searchPattern}' OR Username LIKE '${searchPattern}' OR Email LIKE '${searchPattern}' OR FederationIdentifier LIKE '${searchPattern}' ORDER BY Name ASC LIMIT 50`
-  const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(query)}`
-
-  logger.debug('search:user:soql', { query })
-
-  try {
-    const records = await fetchAllPages<SfUserSearchRecord>(host, queryPath)
-    logger.debug('search:user', { term: searchTerm, count: records.length, ms: Date.now() - start })
-
-    return records.map((record) => {
-      const parts = [record.Username]
-      if (record.Email) parts.push(record.Email)
-      if (record.Profile?.Name) parts.push(record.Profile.Name)
-      if (record.UserRole?.Name) parts.push(record.UserRole.Name)
-      if (record.IsActive === false) parts.push('Inactive')
-
-      return {
-        id: record.Id,
-        name: record.Name,
-        type: 'User',
-        description: parts.join(' | '),
-        metadata: record as Record<string, unknown>
-      }
-    })
-  } catch (error) {
-    logger.error('search:user failed', { term: searchTerm, error })
-    return []
-  }
-}
-
-async function searchGroupsRealtime(
-  searchTerm: string,
-  groupType: 'Queue' | 'Regular',
-  sfHost: string
-): Promise<SearchResult[]> {
-  const host = normalizeHost(sfHost)
-  const start = Date.now()
-  const escaped = escapeSoql(searchTerm)
-  const searchPattern = `%${escaped}%`
-  const resultType = groupType === 'Queue' ? 'Queue' : 'Group'
-
-  const query = groupType === 'Queue'
-    ? `SELECT Id, Name, DeveloperName, Email FROM Group WHERE Type = 'Queue' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
-    : `SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Regular' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
-
-  const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(query)}`
-  logger.debug(`search:${resultType.toLowerCase()}:soql`, { query })
-
-  try {
-    const records = await fetchAllPages<SfGroupSearchRecord>(host, queryPath)
-    logger.debug(`search:${resultType.toLowerCase()}`, { term: searchTerm, count: records.length, ms: Date.now() - start })
-
-    return records.map((record) => {
-      const parts = [record.DeveloperName]
-      if (record.Email) parts.push(record.Email)
-
-      return {
-        id: record.Id,
-        name: record.Name,
-        type: resultType,
-        description: parts.join(' | '),
-        metadata: record as Record<string, unknown>
-      }
-    })
-  } catch (error) {
-    logger.error(`search:${resultType.toLowerCase()} failed`, { term: searchTerm, error })
-    return []
-  }
-}
-
-// Cache of Custom Setting API names for dot-notation detection
-const customSettingCache = new Map<string, Set<string>>()
-
-async function checkIsCustomSetting(objectName: string, sfHost: string): Promise<boolean> {
-  const host = normalizeHost(sfHost)
-
-  if (!customSettingCache.has(host)) {
-    await ensureMetadataIndex('CustomSetting', host)
-    const settings = searchIndex('', 'CustomSetting', host, { useFuzzy: false, hideManagedPackage: false })
-    const settingNames = new Set(settings.map((s) => s.metadata?.QualifiedApiName?.toLowerCase()).filter(Boolean))
-    customSettingCache.set(host, settingNames)
-  }
-
-  const settingNames = customSettingCache.get(host)
-  return settingNames?.has(objectName.toLowerCase()) || false
-}
-
-async function searchMetadataTypes(
-  query: string,
-  selectedTypes: string[],
-  apiHost: string,
-  useFuzzy: boolean,
-  hideManagedPackage: boolean
-): Promise<Record<string, SearchResult[]>> {
-  const results: Record<string, SearchResult[]> = {}
-
-  const searchPromises = selectedTypes.map(async (metadataType) => {
-    try {
-      await ensureMetadataIndex(metadataType, apiHost)
-      const searchResults = searchIndex(query, metadataType, apiHost, { useFuzzy, hideManagedPackage })
-      return { type: metadataType, results: searchResults }
-    } catch (error) {
-      logger.error('search:metadata failed', { type: metadataType, error })
-      return { type: metadataType, results: [] }
-    }
-  })
-
-  const searchResults = await Promise.all(searchPromises)
-  searchResults.forEach(({ type, results: typeResults }) => {
-    results[type] = typeResults
-  })
-
-  return results
-}
+export { searchSalesforceMetadata } from './search-orchestrator'
+export { executeCustomCommand, type CustomCommandOptions } from './custom-command'
 
 // --- API availability ---
 
@@ -508,30 +101,6 @@ export async function validateSalesforceSession(sfHost: string): Promise<boolean
   }
 }
 
-export async function refreshMetadataCache(metadataType: string, sfHost: string): Promise<void> {
-  const host = normalizeHost(sfHost)
-  const session = await getSession(host)
-  if (!session) {
-    logger.error('refresh:cache no session', { host })
-    return
-  }
-
-  const cache = MetadataCache.getInstance()
-
-  try {
-    await cache.delete(host, metadataType)
-    clearSearchIndex(metadataType, host)
-
-    const freshData = await fetchMetadataFromAPI(metadataType, host)
-    await cache.set(host, metadataType, freshData)
-    buildSearchIndex(metadataType, freshData, host)
-
-    logger.debug('refresh:cache done', { type: metadataType, count: freshData.length })
-  } catch (error) {
-    logger.error('refresh:cache failed', { type: metadataType, error })
-  }
-}
-
 // --- Permission checking ---
 
 const PERMISSION_CHECK_MAP: Record<string, { object: string; useRestApi: boolean }> = {
@@ -575,6 +144,7 @@ async function checkViewSetupPermission(apiHost: string, sessionKey: string): Pr
   }
 }
 
+/** Probes the org to discover which metadata types the current user can access. */
 export async function checkMetadataPermissions(sfHost: string): Promise<string[]> {
   const allTypes = Object.keys(METADATA_TYPES)
 
@@ -584,7 +154,6 @@ export async function checkMetadataPermissions(sfHost: string): Promise<string[]
   }
 
   const apiHost = normalizeHost(session.hostname)
-
   const hasViewSetup = await checkViewSetupPermission(apiHost, session.key)
 
   if (!hasViewSetup) {
@@ -643,6 +212,32 @@ export async function checkMetadataPermissions(sfHost: string): Promise<string[]
 
 // --- Cache management ---
 
+/** Force-refreshes a single metadata type's cache and search index. */
+export async function refreshMetadataCache(metadataType: string, sfHost: string): Promise<void> {
+  const host = normalizeHost(sfHost)
+  const session = await getSession(host)
+  if (!session) {
+    logger.error('refresh:cache no session', { host })
+    return
+  }
+
+  const cache = MetadataCache.getInstance()
+
+  try {
+    await cache.delete(host, metadataType)
+    clearSearchIndex(metadataType, host)
+
+    const freshData = await fetchMetadataFromAPI(metadataType, host)
+    await cache.set(host, metadataType, freshData)
+    buildSearchIndex(metadataType, freshData, host)
+
+    logger.debug('refresh:cache done', { type: metadataType, count: freshData.length })
+  } catch (error) {
+    logger.error('refresh:cache failed', { type: metadataType, error })
+  }
+}
+
+/** Pre-fetches common metadata types and builds search indexes on extension startup. */
 export async function warmupMetadataCache(sfHost: string): Promise<void> {
   const commonTypes = ['ApexClass', 'ApexTrigger', 'Flow', 'CustomObject']
 
@@ -697,151 +292,4 @@ export async function getSupportedMetadataTypes(sfHost: string): Promise<string[
   const allTypes = Object.keys(METADATA_TYPES)
   const unsupported = await getUnsupportedTypes(sfHost)
   return allTypes.filter((type) => !unsupported.includes(type))
-}
-
-// --- Domain detection ---
-
-const SALESFORCE_PATTERNS = [
-  /https:\/\/.*\.salesforce\.com/,
-  /https:\/\/.*\.salesforce-setup\.com/,
-  /https:\/\/.*\.visual\.force\.com/,
-  /https:\/\/.*\.visualforce\.com/,
-  /https:\/\/.*\.lightning\.force\.com/,
-  /https:\/\/.*\.my\.salesforce\.com/,
-  /https:\/\/.*\.force\.com/,
-  /https:\/\/.*\.sfcrmapps\.cn/,
-  /https:\/\/.*\.sfcrmproducts\.cn/
-]
-
-export function isSalesforceDomain(url: string): boolean {
-  if (!url) return false
-  return SALESFORCE_PATTERNS.some((pattern) => pattern.test(url))
-}
-
-// --- Custom command execution ---
-
-export interface CustomCommandOptions {
-  soqlTemplate: string
-  searchQuery: string
-  useToolingApi: boolean
-  nameField: string
-  descriptionFields?: string[]
-}
-
-export async function executeCustomCommand(
-  options: CustomCommandOptions,
-  sfHost: string
-): Promise<SearchResult[]> {
-  const { soqlTemplate, searchQuery, useToolingApi, nameField, descriptionFields } = options
-
-  if (!sfHost) {
-    logger.error('executeCustomCommand: missing sfHost')
-    return []
-  }
-
-  const session = await getSession(sfHost)
-  if (!session) {
-    logger.error('executeCustomCommand: no session', { host: sfHost })
-    return []
-  }
-
-  const apiHost = normalizeHost(session.hostname)
-  const start = Date.now()
-
-  const { searchTerm, filterTerm, isExactMatch } = parseSearchQuery(searchQuery)
-
-  const escapedQuery = escapeSoql(searchTerm)
-  const soql = soqlTemplate.replace(/\{query\}/gi, escapedQuery)
-
-  const apiPath = useToolingApi ? 'tooling/query' : 'query'
-  const queryPath = `/services/data/v${API_VERSION}/${apiPath}?q=${encodeURIComponent(soql)}`
-
-  logger.debug('custom-command:execute', { soql, api: apiPath })
-
-  try {
-    const records = await fetchAllPages(apiHost, queryPath, { maxRecords: 100 })
-    logger.debug('custom-command:result', { count: records.length, ms: Date.now() - start })
-
-    let results: SearchResult[] = records.map((record) => ({
-      id: (record.Id as string) || (record.DurableId as string) || '',
-      name: getFieldValue(record, nameField) || 'Unknown',
-      type: 'CustomQuery',
-      description: buildDescriptionFromFields(record, descriptionFields, nameField),
-      metadata: record as Record<string, unknown>
-    }))
-
-    if (isExactMatch && searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      results = results.filter((r) => r.name.toLowerCase() === searchLower)
-    }
-
-    if (filterTerm) {
-      results = results.filter((r) => {
-        const name = (r.name || '').toLowerCase()
-        const description = (r.description || '').toLowerCase()
-        return name.includes(filterTerm) || description.includes(filterTerm)
-      })
-    }
-
-    return results
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error)
-    logger.error('custom-command:error', { soql, error: message })
-    throw new Error(formatCustomCommandError(message))
-  }
-}
-
-function formatCustomCommandError(errorMessage: string): string {
-  const apiMatch = errorMessage.match(/API(?: Error)? \d+: (.+)/)
-  if (apiMatch) {
-    try {
-      const errorData = JSON.parse(apiMatch[1])
-      if (Array.isArray(errorData) && errorData[0]?.message) {
-        const sfError = errorData[0].message
-        return `SOQL Error: ${sfError}\n\nPlease check your custom command configuration in Settings.`
-      }
-    } catch {
-      // Not JSON, use as-is
-    }
-  }
-  return `${errorMessage}\n\nPlease check your custom command configuration in Settings.`
-}
-
-function getFieldValue(record: Record<string, unknown>, fieldPath: string): string {
-  if (!fieldPath) return ''
-  const parts = fieldPath.split('.')
-  let value: unknown = record
-  for (const part of parts) {
-    if (value === null || value === undefined) return ''
-    value = (value as Record<string, unknown>)[part]
-  }
-  return value != null ? String(value) : ''
-}
-
-function buildDescriptionFromFields(record: Record<string, unknown>, descriptionFields?: string[], nameField?: string): string {
-  if (descriptionFields && descriptionFields.length > 0) {
-    const values = descriptionFields
-      .map((field) => getFieldValue(record, field.trim()))
-      .filter((v) => v)
-    if (values.length > 0) {
-      return values.join(' | ')
-    }
-  }
-  return buildCustomResultDescription(record, nameField)
-}
-
-function buildCustomResultDescription(record: Record<string, unknown>, nameField?: string): string {
-  const parts: string[] = []
-  const excludeFields = ['Id', 'Name', 'MasterLabel', 'DeveloperName', 'Label', 'attributes']
-  if (nameField) excludeFields.push(nameField)
-
-  for (const [key, value] of Object.entries(record)) {
-    if (excludeFields.includes(key)) continue
-    if (value === null || value === undefined) continue
-    if (typeof value === 'object') continue
-    parts.push(`${key}: ${value}`)
-    if (parts.length >= 3) break
-  }
-
-  return parts.join(' | ')
 }

@@ -13,7 +13,7 @@ This milestone transforms UltraForce from a working-but-brittle Chrome extension
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundation & Safety Net** - Fix TS errors, set up test infrastructure, capture current behavior
-- [ ] **Phase 2: Module Extraction & Type Safety** - Decompose god classes, add unit tests, eliminate any types
+- [x] **Phase 2: Module Extraction & Type Safety** - Decompose god classes, add unit tests, eliminate any types
 - [ ] **Phase 3: State Migration** - Replace WindowManager singleton with Zustand stores and centralized storage
 - [ ] **Phase 4: Cleanup & Coverage** - Migrate CSS, remove legacy code, achieve 80% coverage target
 
@@ -40,16 +40,17 @@ Plans:
 **Requirements**: MODL-01, MODL-02, MODL-03, MODL-04, TEST-02, TEST-03, TEST-04, TEST-05, TYPE-01, TYPE-02, TYPE-03
 **Success Criteria** (what must be TRUE):
   1. window-manager.ts is replaced by url-builder, navigation, record-context, setup-shortcuts, and core orchestration modules (each under 400 lines)
-  2. salesforce-api.ts is replaced by metadata-types, metadata-fetcher, and orchestration facade modules (each under 400 lines)
+  2. salesforce-api.ts is replaced by metadata-types, metadata-fetcher, search-orchestrator, custom-command, and facade modules (each under 400 lines)
   3. Unit tests exist for every extracted module and SearchModal component, covering key behaviors
   4. All existing E2E tests pass after extraction (no regressions)
   5. Zero `any` types remain in profile-search.ts, salesforce-api modules, and all fetch calls route through typed sfRest
-**Plans:** 3 plans
+**Plans:** 3 plans + 1 gap closure
 
 Plans:
 - [x] 02-01-PLAN.md -- Extract window-manager.ts into 5 modules (url-builder, setup-shortcuts, record-context, navigation, typed-event-emitter) with unit tests
 - [x] 02-02-PLAN.md -- Extract salesforce-api.ts into 3 modules (metadata-types, metadata-fetcher, facade) with unit tests
 - [x] 02-03-PLAN.md -- Type safety (sfRest generic, any replacement) + SearchModal component tests + metadata-cache unit tests
+- [x] 02-04-GAP.md -- Further decompose salesforce-api.ts facade: extract search-orchestrator.ts and custom-command.ts (MODL-02 gap closure)
 
 ### Phase 3: State Migration
 **Goal**: Application state is managed through React-friendly Zustand stores and a centralized storage service, making state testable and predictable
@@ -88,7 +89,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Safety Net | 0/2 | Not started | - |
-| 2. Module Extraction & Type Safety | 0/3 | Not started | - |
+| 1. Foundation & Safety Net | 2/2 | Complete | 2026-04-04 |
+| 2. Module Extraction & Type Safety | 4/4 | Complete | 2026-04-04 |
 | 3. State Migration | 0/2 | Not started | - |
 | 4. Cleanup & Coverage | 0/2 | Not started | - |
