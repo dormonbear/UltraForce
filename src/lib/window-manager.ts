@@ -1250,6 +1250,77 @@ class UltraForceWindowManager {
           case 'Profile':
             targetUrl = `${baseUrl}/lightning/setup/EnhancedProfiles/page?address=%2F${result.id}`
             break
+          case 'ProfileSubMenu':
+            // Tab-only navigation, no click action
+            return
+          case 'ObjectPermission': {
+            const setupHostObj = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                   ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const objProfileId = result.metadata?.profileId
+            // Custom objects use DurableId (01Ixx), standard objects use API name
+            const objectRef = result.metadata?.objectRef || result.name
+            const objAddr = encodeURIComponent(`/${objProfileId}?s=ObjectsAndTabs&o=${objectRef}`)
+            targetUrl = `https://${setupHostObj}/lightning/setup/Profiles/page?address=${objAddr}`
+            break
+          }
+          case 'FieldPermission': {
+            const setupHostField = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                     ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const fieldProfileId = result.metadata?.profileId
+            const fieldSobjectType = result.metadata?.SobjectType
+            const fieldAddr = encodeURIComponent(`/${fieldProfileId}?s=FieldPermissions&o=${fieldSobjectType}`)
+            targetUrl = `https://${setupHostField}/lightning/setup/Profiles/page?address=${fieldAddr}`
+            break
+          }
+          case 'CustomPermissionAccess': {
+            const setupHostCP = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const cpProfileId = result.metadata?.profileId
+            const cpAddr = encodeURIComponent(`/${cpProfileId}?s=CustomPermissions`)
+            targetUrl = `https://${setupHostCP}/lightning/setup/Profiles/page?address=${cpAddr}`
+            break
+          }
+          case 'ApexClassAccess': {
+            const setupHostAC = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const acProfileId = result.metadata?.profileId
+            const acAddr = encodeURIComponent(`/${acProfileId}?s=ApexClassAccess`)
+            targetUrl = `https://${setupHostAC}/lightning/setup/Profiles/page?address=${acAddr}`
+            break
+          }
+          case 'VFPageAccess': {
+            const setupHostVF = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const vfProfileId = result.metadata?.profileId
+            const vfAddr = encodeURIComponent(`/${vfProfileId}?s=ApexPageAccess`)
+            targetUrl = `https://${setupHostVF}/lightning/setup/Profiles/page?address=${vfAddr}`
+            break
+          }
+          case 'ConnectedAppAccess': {
+            const setupHostCA = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const caProfileId = result.metadata?.profileId
+            const caAddr = encodeURIComponent(`/${caProfileId}?s=ConnectedAppSettings`)
+            targetUrl = `https://${setupHostCA}/lightning/setup/Profiles/page?address=${caAddr}`
+            break
+          }
+          case 'AssignedAppAccess': {
+            const setupHostAA = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                  ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const aaProfileId = result.metadata?.profileId
+            const aaAddr = encodeURIComponent(`/${aaProfileId}?s=ObjectsAndTabs`)
+            targetUrl = `https://${setupHostAA}/lightning/setup/Profiles/page?address=${aaAddr}`
+            break
+          }
+          case 'ProfileSetupLink': {
+            const setupHostPSL = this.state.sfHost?.replace('.my.salesforce.com', '.my.salesforce-setup.com')
+                                                   ?.replace('.lightning.force.com', '.my.salesforce-setup.com')
+            const pslProfileId = result.metadata?.profileId
+            const pslSection = result.metadata?.section
+            const pslAddr = encodeURIComponent(`/${pslProfileId}?s=${pslSection}`)
+            targetUrl = `https://${setupHostPSL}/lightning/setup/Profiles/page?address=${pslAddr}`
+            break
+          }
           case 'CustomLabel':
             targetUrl = `${baseUrl}/lightning/setup/ExternalStrings/page?address=%2F${result.id}`
             break
@@ -1318,6 +1389,35 @@ class UltraForceWindowManager {
           case 'PermissionSet':
           case 'Profile':
             targetUrl = `${baseUrl}/${result.id}`
+            break
+          case 'ProfileSubMenu':
+            // Tab-only navigation, no click action
+            return
+          case 'ObjectPermission': {
+            const classicObjRef = result.metadata?.objectRef || result.name
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs&o=${classicObjRef}`
+            break
+          }
+          case 'FieldPermission':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=FieldPermissions&o=${result.metadata?.SobjectType}`
+            break
+          case 'CustomPermissionAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=CustomPermissions`
+            break
+          case 'ApexClassAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ApexClassAccess`
+            break
+          case 'VFPageAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ApexPageAccess`
+            break
+          case 'ConnectedAppAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ConnectedAppSettings`
+            break
+          case 'AssignedAppAccess':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs`
+            break
+          case 'ProfileSetupLink':
+            targetUrl = `${baseUrl}/${result.metadata?.profileId}?s=${result.metadata?.section}`
             break
           case 'Flow':
             targetUrl = `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
@@ -1583,7 +1683,8 @@ class UltraForceWindowManager {
         navigationMode: 'auto',
         fuzzySearch: true,
         searchError: null,
-        userLightningPreference: null
+        userLightningPreference: null,
+        recordContext: null
       }
 
       this.log('WindowManager destroyed successfully')

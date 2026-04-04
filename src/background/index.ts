@@ -60,6 +60,7 @@ async function handleGetSfHost(
 ) {
   try {
     const currentDomain = new URL(request.url).hostname
+    // @ts-expect-error Firefox container tab API
     const storeId = sender.tab?.cookieStoreId
 
     if (currentDomain.endsWith('.mcas.ms')) {
@@ -211,6 +212,7 @@ async function handleGetSession(
 ) {
   try {
     const sfHost = request.sfHost
+    // @ts-expect-error Firefox container tab API
     const storeId = sender.tab?.cookieStoreId
     const domainsToCheck = [sfHost]
 
