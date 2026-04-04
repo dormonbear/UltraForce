@@ -48,8 +48,8 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md -- Extract window-manager.ts into 5 modules (url-builder, setup-shortcuts, record-context, navigation, typed-event-emitter) with unit tests
-- [ ] 02-02-PLAN.md -- Extract salesforce-api.ts into 3 modules (metadata-types, metadata-fetcher, facade) with unit tests
-- [ ] 02-03-PLAN.md -- Type safety (sfRest generic, any replacement) + SearchModal component tests + metadata-cache unit tests
+- [x] 02-02-PLAN.md -- Extract salesforce-api.ts into 3 modules (metadata-types, metadata-fetcher, facade) with unit tests
+- [x] 02-03-PLAN.md -- Type safety (sfRest generic, any replacement) + SearchModal component tests + metadata-cache unit tests
 
 ### Phase 3: State Migration
 **Goal**: Application state is managed through React-friendly Zustand stores and a centralized storage service, making state testable and predictable

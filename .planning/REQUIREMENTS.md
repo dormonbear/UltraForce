@@ -26,8 +26,8 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 - [x] **TEST-01**: Characterization tests capture current behavior of window-manager.ts and salesforce-api.ts before refactoring
 - [x] **TEST-02**: Unit tests exist for all extracted modules from window-manager.ts (url-builder, navigation, record-context, setup-shortcuts)
 - [ ] **TEST-03**: Unit tests exist for all extracted modules from salesforce-api.ts (metadata-types, metadata-fetcher)
-- [ ] **TEST-04**: Component tests exist for SearchModal.tsx covering keyboard navigation, settings persistence, fuzzy toggle, and error states
-- [ ] **TEST-05**: Unit tests exist for metadata-cache.ts covering TTL expiry, quota-exceeded retry, cleanup eviction, and background refresh deduplication
+- [x] **TEST-04**: Component tests exist for SearchModal.tsx covering keyboard navigation, settings persistence, fuzzy toggle, and error states
+- [x] **TEST-05**: Unit tests exist for metadata-cache.ts covering TTL expiry, quota-exceeded retry, cleanup eviction, and background refresh deduplication
 - [ ] **TEST-06**: E2E tests cover all core user flows: search, navigation, command system, field search, profile sub-menu
 - [ ] **TEST-07**: Overall unit test coverage reaches 80%+ as reported by @vitest/coverage-v8
 
@@ -39,9 +39,9 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 
 ### Type Safety
 
-- [ ] **TYPE-01**: All `any` types in profile-search.ts are replaced with explicit Salesforce API record interfaces
-- [ ] **TYPE-02**: All `any` types in salesforce-api.ts are replaced with explicit interfaces
-- [ ] **TYPE-03**: All inline fetch calls are routed through sfRest (no duplicate auth logic)
+- [x] **TYPE-01**: All `any` types in profile-search.ts are replaced with explicit Salesforce API record interfaces
+- [x] **TYPE-02**: All `any` types in salesforce-api.ts are replaced with explicit interfaces
+- [x] **TYPE-03**: All inline fetch calls are routed through sfRest (no duplicate auth logic)
 
 ### Cleanup
 
@@ -93,16 +93,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 2 | Complete |
 | TEST-03 | Phase 2 | Pending |
-| TEST-04 | Phase 2 | Pending |
-| TEST-05 | Phase 2 | Pending |
+| TEST-04 | Phase 2 | Complete |
+| TEST-05 | Phase 2 | Complete |
 | TEST-06 | Phase 4 | Pending |
 | TEST-07 | Phase 4 | Pending |
 | STAT-01 | Phase 3 | Pending |
 | STAT-02 | Phase 3 | Pending |
 | STAT-03 | Phase 3 | Pending |
-| TYPE-01 | Phase 2 | Pending |
-| TYPE-02 | Phase 2 | Pending |
-| TYPE-03 | Phase 2 | Pending |
+| TYPE-01 | Phase 2 | Complete |
+| TYPE-02 | Phase 2 | Complete |
+| TYPE-03 | Phase 2 | Complete |
 | CLEN-01 | Phase 4 | Pending |
 | CLEN-02 | Phase 4 | Pending |
 | CLEN-03 | Phase 4 | Pending |
