@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md -- Fix TS errors, coverage tooling, ESLint any-warning, vitest-chrome migration
-- [ ] 01-02-PLAN.md -- Characterization tests for window-manager.ts and salesforce-api.ts
+- [x] 01-02-PLAN.md -- Characterization tests for window-manager.ts and salesforce-api.ts
 
 ### Phase 2: Module Extraction & Type Safety
 **Goal**: The two god classes are decomposed into focused, tested modules with explicit types replacing all any usage

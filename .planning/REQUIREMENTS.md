@@ -23,7 +23,7 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Characterization tests capture current behavior of window-manager.ts and salesforce-api.ts before refactoring
+- [x] **TEST-01**: Characterization tests capture current behavior of window-manager.ts and salesforce-api.ts before refactoring
 - [ ] **TEST-02**: Unit tests exist for all extracted modules from window-manager.ts (url-builder, navigation, record-context, setup-shortcuts)
 - [ ] **TEST-03**: Unit tests exist for all extracted modules from salesforce-api.ts (metadata-types, metadata-fetcher)
 - [ ] **TEST-04**: Component tests exist for SearchModal.tsx covering keyboard navigation, settings persistence, fuzzy toggle, and error states
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MODL-02 | Phase 2 | Pending |
 | MODL-03 | Phase 2 | Pending |
 | MODL-04 | Phase 2 | Pending |
-| TEST-01 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 2 | Pending |
 | TEST-03 | Phase 2 | Pending |
 | TEST-04 | Phase 2 | Pending |
