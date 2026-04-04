@@ -53,15 +53,15 @@ export async function getSession(sfHost: string): Promise<SfSession | null> {
 /**
  * Make authenticated REST API call to Salesforce
  */
-export async function sfRest(
+export async function sfRest<T = unknown>(
   sfHost: string,
   path: string,
   options: {
     method?: string
-    body?: any
+    body?: unknown
     api?: 'normal' | 'bulk'
   } = {}
-): Promise<any> {
+): Promise<T> {
   const { method = 'GET', body, api = 'normal' } = options
 
   const session = await getSession(sfHost)
@@ -104,5 +104,5 @@ export async function sfRest(
   }
 
   trackApiRequest()
-  return response.json()
+  return response.json() as Promise<T>
 }

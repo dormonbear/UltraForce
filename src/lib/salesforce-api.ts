@@ -72,6 +72,31 @@ import {
   getMetadataWithCache
 } from './metadata-fetcher'
 
+// Record interfaces for realtime search queries
+
+interface SfUserSearchRecord extends Record<string, unknown> {
+  Id: string
+  Name: string
+  Username: string
+  Email: string
+  FederationIdentifier: string | null
+  IsActive: boolean
+  Profile: { Name: string } | null
+  UserRole: { Name: string } | null
+}
+
+interface SfGroupSearchRecord extends Record<string, unknown> {
+  Id: string
+  Name: string
+  DeveloperName: string
+  Email?: string
+}
+
+interface SfCustomQueryRecord extends Record<string, unknown> {
+  Id?: string
+  DurableId?: string
+}
+
 // --- Orchestration functions ---
 
 interface DotNotationResult {
@@ -326,10 +351,10 @@ async function searchUsersRealtime(
   logger.debug('search:user:soql', { query })
 
   try {
-    const records = await fetchAllPages(host, queryPath)
+    const records = await fetchAllPages<SfUserSearchRecord>(host, queryPath)
     logger.debug('search:user', { term: searchTerm, count: records.length, ms: Date.now() - start })
 
-    return records.map((record: any) => {
+    return records.map((record) => {
       const parts = [record.Username]
       if (record.Email) parts.push(record.Email)
       if (record.Profile?.Name) parts.push(record.Profile.Name)
@@ -341,7 +366,7 @@ async function searchUsersRealtime(
         name: record.Name,
         type: 'User',
         description: parts.join(' | '),
-        metadata: record
+        metadata: record as Record<string, unknown>
       }
     })
   } catch (error) {
@@ -369,10 +394,10 @@ async function searchGroupsRealtime(
   logger.debug(`search:${resultType.toLowerCase()}:soql`, { query })
 
   try {
-    const records = await fetchAllPages(host, queryPath)
+    const records = await fetchAllPages<SfGroupSearchRecord>(host, queryPath)
     logger.debug(`search:${resultType.toLowerCase()}`, { term: searchTerm, count: records.length, ms: Date.now() - start })
 
-    return records.map((record: any) => {
+    return records.map((record) => {
       const parts = [record.DeveloperName]
       if (record.Email) parts.push(record.Email)
 
@@ -381,7 +406,7 @@ async function searchGroupsRealtime(
         name: record.Name,
         type: resultType,
         description: parts.join(' | '),
-        metadata: record
+        metadata: record as Record<string, unknown>
       }
     })
   } catch (error) {
@@ -737,12 +762,12 @@ export async function executeCustomCommand(
     const records = await fetchAllPages(apiHost, queryPath, { maxRecords: 100 })
     logger.debug('custom-command:result', { count: records.length, ms: Date.now() - start })
 
-    let results: SearchResult[] = records.map((record: any) => ({
-      id: record.Id || record.DurableId || '',
+    let results: SearchResult[] = records.map((record) => ({
+      id: (record.Id as string) || (record.DurableId as string) || '',
       name: getFieldValue(record, nameField) || 'Unknown',
       type: 'CustomQuery',
       description: buildDescriptionFromFields(record, descriptionFields, nameField),
-      metadata: record
+      metadata: record as Record<string, unknown>
     }))
 
     if (isExactMatch && searchTerm) {
@@ -759,9 +784,10 @@ export async function executeCustomCommand(
     }
 
     return results
-  } catch (error: any) {
-    logger.error('custom-command:error', { soql, error: error.message })
-    throw new Error(formatCustomCommandError(error.message))
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger.error('custom-command:error', { soql, error: message })
+    throw new Error(formatCustomCommandError(message))
   }
 }
 
@@ -781,18 +807,18 @@ function formatCustomCommandError(errorMessage: string): string {
   return `${errorMessage}\n\nPlease check your custom command configuration in Settings.`
 }
 
-function getFieldValue(record: any, fieldPath: string): string {
+function getFieldValue(record: Record<string, unknown>, fieldPath: string): string {
   if (!fieldPath) return ''
   const parts = fieldPath.split('.')
-  let value: any = record
+  let value: unknown = record
   for (const part of parts) {
     if (value === null || value === undefined) return ''
-    value = value[part]
+    value = (value as Record<string, unknown>)[part]
   }
-  return value?.toString() || ''
+  return value != null ? String(value) : ''
 }
 
-function buildDescriptionFromFields(record: any, descriptionFields?: string[], nameField?: string): string {
+function buildDescriptionFromFields(record: Record<string, unknown>, descriptionFields?: string[], nameField?: string): string {
   if (descriptionFields && descriptionFields.length > 0) {
     const values = descriptionFields
       .map((field) => getFieldValue(record, field.trim()))
@@ -804,7 +830,7 @@ function buildDescriptionFromFields(record: any, descriptionFields?: string[], n
   return buildCustomResultDescription(record, nameField)
 }
 
-function buildCustomResultDescription(record: any, nameField?: string): string {
+function buildCustomResultDescription(record: Record<string, unknown>, nameField?: string): string {
   const parts: string[] = []
   const excludeFields = ['Id', 'Name', 'MasterLabel', 'DeveloperName', 'Label', 'attributes']
   if (nameField) excludeFields.push(nameField)

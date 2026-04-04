@@ -117,7 +117,7 @@ describe('buildProfileSubMenu', () => {
 
   it('should include all sub-menu items', () => {
     const items = buildProfileSubMenu('00e000000000001', 'System Administrator')
-    const names = items.map(i => i.name)
+    const names = items.map((i) => i.name)
     expect(names).toContain('Users')
     expect(names).toContain('Object Permissions')
     expect(names).toContain('Field Permissions')
@@ -133,16 +133,16 @@ describe('buildProfileSubMenu', () => {
 
   it('should set type to ProfileSubMenu for queryable items and ProfileSetupLink for navigate-only items', () => {
     const items = buildProfileSubMenu('00e000000000001', 'System Administrator')
-    const subMenuItems = items.filter(i => i.type === 'ProfileSubMenu')
-    const setupLinks = items.filter(i => i.type === 'ProfileSetupLink')
+    const subMenuItems = items.filter((i) => i.type === 'ProfileSubMenu')
+    const setupLinks = items.filter((i) => i.type === 'ProfileSetupLink')
     expect(subMenuItems).toHaveLength(8)
     expect(setupLinks).toHaveLength(3)
-    expect(setupLinks.map(i => i.name)).toEqual(['System Permissions', 'Login Hours', 'Login IP Ranges'])
+    expect(setupLinks.map((i) => i.name)).toEqual(['System Permissions', 'Login Hours', 'Login IP Ranges'])
   })
 
   it('should include profileId, profileName, subCategory in metadata', () => {
     const items = buildProfileSubMenu('00e000000000001', 'System Administrator')
-    const usersItem = items.find(i => i.name === 'Users')
+    const usersItem = items.find((i) => i.name === 'Users')
     expect(usersItem?.metadata).toEqual({
       profileId: '00e000000000001',
       profileName: 'System Administrator',
@@ -152,15 +152,18 @@ describe('buildProfileSubMenu', () => {
 
   it('should include description for each item', () => {
     const items = buildProfileSubMenu('00e000000000001', 'System Administrator')
-    items.forEach(item => {
+    items.forEach((item) => {
       expect(item.description).toBeTruthy()
     })
   })
 })
 
-// Mock fetch for sub-data query tests
+// Mock sfRest for sub-data query tests (profile-search routes through sfRest)
+const mockSfRest = vi.fn()
+
 vi.mock('./auth', () => ({
   getSession: vi.fn().mockResolvedValue({ key: 'mock-key', hostname: 'test.my.salesforce.com' }),
+  sfRest: (...args: unknown[]) => mockSfRest(...args),
   API_VERSION: '62.0'
 }))
 
@@ -169,25 +172,32 @@ vi.mock('./domain-utils', () => ({
   escapeSoql: vi.fn((s: string) => s)
 }))
 
-const mockFetch = vi.fn()
-globalThis.fetch = mockFetch as any
+// Helper: mock sfRest for PermissionSetId + SetupEntityAccess + detail query (3 calls)
+function mockSetupEntityAccessFlow(detailRecords: Record<string, unknown>[]) {
+  // 1. PermissionSetId query
+  mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
+  // 2. SetupEntityAccess query
+  mockSfRest.mockResolvedValueOnce({
+    records: detailRecords.map((r) => ({ SetupEntityId: r.Id })),
+    done: true
+  })
+  // 3. Detail query
+  mockSfRest.mockResolvedValueOnce({ records: detailRecords, done: true })
+}
 
 describe('queryProfileUsers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
   it('should return SearchResult[] with type User', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [
-          { Id: '005001', Name: 'John Doe', Username: 'john@test.com', IsActive: true }
-        ],
-        done: true
-      })
+    mockSfRest.mockResolvedValueOnce({
+      records: [
+        { Id: '005001', Name: 'John Doe', Username: 'john@test.com', IsActive: true }
+      ],
+      done: true
     })
 
     const results = await queryProfileUsers('00e000000000001', 'test.my.salesforce.com', 'session-key')
@@ -198,15 +208,12 @@ describe('queryProfileUsers', () => {
   })
 
   it('should show Active/Inactive status in description', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [
-          { Id: '005001', Name: 'John Doe', Username: 'john@test.com', IsActive: true },
-          { Id: '005002', Name: 'Jane Doe', Username: 'jane@test.com', IsActive: false }
-        ],
-        done: true
-      })
+    mockSfRest.mockResolvedValueOnce({
+      records: [
+        { Id: '005001', Name: 'John Doe', Username: 'john@test.com', IsActive: true },
+        { Id: '005002', Name: 'Jane Doe', Username: 'jane@test.com', IsActive: false }
+      ],
+      done: true
     })
 
     const results = await queryProfileUsers('00e000000000001', 'test.my.salesforce.com', 'session-key')
@@ -215,7 +222,7 @@ describe('queryProfileUsers', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
 
     const results = await queryProfileUsers('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
@@ -225,37 +232,26 @@ describe('queryProfileUsers', () => {
 describe('queryProfileObjectPermissions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
   it('should return SearchResult[] with type ObjectPermission', async () => {
-    // First call: get PermissionSetId
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [{ Id: '0PS001' }],
-        done: true
-      })
-    })
-    // Second call: get ObjectPermissions
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [
-          {
-            Id: 'op001',
-            SobjectType: 'Account',
-            PermissionsCreate: true,
-            PermissionsRead: true,
-            PermissionsEdit: true,
-            PermissionsDelete: false,
-            PermissionsViewAllRecords: false,
-            PermissionsModifyAllRecords: false
-          }
-        ],
-        done: true
-      })
+    mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
+    mockSfRest.mockResolvedValueOnce({
+      records: [
+        {
+          Id: 'op001',
+          SobjectType: 'Account',
+          PermissionsCreate: true,
+          PermissionsRead: true,
+          PermissionsEdit: true,
+          PermissionsDelete: false,
+          PermissionsViewAllRecords: false,
+          PermissionsModifyAllRecords: false
+        }
+      ],
+      done: true
     })
 
     const results = await queryProfileObjectPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
@@ -268,41 +264,29 @@ describe('queryProfileObjectPermissions', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileObjectPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
 
   it('should use DurableId for custom objects in objectRef', async () => {
-    // 1. PermissionSetId
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ records: [{ Id: '0PS001' }], done: true })
+    mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
+    mockSfRest.mockResolvedValueOnce({
+      records: [{
+        Id: 'op002',
+        SobjectType: 'MyObj__c',
+        PermissionsCreate: true,
+        PermissionsRead: true,
+        PermissionsEdit: false,
+        PermissionsDelete: false,
+        PermissionsViewAllRecords: false,
+        PermissionsModifyAllRecords: false
+      }],
+      done: true
     })
-    // 2. ObjectPermissions with custom object
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [{
-          Id: 'op002',
-          SobjectType: 'MyObj__c',
-          PermissionsCreate: true,
-          PermissionsRead: true,
-          PermissionsEdit: false,
-          PermissionsDelete: false,
-          PermissionsViewAllRecords: false,
-          PermissionsModifyAllRecords: false
-        }],
-        done: true
-      })
-    })
-    // 3. EntityDefinition DurableId lookup
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [{ QualifiedApiName: 'MyObj__c', DurableId: '01I000000000ABC' }],
-        done: true
-      })
+    mockSfRest.mockResolvedValueOnce({
+      records: [{ QualifiedApiName: 'MyObj__c', DurableId: '01I000000000ABC' }],
+      done: true
     })
 
     const results = await queryProfileObjectPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
@@ -311,27 +295,19 @@ describe('queryProfileObjectPermissions', () => {
   })
 
   it('should use API name for standard objects in objectRef', async () => {
-    // 1. PermissionSetId
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ records: [{ Id: '0PS001' }], done: true })
-    })
-    // 2. ObjectPermissions with standard object only
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [{
-          Id: 'op001',
-          SobjectType: 'Account',
-          PermissionsCreate: true,
-          PermissionsRead: true,
-          PermissionsEdit: true,
-          PermissionsDelete: false,
-          PermissionsViewAllRecords: false,
-          PermissionsModifyAllRecords: false
-        }],
-        done: true
-      })
+    mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
+    mockSfRest.mockResolvedValueOnce({
+      records: [{
+        Id: 'op001',
+        SobjectType: 'Account',
+        PermissionsCreate: true,
+        PermissionsRead: true,
+        PermissionsEdit: true,
+        PermissionsDelete: false,
+        PermissionsViewAllRecords: false,
+        PermissionsModifyAllRecords: false
+      }],
+      done: true
     })
 
     const results = await queryProfileObjectPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
@@ -343,34 +319,23 @@ describe('queryProfileObjectPermissions', () => {
 describe('queryProfileFieldPermissions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
   it('should return SearchResult[] with type FieldPermission', async () => {
-    // First call: get PermissionSetId
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [{ Id: '0PS001' }],
-        done: true
-      })
-    })
-    // Second call: get FieldPermissions
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({
-        records: [
-          {
-            Id: 'fp001',
-            SobjectType: 'Account',
-            Field: 'Account.Industry',
-            PermissionsRead: true,
-            PermissionsEdit: false
-          }
-        ],
-        done: true
-      })
+    mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
+    mockSfRest.mockResolvedValueOnce({
+      records: [
+        {
+          Id: 'fp001',
+          SobjectType: 'Account',
+          Field: 'Account.Industry',
+          PermissionsRead: true,
+          PermissionsEdit: false
+        }
+      ],
+      done: true
     })
 
     const results = await queryProfileFieldPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
@@ -381,47 +346,22 @@ describe('queryProfileFieldPermissions', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileFieldPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
 
   it('should return empty array when no PermissionSet found', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ records: [], done: true })
-    })
+    mockSfRest.mockResolvedValueOnce({ records: [], done: true })
     const results = await queryProfileFieldPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
 })
 
-// Helper: mock PermissionSetId + SetupEntityAccess + detail query (3 fetch calls)
-function mockSetupEntityAccessFlow(detailRecords: any[]) {
-  // 1. PermissionSetId query
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve({ records: [{ Id: '0PS001' }], done: true })
-  })
-  // 2. SetupEntityAccess query
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve({
-      records: detailRecords.map((r: any) => ({ SetupEntityId: r.Id })),
-      done: true
-    })
-  })
-  // 3. Detail query
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    json: () => Promise.resolve({ records: detailRecords, done: true })
-  })
-}
-
 describe('queryProfileCustomPermissions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
@@ -438,21 +378,15 @@ describe('queryProfileCustomPermissions', () => {
   })
 
   it('should return empty array when no custom permissions', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ records: [{ Id: '0PS001' }], done: true })
-    })
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ records: [], done: true })
-    })
+    mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
+    mockSfRest.mockResolvedValueOnce({ records: [], done: true })
 
     const results = await queryProfileCustomPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileCustomPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
@@ -461,7 +395,7 @@ describe('queryProfileCustomPermissions', () => {
 describe('queryProfileApexClassAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
@@ -487,16 +421,13 @@ describe('queryProfileApexClassAccess', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileApexClassAccess('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
 
   it('should return empty array when no PermissionSet found', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ records: [], done: true })
-    })
+    mockSfRest.mockResolvedValueOnce({ records: [], done: true })
     const results = await queryProfileApexClassAccess('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
@@ -505,7 +436,7 @@ describe('queryProfileApexClassAccess', () => {
 describe('queryProfileVFPageAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
@@ -521,7 +452,7 @@ describe('queryProfileVFPageAccess', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileVFPageAccess('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
@@ -530,7 +461,7 @@ describe('queryProfileVFPageAccess', () => {
 describe('queryProfileConnectedApps', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
@@ -546,7 +477,7 @@ describe('queryProfileConnectedApps', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileConnectedApps('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
@@ -555,7 +486,7 @@ describe('queryProfileConnectedApps', () => {
 describe('queryProfileAssignedApps', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetch.mockReset()
+    mockSfRest.mockReset()
     clearPermissionSetIdCache()
   })
 
@@ -581,7 +512,7 @@ describe('queryProfileAssignedApps', () => {
   })
 
   it('should return empty array on error', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Network error'))
+    mockSfRest.mockRejectedValueOnce(new Error('Network error'))
     const results = await queryProfileAssignedApps('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toEqual([])
   })
