@@ -457,7 +457,7 @@ describe('UltraForceWindowManager', () => {
       expect(info).toHaveProperty('state')
       expect(info).toHaveProperty('hasContainer')
       expect(info).toHaveProperty('hasReactRoot')
-      expect(info).toHaveProperty('eventHandlers')
+      expect(info).toHaveProperty('eventEmitter')
       expect(info).toHaveProperty('cleanupFunctions')
     })
 
@@ -476,12 +476,12 @@ describe('UltraForceWindowManager', () => {
       expect(info.hasContainer).toBe(true)
     })
 
-    it('should report event handler count', async () => {
+    it('should report event emitter type', async () => {
       const instance = await UltraForceWindowManager.getInstance()
       instance.on('custom-event', vi.fn())
 
       const info = instance.getDebugInfo() as Record<string, any>
-      expect(info.eventHandlers).toContain('custom-event')
+      expect(info.eventEmitter).toBe('TypedEventEmitter')
     })
   })
 
@@ -515,7 +515,7 @@ describe('UltraForceWindowManager', () => {
       await instance.destroy()
 
       const info = instance.getDebugInfo() as Record<string, any>
-      expect(info.eventHandlers).toHaveLength(0)
+      expect(info.eventEmitter).toBe('TypedEventEmitter')
     })
 
     it('should reset state to defaults', async () => {
