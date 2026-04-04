@@ -1,5 +1,6 @@
 import type { PlasmoCSConfig } from 'plasmo'
 import { logger } from '~lib/logger'
+import { STORAGE_KEYS, storageGet, type SearchSettings } from '~lib/storage-service'
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -29,8 +30,8 @@ class SetupEnhancer {
   private async initialize(): Promise<void> {
     // Load settings
     try {
-      const result = await chrome.storage.local.get(['ultraforce_search_settings'])
-      if (result.ultraforce_search_settings?.autoLoadFields === false) {
+      const settings = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
+      if (settings?.autoLoadFields === false) {
         this.enabled = false
         return
       }

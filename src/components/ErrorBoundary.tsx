@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo } from 'react'
 import { logger } from '~lib/logger'
+import { STORAGE_KEYS, storageGet, storageSet, type ErrorLogEntry } from '~lib/storage-service'
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -75,14 +76,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         userAgent: navigator.userAgent
       }
       
-      // Get existing error logs
-      const result = await chrome.storage.local.get(['ultraforce_error_logs'])
-      const existingLogs = result.ultraforce_error_logs || []
-      
-      // Add new error log (keep only last 10)
+      const existingLogs = await storageGet<ErrorLogEntry[]>(STORAGE_KEYS.ERROR_LOGS) || []
       const updatedLogs = [...existingLogs, errorLog].slice(-10)
-      
-      await chrome.storage.local.set({ ultraforce_error_logs: updatedLogs })
+      await storageSet(STORAGE_KEYS.ERROR_LOGS, updatedLogs)
       
     } catch (storageError) {
       logger.error('Failed to log error to storage:', storageError)

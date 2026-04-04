@@ -1,4 +1,5 @@
 import { logger } from './logger'
+import { metadataCacheKey as buildCacheKey, storageGet, storageSet, storageRemove, storageGetAll } from './storage-service'
 
 const CACHE_CONFIG = {
   TTL: 24 * 60 * 60 * 1000,
@@ -17,7 +18,7 @@ interface CacheItem {
 }
 
 function getCacheKey(orgId: string, metadataType: string): string {
-  return `metadata_${orgId}_${metadataType}`
+  return buildCacheKey(orgId, metadataType)
 }
 
 function generateDataHash(data: Record<string, unknown>[]): string {
@@ -47,8 +48,7 @@ export class MetadataCache {
   async get(orgId: string, metadataType: string): Promise<Record<string, unknown>[] | null> {
     try {
       const key = getCacheKey(orgId, metadataType)
-      const result = await chrome.storage.local.get(key)
-      const cacheItem: CacheItem | undefined = result[key]
+      const cacheItem = await storageGet<CacheItem>(key)
 
       if (!cacheItem) return null
 
@@ -93,15 +93,13 @@ export class MetadataCache {
         hash: generateDataHash(data)
       }
 
-      await chrome.storage.local.set({ [key]: cacheItem })
+      await storageSet(key, cacheItem)
       await this.cleanupIfNeeded()
     } catch (error: unknown) {
-      // Handle quota exceeded error
       const errorMessage = error instanceof Error ? error.message : String(error)
       if (errorMessage.includes('quota') || errorMessage.includes('QUOTA')) {
         logger.warn('cache:quota-exceeded', { orgId, metadataType })
         await this.cleanupForQuota()
-        // Retry once after cleanup
         try {
           const key = getCacheKey(orgId, metadataType)
           const cacheData = metadataType === 'CustomLabel'
@@ -115,7 +113,7 @@ export class MetadataCache {
             metadataType,
             hash: generateDataHash(data)
           }
-          await chrome.storage.local.set({ [key]: cacheItem })
+          await storageSet(key, cacheItem)
         } catch (retryError) {
           logger.error('cache:set-retry-failed', { orgId, metadataType, error: retryError })
         }
@@ -133,7 +131,7 @@ export class MetadataCache {
       const entriesToRemove = sortedEntries.slice(0, Math.ceil(sortedEntries.length / 2))
 
       for (const entry of entriesToRemove) {
-        await chrome.storage.local.remove(entry.key)
+        await storageRemove(entry.key)
       }
       logger.debug('cache:quota-cleanup', { removed: entriesToRemove.length })
     } catch (error) {
@@ -143,7 +141,7 @@ export class MetadataCache {
 
   async delete(orgId: string, metadataType: string): Promise<void> {
     try {
-      await chrome.storage.local.remove(getCacheKey(orgId, metadataType))
+      await storageRemove(getCacheKey(orgId, metadataType))
     } catch (error) {
       logger.error('cache:delete', { orgId, metadataType, error })
     }
@@ -151,10 +149,10 @@ export class MetadataCache {
 
   async clear(): Promise<void> {
     try {
-      const result = await chrome.storage.local.get(null)
+      const result = await storageGetAll()
       const keysToRemove = Object.keys(result).filter((key) => key.startsWith('metadata_'))
       if (keysToRemove.length > 0) {
-        await chrome.storage.local.remove(keysToRemove)
+        await storageRemove(keysToRemove)
       }
     } catch (error) {
       logger.error('cache:clear', { error })
@@ -174,7 +172,7 @@ export class MetadataCache {
     }>
   }> {
     try {
-      const result = await chrome.storage.local.get(null)
+      const result = await storageGetAll()
       const cacheEntries = Object.entries(result)
         .filter(([key]) => key.startsWith('metadata_'))
         .map(([key, value]) => {
@@ -230,7 +228,7 @@ export class MetadataCache {
 
       for (const entry of sortedEntries) {
         if (currentSize <= CACHE_CONFIG.MAX_CACHE_SIZE * 0.8) break
-        await chrome.storage.local.remove(entry.key)
+        await storageRemove(entry.key)
         currentSize -= entry.size
       }
     } catch (error) {

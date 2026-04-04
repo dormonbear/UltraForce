@@ -35,7 +35,7 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 
 - [ ] **STAT-01**: Zustand stores replace WindowManager singleton state (search store, settings store, session store)
 - [ ] **STAT-02**: Centralized storage service replaces scattered chrome.storage.local calls across all modules
-- [ ] **STAT-03**: sfRest is generic typed: `sfRest<T = unknown>()` instead of `Promise<any>`
+- [x] **STAT-03**: sfRest is generic typed: `sfRest<T = unknown>()` instead of `Promise<any>` (completed in Phase 02-03)
 
 ### Type Safety
 
@@ -99,7 +99,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-07 | Phase 4 | Pending |
 | STAT-01 | Phase 3 | Pending |
 | STAT-02 | Phase 3 | Pending |
-| STAT-03 | Phase 3 | Pending |
+| STAT-03 | Phase 2 | Complete |
 | TYPE-01 | Phase 2 | Complete |
 | TYPE-02 | Phase 2 | Complete |
 | TYPE-03 | Phase 2 | Complete |
