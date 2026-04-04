@@ -10,7 +10,7 @@ Requirements for Milestone 1. Each maps to roadmap phases.
 ### Foundation
 
 - [ ] **FOUN-01**: All 6 TypeScript compilation errors are resolved and `tsc --noEmit` passes cleanly
-- [ ] **FOUN-02**: @vitest/coverage-v8 is installed and configured with 80% threshold enforcement
+- [ ] **FOUN-02**: @vitest/coverage-v8 is installed and configured to report coverage (threshold enforcement deferred per D-07 decision)
 - [ ] **FOUN-03**: ESLint `no-explicit-any` rule is enabled as warning across the codebase
 - [ ] **FOUN-04**: vitest-chrome is installed and replaces hand-rolled Chrome API mocks in test-setup.ts
 

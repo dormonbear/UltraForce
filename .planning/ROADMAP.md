@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Requirements**: FOUN-01, FOUN-02, FOUN-03, FOUN-04, TEST-01
 **Success Criteria** (what must be TRUE):
   1. `tsc --noEmit` passes with zero errors
-  2. `vitest run --coverage` reports coverage percentages and enforces 80% threshold (current code may be below, but the gate exists)
+  2. `vitest run --coverage` reports coverage percentages (threshold enforcement deferred to later phase per D-07)
   3. ESLint warns on `any` usage across the codebase (no build failures, just warnings)
   4. Characterization tests exist for window-manager.ts and salesforce-api.ts that document current behavior
 **Plans:** 2 plans
