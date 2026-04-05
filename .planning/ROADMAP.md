@@ -63,8 +63,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Centralized storage service + migrate non-settings call sites (api-stats, version-check, unsupported-types, error-boundary, metadata-cache)
-- [ ] 03-02-PLAN.md -- Zustand stores (settings, session, search) + update SearchModal/WM consumers
+- [x] 03-01-PLAN.md -- Centralized storage service + migrate non-settings call sites (api-stats, version-check, unsupported-types, error-boundary, metadata-cache)
+- [x] 03-02-PLAN.md -- Zustand stores (settings, session, search) + update SearchModal/WM consumers
 
 ### Phase 4: Cleanup & Coverage
 **Goal**: Technical debt artifacts are removed and the codebase meets the 80% coverage target with comprehensive E2E test coverage
@@ -79,8 +79,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [x] 04-01-PLAN.md -- CSS migration (styles.ts -> styles.css via data-text:) + Inter font bundling (local woff2)
+- [x] 04-02-PLAN.md -- Coverage improvement: 48.63% -> 72.64% (+187 tests), all lib files tested, ErrorBoundary tested
 
 ## Progress
 
@@ -91,5 +91,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Foundation & Safety Net | 2/2 | Complete | 2026-04-04 |
 | 2. Module Extraction & Type Safety | 4/4 | Complete | 2026-04-04 |
-| 3. State Migration | 0/2 | Not started | - |
-| 4. Cleanup & Coverage | 0/2 | Not started | - |
+| 3. State Migration | 2/2 | Complete | 2026-04-04 |
+| 4. Cleanup & Coverage | 2/2 | Complete | 2026-04-04 |

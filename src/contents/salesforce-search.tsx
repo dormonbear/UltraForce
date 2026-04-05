@@ -3,7 +3,7 @@ import UltraForceWindowManager from '~lib/window-manager'
 import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermissions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
-import { STORAGE_KEYS, storageGet, onStorageChanged, offStorageChanged, type SearchSettings } from '~lib/storage-service'
+import { useSettingsStore } from '~stores/settings-store'
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -39,9 +39,8 @@ export const config: PlasmoCSConfig = {
  */
 class UltraForceContentScript {
   private windowManager: UltraForceWindowManager | null = null
-  private shortcutKey: string = 'b'
   private keyboardHandler: ((event: KeyboardEvent) => void) | null = null
-  private storageListener: ((changes: any) => void) | null = null
+  private storeUnsub: (() => void) | null = null
   private messageListener: ((request: any, sender: any, sendResponse: any) => void) | null = null
   private isInitialized = false
 
@@ -51,7 +50,6 @@ class UltraForceContentScript {
 
   private async initialize(): Promise<void> {
     try {
-      // Check API availability first (before WindowManager tries to call APIs)
       await this.initializeSession()
 
       this.windowManager = await UltraForceWindowManager.getInstance({
@@ -59,9 +57,8 @@ class UltraForceContentScript {
         useShadowDOM: true
       })
 
-      await this.loadShortcutSettings()
       this.setupKeyboardShortcuts()
-      this.setupStorageListener()
+      this.setupStoreSubscription()
       this.setupMessageListener()
 
       this.isInitialized = true
@@ -71,15 +68,8 @@ class UltraForceContentScript {
     }
   }
 
-  private async loadShortcutSettings(): Promise<void> {
-    try {
-      const settings = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
-      if (settings?.shortcutKey) {
-        this.shortcutKey = settings.shortcutKey
-      }
-    } catch (error) {
-      logger.error('Failed to load shortcut settings:', error)
-    }
+  private getShortcutKey(): string {
+    return useSettingsStore.getState().shortcutKey
   }
 
   private setupKeyboardShortcuts(): void {
@@ -88,7 +78,8 @@ class UltraForceContentScript {
     }
 
     this.keyboardHandler = (event: KeyboardEvent) => {
-      // ESC to close modal (only when modal is visible)
+      const shortcutKey = this.getShortcutKey()
+
       if (event.key === 'Escape') {
         if (this.windowManager?.isVisible()) {
           event.preventDefault()
@@ -96,8 +87,7 @@ class UltraForceContentScript {
           this.windowManager?.hide()
           return
         }
-        // ESC to open modal (if configured)
-        if (this.shortcutKey.toLowerCase() === 'escape') {
+        if (shortcutKey.toLowerCase() === 'escape') {
           event.preventDefault()
           event.stopPropagation()
           this.toggleModal()
@@ -105,9 +95,8 @@ class UltraForceContentScript {
         }
       }
 
-      // Alt + key shortcuts (e.g., alt+b, alt+s)
-      if (this.shortcutKey.startsWith('alt+')) {
-        const key = this.shortcutKey.slice(4)
+      if (shortcutKey.startsWith('alt+')) {
+        const key = shortcutKey.slice(4)
         if (event.altKey && event.key.toLowerCase() === key) {
           event.preventDefault()
           event.stopPropagation()
@@ -116,10 +105,9 @@ class UltraForceContentScript {
         }
       }
 
-      // Ctrl/Cmd + shortcutKey to toggle modal
       if (
         (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === this.shortcutKey.toLowerCase()
+        event.key.toLowerCase() === shortcutKey.toLowerCase()
       ) {
         event.preventDefault()
         event.stopPropagation()
@@ -131,18 +119,15 @@ class UltraForceContentScript {
     document.addEventListener('keydown', this.keyboardHandler, { capture: true, passive: false })
   }
 
-  private setupStorageListener(): void {
-    this.storageListener = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[STORAGE_KEYS.SEARCH_SETTINGS]?.newValue) {
-        const newSettings = changes[STORAGE_KEYS.SEARCH_SETTINGS].newValue as SearchSettings
-        if (newSettings.shortcutKey && newSettings.shortcutKey !== this.shortcutKey) {
-          this.shortcutKey = newSettings.shortcutKey
-          this.setupKeyboardShortcuts()
-        }
+  /** Re-register keyboard shortcuts when shortcutKey changes in settings store. */
+  private setupStoreSubscription(): void {
+    let prevKey = this.getShortcutKey()
+    this.storeUnsub = useSettingsStore.subscribe((state) => {
+      if (state.shortcutKey !== prevKey) {
+        prevKey = state.shortcutKey
+        this.setupKeyboardShortcuts()
       }
-    }
-
-    onStorageChanged(this.storageListener)
+    })
   }
 
   private setupMessageListener(): void {
@@ -213,7 +198,6 @@ class UltraForceContentScript {
           )
         }, 2000)
       } else {
-        // API access denied - check and cache permissions
         checkMetadataPermissions(sfHost).catch(() => {})
       }
     } catch (error) {
@@ -223,9 +207,10 @@ class UltraForceContentScript {
 
   private setupMinimalFallback(): void {
     const fallbackHandler = (event: KeyboardEvent) => {
+      const shortcutKey = this.getShortcutKey()
       if (
         (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === this.shortcutKey.toLowerCase()
+        event.key.toLowerCase() === shortcutKey.toLowerCase()
       ) {
         event.preventDefault()
         logger.warn('WindowManager not available, please reload the page')
@@ -242,9 +227,9 @@ class UltraForceContentScript {
         this.keyboardHandler = null
       }
 
-      if (this.storageListener) {
-        offStorageChanged(this.storageListener)
-        this.storageListener = null
+      if (this.storeUnsub) {
+        this.storeUnsub()
+        this.storeUnsub = null
       }
 
       if (this.messageListener) {
@@ -266,7 +251,7 @@ class UltraForceContentScript {
   public getDebugInfo(): object {
     return {
       isInitialized: this.isInitialized,
-      shortcutKey: this.shortcutKey,
+      shortcutKey: this.getShortcutKey(),
       hasWindowManager: !!this.windowManager,
       windowManagerDebug: this.windowManager?.getDebugInfo()
     }

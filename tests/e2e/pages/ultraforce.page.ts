@@ -69,18 +69,17 @@ export class UltraForcePage {
     command: string,
     waitMs: number = 3000
   ): Promise<{ opened: boolean; url: string }> {
-    const pagesBefore = this.context.pages().length
     await this.openModal()
     await this.clearAndType(command)
     await this.page.waitForTimeout(waitMs)
 
-    // First result is already selected (selectedIndex=0), just press Enter
+    // Listen for new page event before pressing Enter
+    const newPagePromise = this.context.waitForEvent('page', { timeout: 5000 }).catch(() => null)
     await this.page.keyboard.press('Enter')
-    await this.page.waitForTimeout(3000)
 
-    const pagesAfter = this.context.pages().length
-    if (pagesAfter > pagesBefore) {
-      const newPage = this.context.pages()[pagesAfter - 1]
+    const newPage = await newPagePromise
+    if (newPage) {
+      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
       const url = newPage.url()
       await newPage.close()
       return { opened: true, url }
@@ -91,8 +90,28 @@ export class UltraForcePage {
   /**
    * Navigate to a setup shortcut and return the new tab URL.
    */
-  async navigateSetupShortcut(shortcutName: string): Promise<{ opened: boolean; url: string }> {
-    return this.searchAndNavigateNewTab(`:g ${shortcutName}`)
+  async navigateSetupShortcut(
+    shortcutName: string,
+    waitMs: number = 3000
+  ): Promise<{ opened: boolean; url: string }> {
+    return this.searchAndNavigateNewTab(`:g ${shortcutName}`, waitMs)
+  }
+
+  /** Ensure the modal is closed, regardless of current state */
+  async ensureModalClosed() {
+    const isOpen = await this.isShieldActive()
+    if (isOpen) {
+      await this.page.keyboard.press('Escape')
+      await this.page.waitForTimeout(500)
+    }
+  }
+
+  /** Close any extra tabs beyond the main page tab, keeping only the first two (default + main) */
+  async closeExtraTabs() {
+    const pages = this.context.pages()
+    for (let i = pages.length - 1; i >= 2; i--) {
+      await pages[i].close()
+    }
   }
 
   /** Wait helper */
@@ -117,15 +136,19 @@ export class UltraForcePage {
   async tabThenNavigateNewTab(
     waitAfterTab: number = 3000
   ): Promise<{ opened: boolean; url: string }> {
-    const pagesBefore = this.context.pages().length
     await this.page.keyboard.press('Tab')
     await this.page.waitForTimeout(waitAfterTab)
-    await this.page.keyboard.press('Enter')
-    await this.page.waitForTimeout(3000)
+    return this.pressEnterAndWaitForNewTab()
+  }
 
-    const pagesAfter = this.context.pages().length
-    if (pagesAfter > pagesBefore) {
-      const newPage = this.context.pages()[pagesAfter - 1]
+  /** Press Enter on the currently selected result and wait for a new tab to open */
+  async pressEnterAndWaitForNewTab(): Promise<{ opened: boolean; url: string }> {
+    const newPagePromise = this.context.waitForEvent('page', { timeout: 5000 }).catch(() => null)
+    await this.page.keyboard.press('Enter')
+
+    const newPage = await newPagePromise
+    if (newPage) {
+      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
       const url = newPage.url()
       await newPage.close()
       return { opened: true, url }

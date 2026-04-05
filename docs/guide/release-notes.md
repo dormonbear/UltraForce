@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.1.2
+
+Release Date: 2026-04-05
+
+### Improvements
+
+- **Performance & Stability**: Internal architecture improvements for faster and more reliable search
+- **Font Rendering**: Bundled Inter font locally for consistent UI appearance without external requests
+
 ## v0.1.1
 
 Release Date: 2026-02-07

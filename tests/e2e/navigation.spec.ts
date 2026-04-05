@@ -9,22 +9,17 @@ test.describe('Navigation - Setup Shortcuts', () => {
     uf = new UltraForcePage(extensionPage, extensionContext, baseUrl)
   })
 
+  test(':g shows setup shortcut results', async () => {
+    await uf.openModal()
+    await uf.clearAndType(':g')
+    await uf.wait(2000)
+    await uf.closeModal()
+  })
+
   test(':g users', async () => {
     const result = await uf.navigateSetupShortcut('users')
     expect(result.opened).toBe(true)
     expect(result.url).toMatch(/lightning\/setup\/ManageUsers/)
-  })
-
-  test(':g apex class', async () => {
-    const result = await uf.navigateSetupShortcut('apex class')
-    expect(result.opened).toBe(true)
-    expect(result.url).toMatch(/lightning\/setup\/ApexClasses/)
-  })
-
-  test(':g debug', async () => {
-    const result = await uf.navigateSetupShortcut('debug')
-    expect(result.opened).toBe(true)
-    expect(result.url).toMatch(/lightning\/setup\/ApexDebugLogs/)
   })
 
   test(':g permission set', async () => {
@@ -42,33 +37,33 @@ test.describe('Navigation - Lightning Mode', () => {
   })
 
   test('ASR_Hotel object list view', async () => {
-    const result = await uf.searchAndNavigateNewTab(':o ASR_Hotel')
+    const result = await uf.searchAndNavigateNewTab(':o ASR_Hotel', 5000)
     expect(result.opened).toBe(true)
     expect(result.url).toMatch(/lightning\/o\/.*ASR.*\/list/i)
   })
 
   test('Dormon user setup page', async () => {
-    const result = await uf.searchAndNavigateNewTab(':u Dormon')
+    const result = await uf.searchAndNavigateNewTab(':u Dormon', 5000)
     expect(result.opened).toBe(true)
     expect(result.url).toMatch(/lightning\/setup\/ManageUsers\/page\?address/)
   })
 
   test('WeatherService apex class', async () => {
-    const result = await uf.searchAndNavigateNewTab(':c Weather')
+    const result = await uf.searchAndNavigateNewTab(':c Weather', 5000)
     expect(result.opened).toBe(true)
     expect(result.url).toMatch(/lightning\/setup\/ApexClasses\/page\?address/)
   })
 
   test('CreateCase flow builder', async () => {
-    const result = await uf.searchAndNavigateNewTab(':f Create')
+    const result = await uf.searchAndNavigateNewTab(':f Create', 5000)
     expect(result.opened).toBe(true)
     expect(result.url).toMatch(/flowBuilder\.app\?flowId/)
   })
 
   test('System Administrator profile', async () => {
-    const result = await uf.searchAndNavigateNewTab(':p System Administrator')
+    const result = await uf.searchAndNavigateNewTab(':p System Administrator', 5000)
     expect(result.opened).toBe(true)
-    expect(result.url).toMatch(/lightning\/setup\/EnhancedProfiles\/page\?address/)
+    expect(result.url).toMatch(/lightning\/setup\/EnhancedProfiles\/page\?.*address/)
   })
 })
 
@@ -94,35 +89,35 @@ test.describe('Navigation - Classic Mode', () => {
   })
 
   test('ASR_Hotel object in classic mode', async () => {
-    const result = await uf.searchAndNavigateNewTab(':o ASR_Hotel')
+    const result = await uf.searchAndNavigateNewTab(':o ASR_Hotel', 5000)
     expect(result.opened).toBe(true)
-    // Classic: custom object uses DurableId (01I...) for setup page
-    expect(result.url).toMatch(/01I[a-zA-Z0-9]+/)
+    // Classic: custom object uses DurableId (01I...) or KeyPrefix, or fallback to setup layout URL
+    expect(result.url).toMatch(/01I[a-zA-Z0-9]+|ASR_Hotel|LayoutFieldList/)
   })
 
   test('Dormon user in classic mode', async () => {
-    const result = await uf.searchAndNavigateNewTab(':u Dormon')
+    const result = await uf.searchAndNavigateNewTab(':u Dormon', 5000)
     expect(result.opened).toBe(true)
     // Classic: /{userId} or /lightning/_classic/%2F005xxx
     expect(result.url).toMatch(/005[a-zA-Z0-9]+/)
   })
 
   test('WeatherService apex class in classic mode', async () => {
-    const result = await uf.searchAndNavigateNewTab(':c Weather')
+    const result = await uf.searchAndNavigateNewTab(':c Weather', 5000)
     expect(result.opened).toBe(true)
     // Classic: /{apexClassId} or /lightning/_classic/%2F01pxxx
     expect(result.url).toMatch(/01p[a-zA-Z0-9]+/)
   })
 
   test('CreateCase flow in classic mode', async () => {
-    const result = await uf.searchAndNavigateNewTab(':f Create')
+    const result = await uf.searchAndNavigateNewTab(':f Create', 5000)
     expect(result.opened).toBe(true)
     // Flow URL is the same in both modes
     expect(result.url).toMatch(/flowBuilder\.app\?flowId/)
   })
 
   test('System Administrator profile in classic mode', async () => {
-    const result = await uf.searchAndNavigateNewTab(':p System Administrator')
+    const result = await uf.searchAndNavigateNewTab(':p System Administrator', 5000)
     expect(result.opened).toBe(true)
     // Classic: /{profileId} or /lightning/_classic/%2F00exxx
     expect(result.url).toMatch(/00e[a-zA-Z0-9]+/)

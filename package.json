@@ -1,6 +1,6 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
@@ -14,7 +14,10 @@
     "lint:fix": "eslint src --fix",
     "test": "vitest",
     "test:run": "vitest --run",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "release:patch": "node scripts/bump-version.mjs patch",
+    "release:minor": "node scripts/bump-version.mjs minor",
+    "release:major": "node scripts/bump-version.mjs major"
   },
   "keywords": [
     "salesforce",

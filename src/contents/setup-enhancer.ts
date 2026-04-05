@@ -1,6 +1,6 @@
 import type { PlasmoCSConfig } from 'plasmo'
 import { logger } from '~lib/logger'
-import { STORAGE_KEYS, storageGet, type SearchSettings } from '~lib/storage-service'
+import { useSettingsStore } from '~stores/settings-store'
 
 export const config: PlasmoCSConfig = {
   matches: [
@@ -28,28 +28,19 @@ class SetupEnhancer {
   }
 
   private async initialize(): Promise<void> {
-    // Load settings
-    try {
-      const settings = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
-      if (settings?.autoLoadFields === false) {
-        this.enabled = false
-        return
-      }
-    } catch {
-      // Use default (enabled)
+    const { autoLoadFields } = useSettingsStore.getState()
+    if (autoLoadFields === false) {
+      this.enabled = false
+      return
     }
 
-    // Watch for URL changes (SPA navigation)
     this.setupUrlWatcher()
-
-    // Check current page
     this.checkAndEnhancePage()
   }
 
   private setupUrlWatcher(): void {
     let lastUrl = location.href
 
-    // Watch for URL changes
     const urlObserver = new MutationObserver(() => {
       if (location.href !== lastUrl) {
         lastUrl = location.href
@@ -60,7 +51,6 @@ class SetupEnhancer {
 
     urlObserver.observe(document.body, { childList: true, subtree: true })
 
-    // Also listen for popstate
     window.addEventListener('popstate', () => {
       this.stopAutoScroll()
       setTimeout(() => this.checkAndEnhancePage(), 1000)
@@ -68,8 +58,6 @@ class SetupEnhancer {
   }
 
   private getUrlKey(): string {
-    // Normalize URL to prevent duplicate processing
-    // Remove hash and some dynamic query params
     const url = new URL(location.href)
     return `${url.origin}${url.pathname}`
   }
@@ -80,13 +68,11 @@ class SetupEnhancer {
     const url = location.href
     const urlKey = this.getUrlKey()
 
-    // Skip if already processed this page
     if (this.completedUrls.has(urlKey)) {
       logger.debug('Page already processed, skipping auto-load')
       return
     }
 
-    // Fields & Relationships page
     if (url.includes('/FieldsAndRelationships/view')) {
       logger.debug('Detected Fields & Relationships page, starting auto-load...')
       setTimeout(() => this.autoLoadAllContent(urlKey), 2000)
@@ -97,11 +83,9 @@ class SetupEnhancer {
     if (this.isLoading) return
     this.isLoading = true
 
-    // Mark as completed immediately to prevent re-triggering
     this.completedUrls.add(urlKey)
 
     try {
-      // Find the scrollable container
       const scrollContainer = this.findScrollContainer()
       if (!scrollContainer) {
         logger.debug('Scroll container not found')
@@ -111,22 +95,18 @@ class SetupEnhancer {
 
       let previousHeight = 0
       let sameHeightCount = 0
-      const maxAttempts = 50 // Safety limit
+      const maxAttempts = 50
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        // Scroll to bottom
         scrollContainer.scrollTop = scrollContainer.scrollHeight
 
-        // Wait for content to load
         await this.wait(500)
 
         const currentHeight = scrollContainer.scrollHeight
 
-        // Check if new content was loaded
         if (currentHeight === previousHeight) {
           sameHeightCount++
           if (sameHeightCount >= 3) {
-            // No new content after 3 attempts, we're done
             logger.debug(`Auto-load complete after ${attempt + 1} scroll attempts`)
             break
           }
@@ -136,14 +116,11 @@ class SetupEnhancer {
         }
       }
 
-      // Scroll back to top
       scrollContainer.scrollTop = 0
 
-      // Disable Salesforce's infinite scroll to prevent duplicate loading
       this.disableInfiniteScroll(scrollContainer)
     } catch (error) {
       logger.error('Auto-load error:', error)
-      // Remove from completed on error so it can retry
       this.completedUrls.delete(urlKey)
     } finally {
       this.isLoading = false
@@ -151,10 +128,8 @@ class SetupEnhancer {
   }
 
   private disableInfiniteScroll(scrollContainer: HTMLElement): void {
-    // Watch for duplicate items and remove them
     const seenIds = new Set<string>()
 
-    // First pass: collect all existing item IDs
     const collectIds = () => {
       const rows = scrollContainer.querySelectorAll('tr[data-row-key-value], [data-row-key-value]')
       rows.forEach(row => {
@@ -166,7 +141,6 @@ class SetupEnhancer {
     collectIds()
     logger.debug(`Tracking ${seenIds.size} unique items`)
 
-    // Watch for new items being added and remove duplicates
     const duplicateObserver = new MutationObserver((mutations) => {
       let removedCount = 0
       mutations.forEach(mutation => {
@@ -181,7 +155,6 @@ class SetupEnhancer {
                 const id = row.getAttribute('data-row-key-value')
                 if (id) {
                   if (seenIds.has(id)) {
-                    // Duplicate found, remove it
                     row.remove()
                     removedCount++
                   } else {
@@ -203,20 +176,16 @@ class SetupEnhancer {
       subtree: true
     })
 
-    // Store observer for cleanup
     this.observer = duplicateObserver
   }
 
   private findScrollContainer(): HTMLElement | null {
-    // Try to find the main content scrollable area
     const selectors = [
-      // Lightning Setup specific selectors
       '.viewport.scroller',
       '.slds-scrollable_y',
       '[data-aura-class="uiScroller"]',
       '.scroller.actionBody',
       '.oneContent .scroller',
-      // Generic scrollable containers
       'div[style*="overflow: auto"]',
       'div[style*="overflow-y: auto"]'
     ]
@@ -228,7 +197,6 @@ class SetupEnhancer {
       }
     }
 
-    // Fallback: find any scrollable element with significant content
     const allDivs = document.querySelectorAll('div')
     for (const div of allDivs) {
       const el = div as HTMLElement
@@ -242,7 +210,6 @@ class SetupEnhancer {
       }
     }
 
-    // Last resort: use window
     return document.documentElement
   }
 

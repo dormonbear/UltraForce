@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import type { SearchResult, CustomCommand, NavigationMode, RecordContext } from '~types'
+import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
@@ -8,11 +8,14 @@ import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
+import { getInterFontFaces } from '~lib/font-loader'
 import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { logger } from '~lib/logger'
-import { STORAGE_KEYS, storageGet, storageSet, type SearchSettings } from '~lib/storage-service'
+import { useSettingsStore } from '~stores/settings-store'
+import { useSessionStore } from '~stores/session-store'
+import { useSearchStore } from '~stores/search-store'
 import type { ObjectAction } from './ResultItem'
 
 // Salesforce ID validation: 15 or 18 alphanumeric characters
@@ -22,7 +25,6 @@ function isSalesforceId(str: string): boolean {
 }
 
 interface SearchModalProps {
-  isVisible: boolean
   onClose: () => void
   onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
   onCustomSearch?: (soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]) => void
@@ -30,24 +32,12 @@ interface SearchModalProps {
   onResultClick: (result: SearchResult) => void
   onIdNavigate?: (id: string) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
-  onClearResults?: () => void
-  searchResults: Record<string, SearchResult[]>
-  isLoading: boolean
-  sfHost: string | null
-  hasSession: boolean
-  navigationMode?: NavigationMode
-  onNavigationModeChange?: (mode: NavigationMode) => void
-  fuzzySearch?: boolean
-  onFuzzySearchChange?: (value: boolean) => void
-  searchError?: string | null
-  recordContext?: RecordContext | null
   onPageLayoutClick?: () => void
   onRecordTypeClick?: () => void
   onFieldsClick?: () => void
 }
 
 const SearchModal: React.FC<SearchModalProps> = ({
-  isVisible,
   onClose,
   onSearch,
   onCustomSearch,
@@ -55,130 +45,44 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onResultClick,
   onIdNavigate,
   onActionClick,
-  onClearResults,
-  searchResults,
-  isLoading,
-  sfHost,
-  hasSession,
-  navigationMode: externalNavMode,
-  onNavigationModeChange,
-  fuzzySearch: externalFuzzySearch,
-  onFuzzySearchChange,
-  searchError,
-  recordContext,
   onPageLayoutClick,
   onRecordTypeClick,
   onFieldsClick
 }) => {
+  // --- Store subscriptions ---
+  const {
+    selectedTypes,
+    shortcutKey,
+    closeOnNavigate,
+    autoLoadFields,
+    navigationMode,
+    fuzzySearch,
+    hideManagedPackage,
+    maxResultsPerType,
+    customCommands,
+    setSelectedTypes,
+    updateSettings,
+    setNavigationMode: storeSetNavMode,
+    setFuzzySearch: storeSetFuzzy,
+    setCustomCommands
+  } = useSettingsStore()
+
+  const { sfHost, hasSession } = useSessionStore()
+  const { isVisible, searchResults, isLoading, searchError, recordContext } = useSearchStore()
+  const clearResults = useSearchStore((s) => s.clearResults)
+
+  // --- Local UI state ---
   const [query, setQuery] = useState('')
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(['CustomObject', 'CustomField'])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
-  const [settingsLoaded, setSettingsLoaded] = useState(false)
-  const [shortcutKey, setShortcutKey] = useState<string>('b')
-  const [closeOnNavigate, setCloseOnNavigate] = useState<boolean>(true)
-  const [autoLoadFields, setAutoLoadFields] = useState<boolean>(true)
-  const [navigationMode, setNavigationMode] = useState<NavigationMode>(externalNavMode || 'auto')
-  const [fuzzySearch, setFuzzySearch] = useState<boolean>(externalFuzzySearch ?? true)
-  const [hideManagedPackage, setHideManagedPackage] = useState<boolean>(true)
-  const [maxResultsPerType, setMaxResultsPerType] = useState<number>(50)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [_visibleItemCount, setVisibleItemCount] = useState(0)
-  const [customCommands, setCustomCommands] = useState<Record<string, CustomCommand>>({})
   const [showCommandHints, setShowCommandHints] = useState(false)
   const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
   const [showUpdateNotification, setShowUpdateNotification] = useState(false)
   const [updateVersion, setUpdateVersion] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
-  const isInitialMount = useRef(true)
-
-  // Load settings
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const s = await storageGet<SearchSettings>(STORAGE_KEYS.SEARCH_SETTINGS)
-        if (s?.selectedTypes) {
-          const validGroups = [
-            ['ApexClass', 'ApexTrigger'],
-            ['ApexPage', 'ApexComponent'],
-            ['AuraDefinitionBundle', 'LightningComponentBundle'],
-            ['CustomObject', 'CustomField'],
-            ['Flow'],
-            ['CustomLabel'],
-            ['CustomMetadataType'],
-            ['CustomSetting'],
-            ['PermissionSet'],
-            ['Profile']
-          ]
-          const loadedTypes = s.selectedTypes as string[]
-          const cleanedTypes = loadedTypes.filter((type) => {
-            const group = validGroups.find((g) => g.includes(type))
-            if (!group) return false
-            if (group.length === 1) return true
-            return group.every((t) => loadedTypes.includes(t))
-          })
-          setSelectedTypes(cleanedTypes.length > 0 ? cleanedTypes : ['CustomObject', 'CustomField'])
-        }
-        if (s?.shortcutKey) setShortcutKey(s.shortcutKey)
-        if (s?.closeOnNavigate !== undefined) setCloseOnNavigate(s.closeOnNavigate)
-        if (s?.autoLoadFields !== undefined) setAutoLoadFields(s.autoLoadFields)
-        if (s?.navigationMode) setNavigationMode(s.navigationMode)
-        if (s?.fuzzySearch !== undefined) setFuzzySearch(s.fuzzySearch)
-        if (s?.hideManagedPackage !== undefined) setHideManagedPackage(s.hideManagedPackage)
-        if (s?.maxResultsPerType !== undefined) setMaxResultsPerType(s.maxResultsPerType)
-        if (s?.customCommands) setCustomCommands(s.customCommands)
-        setSettingsLoaded(true)
-      } catch (error) {
-        logger.error('settings:load:failed', error)
-        setSettingsLoaded(true)
-      }
-    }
-    loadSettings()
-  }, [])
-
-  // Save settings (skip initial mount to avoid overwriting loaded settings)
-  useEffect(() => {
-    if (!settingsLoaded) return
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-      return
-    }
-
-    const saveSettings = async () => {
-      try {
-        const settings = {
-          selectedTypes,
-          shortcutKey,
-          closeOnNavigate,
-          autoLoadFields,
-          navigationMode,
-          fuzzySearch,
-          hideManagedPackage,
-          maxResultsPerType,
-          customCommands,
-          lastUpdated: Date.now()
-        }
-        await storageSet(STORAGE_KEYS.SEARCH_SETTINGS, settings)
-      } catch (error) {
-        logger.error('settings:save:failed', error)
-      }
-    }
-
-    saveSettings()
-  }, [selectedTypes, shortcutKey, closeOnNavigate, autoLoadFields, navigationMode, fuzzySearch, hideManagedPackage, maxResultsPerType, customCommands, settingsLoaded])
-
-  // Notify parent when navigationMode changes
-  const handleNavigationModeChange = (mode: NavigationMode) => {
-    setNavigationMode(mode)
-    onNavigationModeChange?.(mode)
-  }
-
-  // Notify parent when fuzzySearch changes
-  const handleFuzzySearchChange = (value: boolean) => {
-    setFuzzySearch(value)
-    onFuzzySearchChange?.(value)
-  }
 
   // Focus management
   useEffect(() => {
@@ -240,10 +144,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
     if (currentKey !== prevCommandKeyRef.current) {
       prevCommandKeyRef.current = currentKey
       if (currentKey !== null) {
-        onClearResults?.()
+        clearResults()
       }
     }
-  }, [parsedCommand.isCommand, parsedCommand.commandKey, onClearResults])
+  }, [parsedCommand.isCommand, parsedCommand.commandKey, clearResults])
 
   const onCustomSearchRef = React.useRef(onCustomSearch)
   useEffect(() => {
@@ -279,11 +183,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return () => clearTimeout(debounceTimer)
     }
 
-    // Wait for settings to be loaded before normal search (to respect user's selected types)
-    if (!settingsLoaded) {
-      return
-    }
-
     // Builtin command or normal search
     const searchTypes = parsedCommand.types || selectedTypes
     if (searchTypes.length === 0) {
@@ -295,7 +194,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsLoaded])
+  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -396,7 +295,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
         if (isInRecordActionsMode && recordActions[selectedRecordActionIndex]) {
           recordActions[selectedRecordActionIndex].handler()
         } else if (isSalesforceId(query) && onIdNavigate) {
-          // Check if query is a Salesforce ID - navigate directly
           onIdNavigate(query.trim())
         } else if (visibleResults[selectedIndex]) {
           onResultClick(visibleResults[selectedIndex])
@@ -419,11 +317,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
             }
           } else if (selectedResult.type === 'CustomMetadataType') {
             if (selectedResult.metadata?._isTypeDefinition) {
-              // Type definition: autocomplete to "Type__mdt." to search records
               const cmdtApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
               setQuery(`${prefix}${cmdtApiName}.`)
             } else {
-              // Record: autocomplete to "ParentType__mdt.RecordName"
               const parentType = selectedResult.metadata?._parentType
               const recordName = selectedResult.metadata?.DeveloperName || selectedResult.name
               if (parentType) {
@@ -432,11 +328,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
             }
           } else if (selectedResult.type === 'CustomSetting') {
             if (selectedResult.metadata?._isSettingDefinition) {
-              // Setting definition: autocomplete to "Setting__c." to search records
               const settingApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
               setQuery(`${prefix}${settingApiName}.`)
             } else {
-              // Record: autocomplete to "ParentSetting__c.RecordName"
               const parentType = selectedResult.metadata?._parentType
               const recordName = selectedResult.metadata?.Name || selectedResult.name
               if (parentType) {
@@ -444,11 +338,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
               }
             }
           } else if (selectedResult.type === 'Profile') {
-            // Profile: autocomplete to "ProfileName." to show sub-menu
             const profileName = selectedResult.name
             setQuery(`${prefix}${profileName}.`)
           } else if (selectedResult.type === 'ProfileSubMenu') {
-            // Sub-menu item: autocomplete to "ProfileName.SubCategory."
             const { profileName, subCategory } = selectedResult.metadata || {}
             if (profileName && subCategory) {
               setQuery(`${prefix}${profileName}.${subCategory}.`)
@@ -462,7 +354,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
             selectedResult.type === 'ConnectedAppAccess' ||
             selectedResult.type === 'AssignedAppAccess'
           ) {
-            // Sub-data item: autocomplete to "ProfileName.SubCategory.ItemName" for filtering
             const { profileName, _subCategory } = selectedResult.metadata || {}
             if (profileName && _subCategory) {
               setQuery(`${prefix}${profileName}.${_subCategory}.${selectedResult.name}`)
@@ -487,14 +378,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }
 
   const handleTypeToggle = (type: string) => {
-    setSelectedTypes((prev) => {
-      if (prev.includes(type)) {
-        const newTypes = prev.filter((t) => t !== type)
-        // Prevent removing all types - keep at least one
-        return newTypes.length > 0 ? newTypes : prev
-      }
-      return [...prev, type]
-    })
+    const newTypes = selectedTypes.includes(type)
+      ? selectedTypes.filter((t) => t !== type)
+      : [...selectedTypes, type]
+    if (newTypes.length > 0) {
+      setSelectedTypes(newTypes)
+    }
     setSelectedIndex(0)
   }
 
@@ -510,7 +399,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   return (
     <>
-      <style>{SEARCH_MODAL_STYLES}</style>
+      <style>{getInterFontFaces()}{SEARCH_MODAL_STYLES}</style>
       <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
         <div
           className="ultraforce-search-modal"
@@ -526,19 +415,19 @@ const SearchModal: React.FC<SearchModalProps> = ({
             selectedTypes={selectedTypes}
             onToggleType={handleTypeToggle}
             shortcutKey={shortcutKey}
-            onShortcutChange={setShortcutKey}
+            onShortcutChange={(key) => updateSettings({ shortcutKey: key })}
             closeOnNavigate={closeOnNavigate}
-            onCloseOnNavigateChange={setCloseOnNavigate}
+            onCloseOnNavigateChange={(val) => updateSettings({ closeOnNavigate: val })}
             autoLoadFields={autoLoadFields}
-            onAutoLoadFieldsChange={setAutoLoadFields}
+            onAutoLoadFieldsChange={(val) => updateSettings({ autoLoadFields: val })}
             fuzzySearch={fuzzySearch}
-            onFuzzySearchChange={handleFuzzySearchChange}
+            onFuzzySearchChange={(val) => storeSetFuzzy(val)}
             hideManagedPackage={hideManagedPackage}
-            onHideManagedPackageChange={setHideManagedPackage}
+            onHideManagedPackageChange={(val) => updateSettings({ hideManagedPackage: val })}
             maxResultsPerType={maxResultsPerType}
-            onMaxResultsPerTypeChange={setMaxResultsPerType}
+            onMaxResultsPerTypeChange={(val) => updateSettings({ maxResultsPerType: val })}
             navigationMode={navigationMode}
-            onNavigationModeChange={handleNavigationModeChange}
+            onNavigationModeChange={(mode) => storeSetNavMode(mode)}
             sfHost={sfHost}
             customCommands={customCommands}
             onCustomCommandsChange={setCustomCommands}
