@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.2)'
+        required: true
 
 permissions:
   contents: write
@@ -53,7 +58,12 @@ jobs:
       - name: Extract Release Notes
         id: notes
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
           node scripts/extract-release-notes.mjs "$VERSION" > /tmp/release-body.md
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
