@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      - name: Type Check
+        run: pnpm type-check
+
+      - name: Unit Tests
+        run: pnpm test:run
+
+      - name: Build Extension
+        run: pnpm build
+
+      - name: Package Extension
+        run: pnpm package
+
+      - name: Identify Package
+        id: pkg
+        run: |
+          ZIP=$(find build -name '*.zip' | head -1)
+          echo "zip_path=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$(basename $ZIP)" >> "$GITHUB_OUTPUT"
+          echo "Found package: $ZIP"
+
+      - name: Extract Release Notes
+        id: notes
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          node scripts/extract-release-notes.mjs "$VERSION" > /tmp/release-body.md
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.notes.outputs.version }}
+          body_path: /tmp/release-body.md
+          files: ${{ steps.pkg.outputs.zip_path }}
+          draft: false
+          prerelease: false
+
+      - name: Upload to Chrome Web Store
+        if: secrets.CWS_PUBLISH_ENABLED == 'true'
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          echo '${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}' > /tmp/cws-key.json
+          echo "Uploading ${{ steps.pkg.outputs.zip_name }} to Chrome Web Store..."
+          npx -y chrome-webstore-upload-cli@3 upload \
+            --source "${{ steps.pkg.outputs.zip_path }}" \
+            --extension-id "$EXTENSION_ID" \
+            --service-account-key /tmp/cws-key.json
+
+      - name: Publish to Chrome Web Store
+        if: secrets.CWS_PUBLISH_ENABLED == 'true'
+        env:
+          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+        run: |
+          npx -y chrome-webstore-upload-cli@3 publish \
+            --extension-id "$EXTENSION_ID" \
+            --service-account-key /tmp/cws-key.json
+          rm -f /tmp/cws-key.json
