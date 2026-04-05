@@ -17,6 +17,8 @@ jobs:
   release:
     name: Build & Release
     runs-on: ubuntu-latest
+    env:
+      CWS_PUBLISH: ${{ secrets.CWS_PUBLISH_ENABLED }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,7 +79,7 @@ jobs:
           prerelease: false
 
       - name: Upload to Chrome Web Store
-        if: secrets.CWS_PUBLISH_ENABLED == 'true'
+        if: env.CWS_PUBLISH == 'true'
         env:
           EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
@@ -89,7 +91,7 @@ jobs:
             --service-account-key /tmp/cws-key.json
 
       - name: Publish to Chrome Web Store
-        if: secrets.CWS_PUBLISH_ENABLED == 'true'
+        if: env.CWS_PUBLISH == 'true'
         env:
           EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
