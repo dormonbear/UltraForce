@@ -80,6 +80,7 @@ jobs:
 
       - name: Upload to Chrome Web Store
         if: env.CWS_PUBLISH == 'true'
+        continue-on-error: true
         run: |
           echo '${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}' > /tmp/cws-key.json
           node scripts/cws-publish.mjs upload \
@@ -89,6 +90,7 @@ jobs:
 
       - name: Publish to Chrome Web Store
         if: env.CWS_PUBLISH == 'true'
+        continue-on-error: true
         run: |
           node scripts/cws-publish.mjs publish \
             --extension-id "${{ secrets.CWS_EXTENSION_ID }}" \
