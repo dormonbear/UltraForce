@@ -80,22 +80,17 @@ jobs:
 
       - name: Upload to Chrome Web Store
         if: env.CWS_PUBLISH == 'true'
-        env:
-          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
           echo '${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}' > /tmp/cws-key.json
-          echo "Uploading ${{ steps.pkg.outputs.zip_name }} to Chrome Web Store..."
-          npx -y chrome-webstore-upload-cli@3 upload \
-            --source "${{ steps.pkg.outputs.zip_path }}" \
-            --extension-id "$EXTENSION_ID" \
-            --service-account-key /tmp/cws-key.json
+          node scripts/cws-publish.mjs upload \
+            --zip "${{ steps.pkg.outputs.zip_path }}" \
+            --extension-id "${{ secrets.CWS_EXTENSION_ID }}" \
+            --key /tmp/cws-key.json
 
       - name: Publish to Chrome Web Store
         if: env.CWS_PUBLISH == 'true'
-        env:
-          EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
-          npx -y chrome-webstore-upload-cli@3 publish \
-            --extension-id "$EXTENSION_ID" \
-            --service-account-key /tmp/cws-key.json
+          node scripts/cws-publish.mjs publish \
+            --extension-id "${{ secrets.CWS_EXTENSION_ID }}" \
+            --key /tmp/cws-key.json
           rm -f /tmp/cws-key.json
