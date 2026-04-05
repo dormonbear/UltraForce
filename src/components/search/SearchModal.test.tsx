@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SearchModal from './SearchModal'
-import type { SearchResult, NavigationMode } from '~types'
+import type { SearchResult } from '~types'
+import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
+import { useSessionStore } from '~stores/session-store'
+import { useSearchStore } from '~stores/search-store'
 
 // jsdom doesn't implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
@@ -40,33 +43,17 @@ vi.mock('./styles', () => ({
   SEARCH_MODAL_STYLES: ''
 }))
 
-interface SearchModalTestProps {
-  isVisible?: boolean
+interface RenderOptions {
   onClose?: () => void
   onSearch?: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
   onResultClick?: (result: SearchResult) => void
-  searchResults?: Record<string, SearchResult[]>
-  isLoading?: boolean
-  sfHost?: string | null
-  hasSession?: boolean
-  navigationMode?: NavigationMode
-  fuzzySearch?: boolean
-  searchError?: string | null
 }
 
-function renderModal(overrides: SearchModalTestProps = {}) {
+function renderModal(overrides: RenderOptions = {}) {
   const defaultProps = {
-    isVisible: true,
     onClose: vi.fn(),
     onSearch: vi.fn(),
     onResultClick: vi.fn(),
-    searchResults: {},
-    isLoading: false,
-    sfHost: 'test.my.salesforce.com',
-    hasSession: true,
-    navigationMode: 'auto' as NavigationMode,
-    fuzzySearch: true,
-    searchError: null,
     ...overrides
   }
 
@@ -81,16 +68,28 @@ describe('SearchModal', () => {
     vi.clearAllMocks()
     chrome.storage.local.get.mockResolvedValue({})
     chrome.storage.local.set.mockResolvedValue(undefined)
+
+    // Reset stores to defaults
+    useSettingsStore.setState(SETTINGS_DEFAULTS)
+    useSessionStore.getState().setSession('test.my.salesforce.com', true)
+    useSearchStore.setState({
+      isVisible: true,
+      searchResults: {},
+      isLoading: false,
+      searchError: null,
+      recordContext: null
+    })
   })
 
   describe('visibility', () => {
-    it('should render search input when isVisible is true', () => {
-      renderModal({ isVisible: true })
+    it('should render search input when store isVisible is true', () => {
+      renderModal()
       expect(screen.getByRole('textbox')).toBeInTheDocument()
     })
 
-    it('should not render when isVisible is false', () => {
-      const { container } = renderModal({ isVisible: false })
+    it('should not render when store isVisible is false', () => {
+      useSearchStore.setState({ isVisible: false })
+      const { container } = renderModal()
       expect(container.innerHTML).toBe('')
     })
   })
@@ -102,7 +101,6 @@ describe('SearchModal', () => {
 
       await userEvent.type(input, 'Account')
 
-      // onSearch is debounced, so wait for it
       await waitFor(() => {
         expect(props.onSearch).toHaveBeenCalled()
       }, { timeout: 500 })
@@ -110,16 +108,16 @@ describe('SearchModal', () => {
   })
 
   describe('search results', () => {
-    it('should display search results when query is set', async () => {
+    it('should display search results from store', async () => {
       const mockResults: Record<string, SearchResult[]> = {
         ApexClass: [
           { id: '001', name: 'WeatherService', type: 'ApexClass', description: 'Weather API' }
         ]
       }
 
-      renderModal({ searchResults: mockResults })
+      useSearchStore.setState({ searchResults: mockResults })
+      renderModal()
 
-      // Type a query so results are shown (component hides results when query empty)
       const input = screen.getByRole('textbox')
       await userEvent.type(input, 'Weather')
 
@@ -135,10 +133,9 @@ describe('SearchModal', () => {
         type: 'ApexClass',
         description: 'Weather API'
       }
-      const mockResults = { ApexClass: [mockResult] }
-      const { props } = renderModal({ searchResults: mockResults })
+      useSearchStore.setState({ searchResults: { ApexClass: [mockResult] } })
+      const { props } = renderModal()
 
-      // Type a query so results display
       const input = screen.getByRole('textbox')
       await userEvent.type(input, 'Weather')
 
@@ -165,38 +162,39 @@ describe('SearchModal', () => {
     })
 
     it('should navigate down with ArrowDown key', async () => {
-      const mockResults = {
-        ApexClass: [
-          { id: '001', name: 'ClassA', type: 'ApexClass' },
-          { id: '002', name: 'ClassB', type: 'ApexClass' }
-        ]
-      }
-      renderModal({ searchResults: mockResults })
+      useSearchStore.setState({
+        searchResults: {
+          ApexClass: [
+            { id: '001', name: 'ClassA', type: 'ApexClass' },
+            { id: '002', name: 'ClassB', type: 'ApexClass' }
+          ]
+        }
+      })
+      renderModal()
 
       const input = screen.getByRole('textbox')
-      // Type something so we're not in "empty query" mode
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'ArrowDown' })
 
-      // Verify no crash and component still renders
       expect(screen.getByText('ClassA')).toBeInTheDocument()
       expect(screen.getByText('ClassB')).toBeInTheDocument()
     })
 
     it('should navigate up with ArrowUp key', async () => {
-      const mockResults = {
-        ApexClass: [
-          { id: '001', name: 'ClassA', type: 'ApexClass' },
-          { id: '002', name: 'ClassB', type: 'ApexClass' }
-        ]
-      }
-      renderModal({ searchResults: mockResults })
+      useSearchStore.setState({
+        searchResults: {
+          ApexClass: [
+            { id: '001', name: 'ClassA', type: 'ApexClass' },
+            { id: '002', name: 'ClassB', type: 'ApexClass' }
+          ]
+        }
+      })
+      renderModal()
 
       const input = screen.getByRole('textbox')
       await userEvent.type(input, 'test')
 
-      // Move down then back up
       fireEvent.keyDown(input, { key: 'ArrowDown' })
       fireEvent.keyDown(input, { key: 'ArrowUp' })
 
@@ -209,9 +207,8 @@ describe('SearchModal', () => {
         name: 'ClassA',
         type: 'ApexClass'
       }
-      const { props } = renderModal({
-        searchResults: { ApexClass: [mockResult] }
-      })
+      useSearchStore.setState({ searchResults: { ApexClass: [mockResult] } })
+      const { props } = renderModal()
 
       const input = screen.getByRole('textbox')
       await userEvent.type(input, 'test')
@@ -225,17 +222,18 @@ describe('SearchModal', () => {
   })
 
   describe('loading state', () => {
-    it('should show loading state when isLoading is true', () => {
-      renderModal({ isLoading: true })
-      // EmptyState with type="loading" renders loading indicator
+    it('should show loading state from store', () => {
+      useSearchStore.setState({ isLoading: true })
+      renderModal()
       const modal = screen.getByText(/loading|searching/i)
       expect(modal).toBeInTheDocument()
     })
   })
 
   describe('error state', () => {
-    it('should show error message when searchError is set', async () => {
-      renderModal({ searchError: 'API Error: Connection failed' })
+    it('should show error message from store', async () => {
+      useSearchStore.setState({ searchError: 'API Error: Connection failed' })
+      renderModal()
 
       const input = screen.getByRole('textbox')
       await userEvent.type(input, 'test')
@@ -245,9 +243,9 @@ describe('SearchModal', () => {
   })
 
   describe('no session state', () => {
-    it('should show no-session state when hasSession is false', () => {
-      renderModal({ hasSession: false })
-      // EmptyState with type="no-session" renders login prompt
+    it('should show no-session state from store', () => {
+      useSessionStore.getState().setSession(null, false)
+      renderModal()
       expect(screen.getByText(/session|login|sign in/i)).toBeInTheDocument()
     })
   })
@@ -259,7 +257,6 @@ describe('SearchModal', () => {
       const settingsButton = screen.getByTitle('Settings')
       await userEvent.click(settingsButton)
 
-      // Settings panel renders type checkboxes
       await waitFor(() => {
         expect(screen.getByText('Apex Classes & Triggers')).toBeInTheDocument()
       })
@@ -268,21 +265,17 @@ describe('SearchModal', () => {
     it('should close settings panel when Escape is pressed', async () => {
       renderModal()
 
-      // Open settings
       const settingsButton = screen.getByTitle('Settings')
       await userEvent.click(settingsButton)
 
-      // Verify settings is open
       await waitFor(() => {
         expect(screen.getByText('Apex Classes & Triggers')).toBeInTheDocument()
       })
 
-      // Find the modal container and fire Escape
       const modal = document.querySelector('[data-ultraforce-modal]')
       expect(modal).toBeTruthy()
       fireEvent.keyDown(modal!, { key: 'Escape' })
 
-      // Should be back to search view (input visible again)
       await waitFor(() => {
         expect(screen.getByRole('textbox')).toBeInTheDocument()
       })

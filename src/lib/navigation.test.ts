@@ -1,250 +1,373 @@
-import { describe, it, expect, vi } from 'vitest'
-
-vi.mock('./url-builder', () => ({
-  getSetupHost: vi.fn((host: string | null) => {
-    if (!host) return null
-    return host
-      .replace('.my.salesforce.com', '.my.salesforce-setup.com')
-      .replace('.lightning.force.com', '.my.salesforce-setup.com')
-  }),
-  buildSetupUrl: vi.fn((host: string | null, path: string) => {
-    if (!host) return null
-    const setupHost = host
-      .replace('.my.salesforce.com', '.my.salesforce-setup.com')
-      .replace('.lightning.force.com', '.my.salesforce-setup.com')
-    return `https://${setupHost}${path}`
-  }),
-  shouldUseLightning: vi.fn()
-}))
-
-vi.mock('./logger', () => ({
-  logger: {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  }
-}))
-
+import type { SearchResult } from '~types'
 import { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl, KEY_PREFIX_MAP } from './navigation'
 import type { NavigationContext } from './navigation'
-import type { SearchResult } from '~types'
-import { shouldUseLightning } from './url-builder'
 
-const TEST_HOST = 'myorg.my.salesforce.com'
+const lightningCtx: NavigationContext = {
+  sfHost: 'test.my.salesforce.com',
+  navigationMode: 'lightning',
+  userLightningPreference: true
+}
 
-function makeContext(overrides: Partial<NavigationContext> = {}): NavigationContext {
+const classicCtx: NavigationContext = {
+  sfHost: 'test.my.salesforce.com',
+  navigationMode: 'classic',
+  userLightningPreference: false
+}
+
+function makeResult(overrides: Partial<SearchResult> = {}): SearchResult {
   return {
-    sfHost: TEST_HOST,
-    navigationMode: 'auto',
-    userLightningPreference: null,
+    id: '001xx000003ABCD',
+    name: 'Test',
+    type: 'ApexClass',
     ...overrides
   }
 }
 
-describe('navigation', () => {
-  describe('KEY_PREFIX_MAP', () => {
-    it('should map 001 to Account', () => {
-      expect(KEY_PREFIX_MAP['001']).toBe('Account')
-    })
+describe('KEY_PREFIX_MAP', () => {
+  it('should map common Salesforce key prefixes', () => {
+    expect(KEY_PREFIX_MAP['001']).toBe('Account')
+    expect(KEY_PREFIX_MAP['003']).toBe('Contact')
+    expect(KEY_PREFIX_MAP['005']).toBe('User')
+    expect(KEY_PREFIX_MAP['500']).toBe('Case')
+  })
+})
 
-    it('should map 003 to Contact', () => {
-      expect(KEY_PREFIX_MAP['003']).toBe('Contact')
-    })
-
-    it('should map 005 to User', () => {
-      expect(KEY_PREFIX_MAP['005']).toBe('User')
-    })
-
-    it('should map 500 to Case', () => {
-      expect(KEY_PREFIX_MAP['500']).toBe('Case')
+describe('buildNavigationUrl', () => {
+  describe('setup shortcuts', () => {
+    it('should return absolute url for SetupShortcut results', () => {
+      const result = makeResult({ type: 'SetupShortcut', url: 'https://example.com/setup' })
+      expect(buildNavigationUrl(result, lightningCtx)).toBe('https://example.com/setup')
     })
   })
 
-  describe('buildNavigationUrl', () => {
-    it('should return result.url for SetupShortcut type', () => {
-      const result: SearchResult = {
-        id: 'apex-classes',
-        name: 'Apex Classes',
-        type: 'SetupShortcut',
-        url: 'https://myorg.my.salesforce-setup.com/lightning/setup/ApexClasses/home'
-      }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toBe(result.url)
-    })
-
+  describe('null guards', () => {
     it('should return null when sfHost is null', () => {
-      const result: SearchResult = { id: '01pxx', name: 'MyClass', type: 'ApexClass' }
-      const url = buildNavigationUrl(result, makeContext({ sfHost: null }))
-      expect(url).toBeNull()
+      const ctx = { ...lightningCtx, sfHost: null }
+      expect(buildNavigationUrl(makeResult(), ctx)).toBeNull()
     })
 
-    it('should build Lightning URL for ApexClass', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = { id: '01pxx', name: 'MyClass', type: 'ApexClass' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toContain('/lightning/setup/ApexClasses/page?address=')
-      expect(url).toContain(result.id)
+    it('should return null when result has no id', () => {
+      const result = makeResult({ id: '' })
+      expect(buildNavigationUrl(result, lightningCtx)).toBeNull()
+    })
+  })
+
+  describe('Lightning URLs', () => {
+    it('should build ApexClass url', () => {
+      const result = makeResult({ type: 'ApexClass', id: '01pxxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toBe('https://test.my.salesforce.com/lightning/setup/ApexClasses/page?address=%2F01pxxx')
     })
 
-    it('should build Classic URL for ApexClass', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(false)
-      const result: SearchResult = { id: '01pxx', name: 'MyClass', type: 'ApexClass' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toBe(`https://${TEST_HOST}/01pxx`)
+    it('should build ApexTrigger url', () => {
+      const result = makeResult({ type: 'ApexTrigger', id: '01qxxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('ApexTriggers')
     })
 
-    it('should build Lightning URL for Flow', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = { id: '301xx', name: 'MyFlow', type: 'Flow' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toContain('flowBuilder.app?flowId=301xx')
+    it('should build Flow url', () => {
+      const result = makeResult({ type: 'Flow', id: '301xxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('flowBuilder.app?flowId=301xxx')
     })
 
-    it('should build Lightning URL for CustomObject with list view', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = {
-        id: '01Ixx',
-        name: 'MyObj__c',
+    it('should build CustomObject list url', () => {
+      const result = makeResult({
         type: 'CustomObject',
-        metadata: { QualifiedApiName: 'MyObj__c' }
-      }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toContain('/lightning/o/MyObj__c/list')
+        id: '01Ixxx',
+        metadata: { QualifiedApiName: 'Account' }
+      })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toBe('https://test.my.salesforce.com/lightning/o/Account/list')
     })
 
-    it('should build Lightning URL for User with setup host', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = { id: '005xx', name: 'Test User', type: 'User' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toContain('salesforce-setup.com')
+    it('should build CustomField url with ObjectManager path', () => {
+      const result = makeResult({
+        type: 'CustomField',
+        id: '00Nxxx',
+        metadata: { ObjectApiName: 'Account', DurableId: 'Account.00Nxxx' }
+      })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('ObjectManager/Account/FieldsAndRelationships/00Nxxx/view')
+    })
+
+    it('should build PermissionSet url', () => {
+      const result = makeResult({ type: 'PermissionSet', id: '0PSxxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('PermSets')
+    })
+
+    it('should build Profile url', () => {
+      const result = makeResult({ type: 'Profile', id: '00exxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('EnhancedProfiles')
+    })
+
+    it('should return null for ProfileSubMenu (tab-only)', () => {
+      const result = makeResult({ type: 'ProfileSubMenu' })
+      expect(buildNavigationUrl(result, lightningCtx)).toBeNull()
+    })
+
+    it('should build CustomLabel url', () => {
+      const result = makeResult({ type: 'CustomLabel', id: '101xxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('ExternalStrings')
+    })
+
+    it('should build User url via setup host', () => {
+      const result = makeResult({ type: 'User', id: '005xxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
       expect(url).toContain('ManageUsers')
+      expect(url).toContain('005xxx')
     })
 
-    it('should build Lightning URL for Report', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = { id: '00Oxx', name: 'MyReport', type: 'Report' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toContain('/lightning/r/Report/00Oxx/view')
+    it('should build Queue url', () => {
+      const result = makeResult({ type: 'Queue', id: '00Gxxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('Queues')
     })
 
-    it('should build Classic URL for Report', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(false)
-      const result: SearchResult = { id: '00Oxx', name: 'MyReport', type: 'Report' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toBe(`https://${TEST_HOST}/00Oxx`)
+    it('should build Report url', () => {
+      const result = makeResult({ type: 'Report', id: '00Oxxx' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('/lightning/r/Report/00Oxxx/view')
     })
 
-    it('should build Lightning default URL for unknown types', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = { id: 'abcxx', name: 'Something', type: 'SomeType' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toContain('/lightning/r/SomeType/abcxx/view')
+    it('should build default Lightning url for unknown types', () => {
+      const result = makeResult({ type: 'SomeNewType' as any, id: 'xxx123' })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('/lightning/r/SomeNewType/xxx123/view')
     })
 
-    it('should build Classic default URL for unknown types', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(false)
-      const result: SearchResult = { id: 'abcxx', name: 'Something', type: 'SomeType' }
-      const url = buildNavigationUrl(result, makeContext())
-      expect(url).toBe(`https://${TEST_HOST}/abcxx`)
+    it('should build ObjectPermission url with profile and object', () => {
+      const result = makeResult({
+        type: 'ObjectPermission',
+        id: '0PP001',
+        metadata: { profileId: '00e001', objectRef: 'Account' }
+      })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('Profiles/page')
+      expect(url).toContain('ObjectsAndTabs')
+    })
+
+    it('should build CustomMetadataType url', () => {
+      const result = makeResult({
+        type: 'CustomMetadataType',
+        id: 'm01xxx',
+        metadata: { _isTypeDefinition: true, Id: 'm01xxx' }
+      })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('CustomMetadata')
+    })
+
+    it('should build CustomSetting definition url', () => {
+      const result = makeResult({
+        type: 'CustomSetting',
+        id: '01Nxxx',
+        metadata: { _isSettingDefinition: true, DurableId: '01Nxxx' }
+      })
+      const url = buildNavigationUrl(result, lightningCtx)
+      expect(url).toContain('CustomSettings')
+      expect(url).toContain('viewCustomSettings')
     })
   })
 
-  describe('buildIdNavigationUrl', () => {
-    it('should build direct URL from ID', () => {
-      const url = buildIdNavigationUrl('001xx', makeContext())
-      expect(url).toBe(`https://${TEST_HOST}/001xx`)
+  describe('Classic URLs', () => {
+    it('should build ApexClass url as direct ID', () => {
+      const result = makeResult({ type: 'ApexClass', id: '01pxxx' })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/01pxxx')
     })
 
-    it('should return null when sfHost is null', () => {
-      const url = buildIdNavigationUrl('001xx', makeContext({ sfHost: null }))
-      expect(url).toBeNull()
-    })
-  })
-
-  describe('buildActionUrl', () => {
-    it('should build preview URL for ApexPage', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = {
-        id: '066xx',
-        name: 'MyPage',
-        type: 'ApexPage',
-        metadata: { DurableId: '066xx' }
-      }
-      const url = buildActionUrl(result, 'preview', makeContext())
-      expect(url).toContain('/apex/MyPage')
+    it('should build User url as direct ID', () => {
+      const result = makeResult({ type: 'User', id: '005xxx' })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/005xxx')
     })
 
-    it('should build preview URL for namespaced ApexPage', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = {
-        id: '066xx',
-        name: 'MyPage',
-        type: 'ApexPage',
-        namespace: 'ns',
-        metadata: { DurableId: '066xx' }
-      }
-      const url = buildActionUrl(result, 'preview', makeContext())
-      expect(url).toContain('/apex/ns__MyPage')
+    it('should build Flow url (same in classic and lightning)', () => {
+      const result = makeResult({ type: 'Flow', id: '301xxx' })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toContain('flowBuilder.app?flowId=301xxx')
     })
 
-    it('should build Lightning fields URL for CustomObject', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = {
-        id: '01Ixx',
-        name: 'MyObj__c',
+    it('should build CustomObject url with KeyPrefix', () => {
+      const result = makeResult({
         type: 'CustomObject',
-        metadata: { DurableId: '01Ixx', QualifiedApiName: 'MyObj__c' }
-      }
-      const url = buildActionUrl(result, 'fields', makeContext())
-      expect(url).toContain('/lightning/setup/ObjectManager/01Ixx/FieldsAndRelationships/view')
+        id: '01Ixxx',
+        metadata: { KeyPrefix: '00a', QualifiedApiName: 'MyObj__c' }
+      })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/00a')
     })
 
-    it('should build Classic fields URL for standard object', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(false)
-      const result: SearchResult = {
-        id: 'Account',
-        name: 'Account',
+    it('should build CustomObject url with DurableId starting with 01I', () => {
+      const result = makeResult({
+        type: 'CustomObject',
+        id: '01Ixxx',
+        metadata: { DurableId: '01Ixxx', QualifiedApiName: 'MyObj__c' }
+      })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/01Ixxx')
+    })
+
+    it('should build CustomObject url with LayoutFieldList fallback', () => {
+      const result = makeResult({
+        type: 'CustomObject',
+        id: '01Ixxx',
+        metadata: { QualifiedApiName: 'MyObj__c' }
+      })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toContain('LayoutFieldList?type=MyObj__c')
+    })
+
+    it('should build CustomField classic url', () => {
+      const result = makeResult({
+        type: 'CustomField',
+        id: '00Nxxx',
+        metadata: { DurableId: 'Account.00Nxxx' }
+      })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/00Nxxx')
+    })
+
+    it('should return null for ProfileSubMenu in classic', () => {
+      const result = makeResult({ type: 'ProfileSubMenu' })
+      expect(buildNavigationUrl(result, classicCtx)).toBeNull()
+    })
+
+    it('should build classic Report/Dashboard url', () => {
+      const result = makeResult({ type: 'Report', id: '00Oxxx' })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/00Oxxx')
+    })
+
+    it('should build classic CustomSetting definition url', () => {
+      const result = makeResult({
+        type: 'CustomSetting',
+        id: '01Nxxx',
+        metadata: { _isSettingDefinition: true, DurableId: '01Nxxx' }
+      })
+      const url = buildNavigationUrl(result, classicCtx)
+      expect(url).toContain('viewCustomSettings.apexp?id=01Nxxx')
+    })
+  })
+})
+
+describe('buildIdNavigationUrl', () => {
+  it('should return null when sfHost is null', () => {
+    expect(buildIdNavigationUrl('001xxx', { ...lightningCtx, sfHost: null })).toBeNull()
+  })
+
+  it('should build direct URL to record', () => {
+    expect(buildIdNavigationUrl('001xxx', lightningCtx)).toBe('https://test.my.salesforce.com/001xxx')
+  })
+})
+
+describe('buildActionUrl', () => {
+  it('should return null when sfHost is null', () => {
+    const result = makeResult({ metadata: { DurableId: '01Ixxx', QualifiedApiName: 'Account' } })
+    expect(buildActionUrl(result, 'fields', { ...lightningCtx, sfHost: null })).toBeNull()
+  })
+
+  it('should build ApexPage preview url', () => {
+    const result = makeResult({ type: 'ApexPage', name: 'TestPage' })
+    const url = buildActionUrl(result, 'preview', lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/apex/TestPage')
+  })
+
+  it('should include namespace in ApexPage preview url', () => {
+    const result = makeResult({ type: 'ApexPage', name: 'TestPage', namespace: 'ns' })
+    const url = buildActionUrl(result, 'preview', lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/apex/ns__TestPage')
+  })
+
+  it('should return null when no DurableId for non-preview actions', () => {
+    const result = makeResult({ type: 'CustomObject', metadata: {} })
+    expect(buildActionUrl(result, 'fields', lightningCtx)).toBeNull()
+  })
+
+  describe('Lightning actions', () => {
+    const result = makeResult({
+      type: 'CustomObject',
+      metadata: { DurableId: '01Ixxx', QualifiedApiName: 'Account' }
+    })
+
+    it('should build list url', () => {
+      const url = buildActionUrl(result, 'list', lightningCtx)
+      expect(url).toContain('/lightning/o/Account/list')
+    })
+
+    it('should build fields url', () => {
+      const url = buildActionUrl(result, 'fields', lightningCtx)
+      expect(url).toContain('ObjectManager/01Ixxx/FieldsAndRelationships/view')
+    })
+
+    it('should build layouts url', () => {
+      const url = buildActionUrl(result, 'layouts', lightningCtx)
+      expect(url).toContain('ObjectManager/01Ixxx/PageLayouts/view')
+    })
+
+    it('should build recordtypes url', () => {
+      const url = buildActionUrl(result, 'recordtypes', lightningCtx)
+      expect(url).toContain('ObjectManager/01Ixxx/RecordTypes/view')
+    })
+
+    it('should build validationrules url', () => {
+      const url = buildActionUrl(result, 'validationrules', lightningCtx)
+      expect(url).toContain('ObjectManager/01Ixxx/ValidationRules/view')
+    })
+
+    it('should build details url', () => {
+      const url = buildActionUrl(result, 'details', lightningCtx)
+      expect(url).toContain('ObjectManager/01Ixxx/Details/view')
+    })
+
+    it('should return null for unknown action', () => {
+      expect(buildActionUrl(result, 'unknown' as any, lightningCtx)).toBeNull()
+    })
+  })
+
+  describe('Classic actions', () => {
+    const result = makeResult({
+      type: 'CustomObject',
+      metadata: { DurableId: '01Ixxx', QualifiedApiName: 'Account', KeyPrefix: '001' }
+    })
+
+    it('should build list url with KeyPrefix', () => {
+      const url = buildActionUrl(result, 'list', classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/001')
+    })
+
+    it('should build list url without KeyPrefix', () => {
+      const noPrefix = makeResult({
+        type: 'CustomObject',
+        metadata: { DurableId: '01Ixxx', QualifiedApiName: 'MyObj__c' }
+      })
+      const url = buildActionUrl(noPrefix, 'list', classicCtx)
+      expect(url).toContain('LayoutFieldList?type=MyObj__c')
+    })
+
+    it('should redirect to DurableId page for custom objects', () => {
+      const url = buildActionUrl(result, 'fields', classicCtx)
+      expect(url).toBe('https://test.my.salesforce.com/01Ixxx')
+    })
+
+    it('should build fields url for standard objects', () => {
+      const stdResult = makeResult({
         type: 'CustomObject',
         metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
-      }
-      const url = buildActionUrl(result, 'fields', makeContext())
+      })
+      const url = buildActionUrl(stdResult, 'fields', classicCtx)
       expect(url).toContain('LayoutFieldList?type=Account')
     })
 
-    it('should build Classic URL for custom object with 01I DurableId', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(false)
-      const result: SearchResult = {
-        id: '01Ixx',
-        name: 'MyObj__c',
+    it('should return null for unknown classic action', () => {
+      const stdResult = makeResult({
         type: 'CustomObject',
-        metadata: { DurableId: '01Ixx', QualifiedApiName: 'MyObj__c' }
-      }
-      const url = buildActionUrl(result, 'fields', makeContext())
-      expect(url).toBe(`https://${TEST_HOST}/01Ixx`)
-    })
-
-    it('should return null when sfHost is null', () => {
-      const result: SearchResult = {
-        id: '01Ixx',
-        name: 'MyObj__c',
-        type: 'CustomObject',
-        metadata: { DurableId: '01Ixx', QualifiedApiName: 'MyObj__c' }
-      }
-      const url = buildActionUrl(result, 'fields', makeContext({ sfHost: null }))
-      expect(url).toBeNull()
-    })
-
-    it('should return null when DurableId missing for non-preview action', () => {
-      vi.mocked(shouldUseLightning).mockReturnValue(true)
-      const result: SearchResult = {
-        id: '01Ixx',
-        name: 'MyObj__c',
-        type: 'CustomObject',
-        metadata: {}
-      }
-      const url = buildActionUrl(result, 'fields', makeContext())
-      expect(url).toBeNull()
+        metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
+      })
+      expect(buildActionUrl(stdResult, 'unknown' as any, classicCtx)).toBeNull()
     })
   })
 })

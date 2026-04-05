@@ -107,6 +107,9 @@ import type { WindowManagerState } from './window-manager'
 import { getSfHost, getSession, sfRest } from './auth'
 import { createKeyboardInterceptor } from './keyboard-interceptor'
 import { searchSalesforceMetadata, executeCustomCommand } from './salesforce-api'
+import { useSearchStore } from '~stores/search-store'
+import { useSessionStore } from '~stores/session-store'
+import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 
 const mockGetSfHost = vi.mocked(getSfHost)
 const mockGetSession = vi.mocked(getSession)
@@ -115,6 +118,12 @@ const mockCreateKeyboardInterceptor = vi.mocked(createKeyboardInterceptor)
 const mockSearchMetadata = vi.mocked(searchSalesforceMetadata)
 
 const TEST_HOST = 'myorg.my.salesforce.com'
+
+function resetStores(): void {
+  useSearchStore.getState().reset()
+  useSessionStore.getState().reset()
+  useSettingsStore.setState(SETTINGS_DEFAULTS)
+}
 
 // Helper to destroy singleton and reset static fields
 async function resetSingleton(): Promise<void> {
@@ -129,6 +138,7 @@ async function resetSingleton(): Promise<void> {
     WM.instance = null
   }
   WM.initializationPromise = null
+  resetStores()
 }
 
 describe('UltraForceWindowManager', () => {
@@ -742,8 +752,7 @@ describe('UltraForceWindowManager', () => {
     })
 
     it('should not navigate when sfHost is null', async () => {
-      instance.updateState({ sfHost: null } as any)
-      ;(instance as any).state.sfHost = null
+      useSessionStore.getState().setSession(null, false)
       const handler = (instance as any).handleResultClick.bind(instance)
 
       handler({
@@ -922,13 +931,9 @@ describe('UltraForceWindowManager', () => {
     })
   })
 
-  describe('settings', () => {
-    it('should load closeOnNavigate from storage', async () => {
-      chrome.storage.local.get.mockResolvedValue({
-        ultraforce_search_settings: {
-          closeOnNavigate: false
-        }
-      })
+  describe('settings (via store)', () => {
+    it('should read closeOnNavigate from settings store', async () => {
+      useSettingsStore.setState({ closeOnNavigate: false })
 
       const instance = await UltraForceWindowManager.getInstance()
       const state = instance.getState()
@@ -936,12 +941,8 @@ describe('UltraForceWindowManager', () => {
       expect(state.closeOnNavigate).toBe(false)
     })
 
-    it('should load navigationMode from storage', async () => {
-      chrome.storage.local.get.mockResolvedValue({
-        ultraforce_search_settings: {
-          navigationMode: 'classic'
-        }
-      })
+    it('should read navigationMode from settings store', async () => {
+      useSettingsStore.setState({ navigationMode: 'classic' })
 
       const instance = await UltraForceWindowManager.getInstance()
       const state = instance.getState()
@@ -949,12 +950,8 @@ describe('UltraForceWindowManager', () => {
       expect(state.navigationMode).toBe('classic')
     })
 
-    it('should load fuzzySearch from storage', async () => {
-      chrome.storage.local.get.mockResolvedValue({
-        ultraforce_search_settings: {
-          fuzzySearch: false
-        }
-      })
+    it('should read fuzzySearch from settings store', async () => {
+      useSettingsStore.setState({ fuzzySearch: false })
 
       const instance = await UltraForceWindowManager.getInstance()
       const state = instance.getState()
@@ -963,8 +960,6 @@ describe('UltraForceWindowManager', () => {
     })
 
     it('should default closeOnNavigate to true', async () => {
-      chrome.storage.local.get.mockResolvedValue({})
-
       const instance = await UltraForceWindowManager.getInstance()
       const state = instance.getState()
 

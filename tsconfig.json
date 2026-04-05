@@ -38,6 +38,9 @@
       ],
       "~contents/*": [
         "./src/contents/*"
+      ],
+      "~stores/*": [
+        "./src/stores/*"
       ]
     }
   },

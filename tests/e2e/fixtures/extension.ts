@@ -66,8 +66,8 @@ async function ensureContext() {
   // Login to Salesforce
   const frontdoorUrl = getFrontdoorUrl(sharedOrgInfo)
   await sharedPage.goto(frontdoorUrl)
-  // Wait for redirect to complete - URL may already contain salesforce
-  await sharedPage.waitForURL(/.*salesforce/, { timeout: 30000 }).catch(() => {})
+  // Wait for redirect to complete - URL may use salesforce.com or force.com (Enhanced Domains)
+  await sharedPage.waitForURL(/.*(?:salesforce|force)\.com/, { timeout: 30000 }).catch(() => {})
   await sharedPage.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {})
 
   // Navigate to home page
