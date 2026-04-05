@@ -14,7 +14,7 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmitOnError": false,
@@ -42,7 +42,8 @@
       "~stores/*": [
         "./src/stores/*"
       ]
-    }
+    },
+    "incremental": true
   },
   "include": [
     ".plasmo/index.d.ts",
