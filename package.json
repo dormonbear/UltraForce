@@ -59,7 +59,8 @@
     "minisearch": "^7.2.0",
     "plasmo": "^0.90.5",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

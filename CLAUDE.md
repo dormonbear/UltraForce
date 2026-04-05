@@ -156,31 +156,42 @@ sf data query --query "SELECT Id, DeveloperName FROM FlowDefinition WHERE Develo
 
 ## Publishing New Version
 
-When the user requests to publish a new version, follow these steps:
+### Automated Release (Recommended)
+
+Releases are automated via GitHub Actions. Pushing a `v*` tag triggers the release workflow which builds, packages, creates a GitHub Release, and optionally publishes to the Chrome Web Store.
+
+```bash
+# Bump version, update release notes, commit, and tag (pick one)
+pnpm release:patch   # 0.1.1 -> 0.1.2
+pnpm release:minor   # 0.1.1 -> 0.2.0
+pnpm release:major   # 0.1.1 -> 1.0.0
+
+# Edit the generated release notes placeholder in docs/guide/release-notes.md
+# Then amend the commit and push with tags
+git commit --amend
+git push origin develop --tags
+```
+
+The release workflow (`.github/workflows/release.yml`) will:
+1. Run lint, type-check, and unit tests
+2. Build and package the extension
+3. Create a GitHub Release with the `.zip` artifact
+4. Upload to Chrome Web Store via service account (if `CWS_PUBLISH_ENABLED` is set; see `document/auto-publish-setup.md`)
+
+### CI Pipeline
+
+Every push to `develop`/`main` and every PR triggers the CI workflow (`.github/workflows/ci.yml`):
+- Lint + Type Check
+- Unit Tests with coverage
+- Build verification
+
+### Manual Release (Fallback)
 
 1. **Update version number** in `package.json`
-2. **Update release notes** at `docs/guide/release-notes.md`:
-   - Add a new version section at the top (below the title)
-   - Include release date
-   - List new features, improvements, and bug fixes
-   - Format example:
-     ```markdown
-     ## vX.X.X
-
-     Release Date: YYYY-MM-DD
-
-     ### New Features
-     - Feature description
-
-     ### Improvements
-     - Improvement description
-
-     ### Bug Fixes
-     - Fix description
-     ```
-3. **Build the extension**: `npm run build`
-4. **Deploy documentation** (if applicable): `cd docs && pnpm run build`
-5. The version update notification will automatically show to users when they update to the new version
+2. **Update release notes** at `docs/guide/release-notes.md`
+3. **Build the extension**: `pnpm build:package`
+4. **Upload** the `.zip` from `build/` to Chrome Web Store manually
+5. The version update notification will automatically show to users when they update
 
 <!-- GSD:project-start source:PROJECT.md -->
 ## Project
