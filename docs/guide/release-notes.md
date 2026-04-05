@@ -1,5 +1,14 @@
 # Release Notes
 
+## v0.1.3
+
+Release Date: 2026-04-05
+
+### Bug Fixes
+
+- **Search Modal Visual Effect**: Fixed missing frosted glass background effect on the search modal
+- **Search Functionality**: Fixed issue where typing in the search input did not trigger search results
+
 ## v0.1.2
 
 Release Date: 2026-04-05

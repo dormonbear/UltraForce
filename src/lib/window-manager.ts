@@ -380,6 +380,7 @@ class UltraForceWindowManager {
     const { sfHost } = useSessionStore.getState()
     if (!sfHost) {
       logger.error('No SF host available for search')
+      useSearchStore.getState().setError('Not connected to Salesforce. Please refresh the page.')
       return
     }
 

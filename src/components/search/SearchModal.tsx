@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import type { SearchResult, NavigationMode, RecordContext } from '~types'
+import type { SearchResult } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
@@ -12,11 +12,15 @@ import { getInterFontFaces } from '~lib/font-loader'
 import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
-import { logger } from '~lib/logger'
-import { useSettingsStore } from '~stores/settings-store'
+import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
 import type { ObjectAction } from './ResultItem'
+
+const MODAL_INLINE_STYLE: React.CSSProperties = {
+  backdropFilter: 'blur(24px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(24px) saturate(180%)'
+}
 
 // Salesforce ID validation: 15 or 18 alphanumeric characters
 function isSalesforceId(str: string): boolean {
@@ -51,7 +55,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 }) => {
   // --- Store subscriptions ---
   const {
-    selectedTypes,
+    selectedTypes: rawSelectedTypes,
     shortcutKey,
     closeOnNavigate,
     autoLoadFields,
@@ -67,9 +71,20 @@ const SearchModal: React.FC<SearchModalProps> = ({
     setCustomCommands
   } = useSettingsStore()
 
+  // Guard against empty selectedTypes from corrupted storage or stale persist data
+  const selectedTypes = rawSelectedTypes?.length > 0 ? rawSelectedTypes : SETTINGS_DEFAULTS.selectedTypes
+
   const { sfHost, hasSession } = useSessionStore()
   const { isVisible, searchResults, isLoading, searchError, recordContext } = useSearchStore()
   const clearResults = useSearchStore((s) => s.clearResults)
+
+  // Track whether settings store has hydrated from chrome.storage
+  const [settingsReady, setSettingsReady] = useState(() => useSettingsStore.persist.hasHydrated())
+  useEffect(() => {
+    if (settingsReady) return
+    const unsub = useSettingsStore.persist.onFinishHydration(() => setSettingsReady(true))
+    return unsub
+  }, [settingsReady])
 
   // --- Local UI state ---
   const [query, setQuery] = useState('')
@@ -183,6 +198,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return () => clearTimeout(debounceTimer)
     }
 
+    // Wait for settings store hydration before normal search (respect user's selected types)
+    if (!settingsReady) {
+      return
+    }
+
     // Builtin command or normal search
     const searchTypes = parsedCommand.types || selectedTypes
     if (searchTypes.length === 0) {
@@ -194,7 +214,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage])
+  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -408,6 +428,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           tabIndex={-1}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
+          style={MODAL_INLINE_STYLE}
         >
         {showSettings ? (
           <SettingsPanel

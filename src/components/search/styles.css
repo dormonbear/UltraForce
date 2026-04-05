@@ -22,8 +22,6 @@
   min-height: 200px;
   max-height: 80%;
   background: rgba(20, 20, 25, 0.85);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   box-shadow:
