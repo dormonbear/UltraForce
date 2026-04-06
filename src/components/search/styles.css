@@ -302,7 +302,8 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
-.object-actions {
+.object-actions,
+.favorite-action {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -310,7 +311,8 @@
   transition: opacity 0.15s ease;
 }
 
-.result-item:hover .object-actions {
+.result-item:hover .object-actions,
+.result-item:hover .favorite-action {
   opacity: 1;
 }
 
