@@ -13,7 +13,7 @@ import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
 import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
-import { extractSalesforceId } from '~lib/id-utils'
+import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
 import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from '~lib/contextual-suggestions'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
@@ -205,6 +205,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands, unsupportedTypes), [query, allCommands, unsupportedTypes])
   const extractedId = useMemo(() => extractSalesforceId(query.trim()), [query])
+  const extractedIds = useMemo(() => extractAllSalesforceIds(query.trim()), [query])
   const setupSuggestions = useMemo(
     () => isSetupPage(window.location.pathname)
       ? getSetupSuggestions(window.location.pathname, SETUP_SHORTCUTS)
@@ -350,7 +351,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }, [recordContext, sfHost, onPageLayoutClick, onRecordTypeClick, onFieldsClick, onNavigate])
 
   // Track selected record action index (separate from search results)
-  const [selectedRecordActionIndex, setSelectedRecordActionIndex] = useState(0)
+  const [selectedRecordActionIndex, setSelectedRecordActionIndex] = useState(-1)
 
   const handleDismissUpdate = useCallback(() => {
     setShowUpdateNotification(false)
@@ -626,12 +627,17 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   commandTypes={parsedCommand.types || []}
                   commandDescription={parsedCommand.command.description}
                 />
-              ) : !hasResults && extractedId && sfHost ? (
-                <IdPreview
-                  recordId={extractedId}
-                  sfHost={sfHost}
-                  onNavigate={() => onIdNavigate?.(extractedId)}
-                />
+              ) : !hasResults && extractedIds.length > 0 && sfHost ? (
+                <div className="id-preview-list">
+                  {extractedIds.map((id) => (
+                    <IdPreview
+                      key={id}
+                      recordId={id}
+                      sfHost={sfHost}
+                      onNavigate={() => onIdNavigate?.(id)}
+                    />
+                  ))}
+                </div>
               ) : !hasResults && extractedId ? (
                 <EmptyState type="id-navigation" query={extractedId} />
               ) : !hasResults ? (

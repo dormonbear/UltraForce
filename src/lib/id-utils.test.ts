@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isSalesforceId, extractSalesforceId, getKeyPrefix } from './id-utils'
+import { isSalesforceId, extractSalesforceId, extractAllSalesforceIds, getKeyPrefix } from './id-utils'
 
 describe('isSalesforceId', () => {
   it('accepts valid 15-char ID', () => {
@@ -97,6 +97,41 @@ describe('extractSalesforceId', () => {
     const result = extractSalesforceId(`id is ${VALID_18} here`)
     expect(result).toBe(VALID_18)
     expect(result).toHaveLength(18)
+  })
+})
+
+describe('extractAllSalesforceIds', () => {
+  const ID_A = '001000000000001AAA'
+  const ID_B = '003000000000002BBB'
+  const ID_C = '005000000000003CCC'
+
+  it('returns single ID from plain input', () => {
+    expect(extractAllSalesforceIds(ID_A)).toEqual([ID_A])
+  })
+
+  it('returns multiple IDs from text with several IDs', () => {
+    const result = extractAllSalesforceIds(`check ${ID_A} and ${ID_B} and ${ID_C}`)
+    expect(result).toEqual([ID_A, ID_B, ID_C])
+  })
+
+  it('deduplicates same ID appearing twice', () => {
+    const result = extractAllSalesforceIds(`${ID_A} then ${ID_A}`)
+    expect(result).toEqual([ID_A])
+  })
+
+  it('returns empty array for empty string', () => {
+    expect(extractAllSalesforceIds('')).toEqual([])
+  })
+
+  it('returns empty array for text with no IDs', () => {
+    expect(extractAllSalesforceIds('hello world')).toEqual([])
+  })
+
+  it('handles mixed URLs and plain IDs', () => {
+    const input = `https://org.salesforce.com/${ID_A} and also ${ID_B}`
+    const result = extractAllSalesforceIds(input)
+    expect(result).toContain(ID_A)
+    expect(result).toContain(ID_B)
   })
 })
 

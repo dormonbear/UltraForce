@@ -20,31 +20,31 @@ describe('getRecordSuggestions', () => {
     expect(actions).toHaveLength(5)
   })
 
-  it('includes Sharing, History, Related Lists, Clone, Object Setup', () => {
+  it('includes Sharing, Approvals, Feed Tracking, Clone, Object Setup', () => {
     const actions = getRecordSuggestions(baseContext, TEST_HOST)
     const ids = actions.map((a) => a.id)
     expect(ids).toContain('view-sharing')
-    expect(ids).toContain('audit-history')
-    expect(ids).toContain('related-lists')
+    expect(ids).toContain('approval-history')
+    expect(ids).toContain('feed-tracking')
     expect(ids).toContain('clone-record')
     expect(ids).toContain('object-setup')
   })
 
-  it('builds correct Lightning URLs with sfHost', () => {
+  it('builds correct sharing URL via Object Manager', () => {
     const actions = getRecordSuggestions(baseContext, TEST_HOST)
     const sharing = actions.find((a) => a.id === 'view-sharing')
     expect(sharing?.url).toBe(
-      `https://${TEST_HOST}/lightning/r/Account/001000000000001AAA/related/Shares/view`
+      `https://${TEST_HOST}/lightning/setup/ObjectManager/Account/SharingRules/view`
     )
   })
 
-  it('builds Object Manager URL for standard objects', () => {
+  it('builds Object Manager Details URL for standard objects', () => {
     const actions = getRecordSuggestions(baseContext, TEST_HOST)
     const setup = actions.find((a) => a.id === 'object-setup')
-    expect(setup?.url).toContain('ObjectManager/Account/FieldsAndRelationships')
+    expect(setup?.url).toContain('ObjectManager/Account/Details')
   })
 
-  it('builds Object Manager URL for custom objects', () => {
+  it('builds Object Manager Details URL for custom objects', () => {
     const context = { ...baseContext, objectApiName: 'My_Custom__c' }
     const actions = getRecordSuggestions(context, TEST_HOST)
     const setup = actions.find((a) => a.id === 'object-setup')

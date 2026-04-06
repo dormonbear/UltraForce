@@ -34,31 +34,31 @@ export function getRecordSuggestions(
   const baseUrl = `https://${sfHost}`
   const actions: ContextualAction[] = []
 
-  // View Sharing — sharing detail page
+  // Sharing settings — setup-level sharing rules for the object
   actions.push({
     id: 'view-sharing',
     name: 'Sharing',
     description: 'View sharing settings',
     icon: 'sharing',
-    url: `${baseUrl}/lightning/r/${objectApiName}/${recordId}/related/Shares/view`
+    url: `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/SharingRules/view`
   })
 
-  // Audit History / Field History
+  // Approval History
   actions.push({
-    id: 'audit-history',
-    name: 'History',
-    description: 'View field history',
-    icon: 'history',
-    url: `${baseUrl}/lightning/r/${objectApiName}/${recordId}/related/Histories/view`
+    id: 'approval-history',
+    name: 'Approvals',
+    description: 'View approval processes',
+    icon: 'approval',
+    url: `${baseUrl}/lightning/setup/ApprovalProcesses/home`
   })
 
-  // Related Lists overview
+  // Feed Tracking
   actions.push({
-    id: 'related-lists',
-    name: 'Related Lists',
-    description: 'View all related lists',
-    icon: 'related',
-    url: `${baseUrl}/lightning/r/${objectApiName}/${recordId}/related`
+    id: 'feed-tracking',
+    name: 'Feed Tracking',
+    description: 'Configure feed tracking',
+    icon: 'feed',
+    url: `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/FeedTracking/view`
   })
 
   // Clone record
@@ -70,15 +70,13 @@ export function getRecordSuggestions(
     url: `${baseUrl}/lightning/o/${objectApiName}/new?defaultFieldValues=&clone=${recordId}`
   })
 
-  // Object setup — go to the object's setup page
+  // Object setup — go to the object's setup page (Details for all objects)
   actions.push({
     id: 'object-setup',
     name: 'Object Setup',
     description: `Open ${objectApiName} setup`,
     icon: 'setup',
-    url: objectApiName.endsWith('__c')
-      ? `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/Details/view`
-      : `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/FieldsAndRelationships/view`
+    url: `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/Details/view`
   })
 
   return actions
