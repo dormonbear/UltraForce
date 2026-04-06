@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Feature Expansion -- Smart Navigation & Productivity
-status: active
-stopped_at: Phase 3 complete, ready for Phase 4 discussion
-last_updated: "2026-04-06T04:40:00.000Z"
+status: completed
+stopped_at: Milestone 2 complete — all 4 phases delivered
+last_updated: "2026-04-06T04:48:00.000Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-  percent: 75
+  completed_phases: 4
+  total_plans: 4
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -28,17 +28,17 @@ See: .planning/PROJECT.md (updated 2026-04-04)
 | # | Name | Status | Completed |
 |---|------|--------|-----------|
 | 1 | Architecture & Quality | Complete | 2026-04-04 |
-| 2 | Feature Expansion | Active | -- |
+| 2 | Feature Expansion | Complete | 2026-04-06 |
 
 ## Current Position
 
 Milestone: 02 (Feature Expansion)
-Phase: 04 (Contextual Suggestions) -- READY TO DISCUSS
-Plan: 0 of 1
-Status: Phase 3 complete, advancing to Phase 4
+Phase: -- (Milestone 2 complete)
+Plan: 4 of 4
+Status: All phases complete, ready for next milestone
 Last activity: 2026-04-06
 
-Progress: [########--] 75%
+Progress: [##########] 100%
 
 ## Milestone 2 Features
 
@@ -54,7 +54,7 @@ Progress: [########--] 75%
 | 1 | Data Infrastructure (stores + hooks) | Complete |
 | 2 | Modal Home Screen (favorites + history UI) | Complete |
 | 3 | Smart ID Navigator (clipboard + preview) | Complete |
-| 4 | Contextual Suggestions (expanded actions) | Not Started |
+| 4 | Contextual Suggestions (expanded actions) | Complete |
 
 ## Accumulated Context
 
@@ -72,6 +72,7 @@ Progress: [########--] 75%
 - [Phase 01]: History + Favorites stores already implemented with frecency scoring and chrome.storage persistence
 - [Phase 02]: HomeScreen wired into SearchModal replacing EmptyState; pin/star icon added to ResultItem
 - [Phase 03]: id-utils.ts extracts IDs from plain text, URLs, and mixed content; record-preview.ts resolves object type + name via REST API with dual cache; IdPreview component replaces EmptyState id-navigation; sfRest supports AbortSignal
+- [Phase 04]: contextual-suggestions.ts engine with getRecordSuggestions (5 new actions) and getSetupSuggestions; SearchModal expanded from 3 to 8 record actions; setup suggestions section on setup pages
 
 ### Pending Todos
 
