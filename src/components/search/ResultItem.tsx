@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import type { SearchResult } from '~types'
+import type { FavoriteItem } from '~stores/favorites-store'
 
 export type ObjectAction = 'list' | 'fields' | 'layouts' | 'details' | 'preview' | 'recordtypes' | 'validationrules'
 
@@ -8,6 +9,8 @@ interface ResultItemProps {
   isSelected: boolean
   onClick: () => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
+  isFavorite?: boolean
+  onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
 }
 
 const ActionButton: React.FC<{
@@ -24,7 +27,7 @@ const ActionButton: React.FC<{
   </button>
 )
 
-const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, onActionClick }) => {
+const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, onActionClick, isFavorite, onToggleFavorite }) => {
   const itemRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
@@ -88,6 +91,30 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
       </div>
 
       <div className="result-actions">
+        {onToggleFavorite && (
+          <ActionButton
+            title={isFavorite ? 'Remove from favorites' : 'Pin to favorites'}
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation()
+              onToggleFavorite({
+                id: result.id,
+                name: result.name,
+                type: result.type,
+                url: '',
+                description: result.description
+              })
+            }}
+            icon={
+              <svg width="14" height="14" viewBox="0 0 24 24"
+                fill={isFavorite ? 'currentColor' : 'none'}
+                stroke="currentColor" strokeWidth="2"
+                className={isFavorite ? 'pin-icon-filled' : 'pin-icon-outline'}
+              >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            }
+          />
+        )}
         {isApex && lastModifiedDate && (
           <div className="result-meta">
             {lastModifiedBy && <span className="meta-user">{lastModifiedBy}</span>}

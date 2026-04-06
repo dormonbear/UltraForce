@@ -353,13 +353,13 @@ describe('buildActionUrl', () => {
       expect(url).toBe('https://test.my.salesforce.com/01Ixxx')
     })
 
-    it('should build fields url for standard objects', () => {
+    it('should build fields url for standard objects with setupid', () => {
       const stdResult = makeResult({
         type: 'CustomObject',
         metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
       })
       const url = buildActionUrl(stdResult, 'fields', classicCtx)
-      expect(url).toContain('LayoutFieldList?type=Account')
+      expect(url).toContain('LayoutFieldList?type=Account&setupid=AccountFields')
     })
 
     it('should return null for unknown classic action', () => {

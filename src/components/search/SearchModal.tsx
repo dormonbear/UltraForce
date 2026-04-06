@@ -5,6 +5,7 @@ import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
 import SettingsPanel from './SettingsPanel'
 import EmptyState from './EmptyState'
+import HomeScreen from './HomeScreen'
 import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
@@ -15,6 +16,8 @@ import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
+import { useFavoritesStore } from '~stores/favorites-store'
+import { useHistoryStore } from '~stores/history-store'
 import type { ObjectAction } from './ResultItem'
 
 const MODAL_INLINE_STYLE: React.CSSProperties = {
@@ -36,6 +39,7 @@ interface SearchModalProps {
   onResultClick: (result: SearchResult) => void
   onIdNavigate?: (id: string) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
+  onNavigate?: (url: string) => void
   onPageLayoutClick?: () => void
   onRecordTypeClick?: () => void
   onFieldsClick?: () => void
@@ -49,6 +53,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onResultClick,
   onIdNavigate,
   onActionClick,
+  onNavigate,
   onPageLayoutClick,
   onRecordTypeClick,
   onFieldsClick
@@ -77,6 +82,39 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const { sfHost, hasSession } = useSessionStore()
   const { isVisible, searchResults, isLoading, searchError, recordContext } = useSearchStore()
   const clearResults = useSearchStore((s) => s.clearResults)
+
+  // --- HomeScreen integration ---
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite)
+  const isFavoriteCheck = useFavoritesStore((s) => s.isFavorite)
+  const removeHistoryItem = useHistoryStore((s) => s.removeItem)
+
+  const handleToggleFavorite = useCallback(
+    (item: Omit<import('~stores/favorites-store').FavoriteItem, 'pinnedAt'>) => {
+      toggleFavorite(item)
+    },
+    [toggleFavorite]
+  )
+
+  const handleRemoveHistoryItem = useCallback(
+    (id: string) => {
+      removeHistoryItem(id)
+    },
+    [removeHistoryItem]
+  )
+
+  const handleHomeNavigate = useCallback(
+    (url: string) => {
+      if (onNavigate) {
+        onNavigate(url)
+      } else {
+        window.open(url, '_blank')
+      }
+      if (closeOnNavigate) {
+        onClose()
+      }
+    },
+    [onNavigate, closeOnNavigate, onClose]
+  )
 
   // Track whether settings store has hydrated from chrome.storage
   const [settingsReady, setSettingsReady] = useState(() => useSettingsStore.persist.hasHydrated())
@@ -491,6 +529,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                           <span className="record-object-name">{recordContext.objectApiName}</span>
                         )}
                       </div>
+                      <div className="record-actions-list">
                       {recordActions.map((action, index) => (
                         <div
                           key={action.id}
@@ -498,6 +537,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                           onClick={action.handler}
                           role="button"
                           tabIndex={0}
+                          title={action.name}
                           onKeyDown={(e) => e.key === 'Enter' && action.handler()}
                         >
                           <span className="record-action-icon">
@@ -531,9 +571,15 @@ const SearchModal: React.FC<SearchModalProps> = ({
                           </span>
                         </div>
                       ))}
+                      </div>
                     </div>
                   )}
-                  <EmptyState type="start" selectedTypes={selectedTypes} />
+                  <HomeScreen
+                    onNavigate={handleHomeNavigate}
+                    onToggleFavorite={handleToggleFavorite}
+                    onRemoveHistoryItem={handleRemoveHistoryItem}
+                    selectedTypes={selectedTypes}
+                  />
                 </>
               ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
                 <EmptyState
@@ -554,6 +600,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   onVisibleCountChange={handleVisibleCountChange}
                   collapsedGroups={collapsedGroups}
                   onToggleCollapse={handleToggleCollapse}
+                  onToggleFavorite={handleToggleFavorite}
+                  isFavorite={isFavoriteCheck}
                 />
               )}
             </div>

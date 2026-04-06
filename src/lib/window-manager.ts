@@ -8,6 +8,7 @@ import { logger } from '~lib/logger'
 import { useSettingsStore } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
+import { useHistoryStore } from '~stores/history-store'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
 import {
@@ -15,7 +16,8 @@ import {
   buildSetupUrl,
   resolveSetupShortcutPath,
   getCurrentRecordFromUrl,
-  shouldUseLightning
+  shouldUseLightning,
+  isChinaDomain
 } from '~lib/url-builder'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 import { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl } from '~lib/navigation'
@@ -364,6 +366,9 @@ class UltraForceWindowManager {
           onResultClick: this.handleResultClick.bind(this),
           onIdNavigate: this.handleIdNavigate.bind(this),
           onActionClick: this.handleActionClick.bind(this),
+          onNavigate: (url: string) => {
+            window.open(url, '_blank')
+          },
           onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
           onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
           onFieldsClick: this.handleFieldsNavigation.bind(this)
@@ -635,7 +640,8 @@ class UltraForceWindowManager {
     if (!sfHost || !objectApiName || !recordId) return null
     const layoutInfo = await getCurrentRecordLayoutInfoFn(sfHost, objectApiName, recordId)
     if (!layoutInfo) return null
-    const useLightning = shouldUseLightning(navigationMode, userLightningPreference)
+    // China (Alibaba) domains don't support Classic layout editor
+    const useLightning = shouldUseLightning(navigationMode, userLightningPreference) || isChinaDomain(sfHost)
     const url = useLightning
       ? buildSetupUrl(sfHost, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
       : `https://${sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
@@ -666,6 +672,7 @@ class UltraForceWindowManager {
     const navContext = this.getNavigationContext()
     const targetUrl = buildNavigationUrl(result, navContext)
     if (targetUrl) {
+      this.trackNavigation(result, targetUrl)
       window.open(targetUrl, '_blank')
     }
     if (useSettingsStore.getState().closeOnNavigate) {
@@ -678,6 +685,12 @@ class UltraForceWindowManager {
     const navContext = this.getNavigationContext()
     const targetUrl = buildIdNavigationUrl(id, navContext)
     if (targetUrl) {
+      useHistoryStore.getState().recordVisit({
+        id,
+        name: id,
+        type: 'Record',
+        url: targetUrl
+      })
       window.open(targetUrl, '_blank')
     }
     if (useSettingsStore.getState().closeOnNavigate) {
@@ -692,11 +705,26 @@ class UltraForceWindowManager {
     const navContext = this.getNavigationContext()
     const targetUrl = buildActionUrl(result, action, navContext)
     if (targetUrl) {
+      this.trackNavigation(
+        { ...result, name: `${result.name} - ${action}` },
+        targetUrl
+      )
       window.open(targetUrl, '_blank')
       if (useSettingsStore.getState().closeOnNavigate) {
         this.hide()
       }
     }
+  }
+
+  /** Record a navigation event for history tracking. */
+  private trackNavigation(result: SearchResult, url: string): void {
+    useHistoryStore.getState().recordVisit({
+      id: result.id,
+      name: result.name,
+      type: result.type,
+      url,
+      description: result.description
+    })
   }
 
   /** Builds NavigationContext from session + settings stores. */
