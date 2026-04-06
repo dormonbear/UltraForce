@@ -14,7 +14,7 @@ Evolve UltraForce from a metadata search tool into a Salesforce productivity lau
 ## Phases
 
 - [x] **Phase 1: Data Infrastructure** -- New Zustand stores for history and favorites with chrome.storage persistence
-- [ ] **Phase 2: Modal Home Screen** -- Redesign empty state into a rich home screen with favorites + recent history
+- [x] **Phase 2: Modal Home Screen** -- Redesign empty state into a rich home screen with favorites + recent history
 - [ ] **Phase 3: Smart ID Navigator** -- Clipboard ID detection, record preview, enhanced ID navigation
 - [ ] **Phase 4: Contextual Suggestions** -- Expand record actions with page-aware contextual suggestions
 
@@ -82,6 +82,6 @@ Evolve UltraForce from a metadata search tool into a Salesforce productivity lau
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Infrastructure | 1/1 | Complete | 2026-04-06 |
-| 2. Modal Home Screen | 0/1 | Not Started | -- |
+| 2. Modal Home Screen | 1/1 | Complete | 2026-04-06 |
 | 3. Smart ID Navigator | 0/1 | Not Started | -- |
 | 4. Contextual Suggestions | 0/1 | Not Started | -- |
