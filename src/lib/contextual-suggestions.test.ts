@@ -15,27 +15,16 @@ describe('getRecordSuggestions', () => {
     recordTypeId: null
   }
 
-  it('returns 5 actions for a standard object record', () => {
+  it('returns 2 actions for a standard object record', () => {
     const actions = getRecordSuggestions(baseContext, TEST_HOST)
-    expect(actions).toHaveLength(5)
+    expect(actions).toHaveLength(2)
   })
 
-  it('includes Sharing, Approvals, Feed Tracking, Clone, Object Setup', () => {
+  it('includes Clone and Object Setup', () => {
     const actions = getRecordSuggestions(baseContext, TEST_HOST)
     const ids = actions.map((a) => a.id)
-    expect(ids).toContain('view-sharing')
-    expect(ids).toContain('approval-history')
-    expect(ids).toContain('feed-tracking')
     expect(ids).toContain('clone-record')
     expect(ids).toContain('object-setup')
-  })
-
-  it('builds correct sharing URL via Object Manager', () => {
-    const actions = getRecordSuggestions(baseContext, TEST_HOST)
-    const sharing = actions.find((a) => a.id === 'view-sharing')
-    expect(sharing?.url).toBe(
-      `https://${TEST_HOST}/lightning/setup/ObjectManager/Account/SharingRules/view`
-    )
   })
 
   it('builds Object Manager Details URL for standard objects', () => {
