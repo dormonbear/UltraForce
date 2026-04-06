@@ -11,6 +11,8 @@ export const STORAGE_KEYS = {
   API_STATS: 'ultraforce_api_stats',
   VERSION_CHECK: 'ultraforce_version_check',
   ERROR_LOGS: 'ultraforce_error_logs',
+  HISTORY: 'ultraforce_history',
+  FAVORITES: 'ultraforce_favorites',
   LEGACY_SETTINGS: 'settings'
 } as const
 
