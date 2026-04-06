@@ -107,12 +107,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     return filterCommandsBySupported(BUILTIN_COMMANDS, unsupportedTypes)
   }, [unsupportedTypes])
 
-  const supportedMetadataTypes = useMemo(() => {
-    return METADATA_TYPES.filter(type => {
-      const types = type.value.split(',')
-      return types.some(t => !unsupportedTypes.includes(t))
-    })
-  }, [unsupportedTypes])
   const [formState, setFormState] = useState<CommandFormState>({
     key: '',
     description: '',
@@ -315,6 +309,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     try {
       await clearMetadataCache()
       await warmupMetadataCache(sfHost)
+      const refreshed = await getUnsupportedTypes(sfHost)
+      setUnsupportedTypes(refreshed)
     } finally {
       setIsRebuilding(false)
     }
@@ -411,7 +407,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <h3 className="section-title">Search Types</h3>
           <p className="section-desc">Select metadata types to include in search.</p>
           <div className="type-grid">
-            {supportedMetadataTypes.map((type) => {
+            {METADATA_TYPES.map((type) => {
               const types = type.value.split(',')
               const isChecked = types.every((t) => selectedTypes.includes(t))
               const handleToggle = () => {

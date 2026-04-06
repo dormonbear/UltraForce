@@ -1,4 +1,4 @@
-import { getSetupHost, shouldUseLightning } from './url-builder'
+import { getSetupHost, shouldUseLightning, isChinaDomain } from './url-builder'
 import type { SearchResult, NavigationMode } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
@@ -203,7 +203,8 @@ function buildClassicUrl(result: SearchResult, baseUrl: string): string | null {
       if (keyPrefix) {
         return `${baseUrl}/${keyPrefix}`
       }
-      return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${result.metadata?.QualifiedApiName}`
+      const apiName = result.metadata?.QualifiedApiName
+      return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${apiName}&setupid=${apiName}Fields`
     }
     case 'CustomField': {
       const durableId = result.metadata?.DurableId || ''
@@ -270,7 +271,8 @@ export function buildActionUrl(
 
   const objectId = result.metadata.DurableId
   const objectApiName = result.metadata.QualifiedApiName
-  const useLightning = shouldUseLightning(context.navigationMode, context.userLightningPreference)
+  // China (Alibaba) domains don't support Classic setup pages for layouts
+  const useLightning = shouldUseLightning(context.navigationMode, context.userLightningPreference) || isChinaDomain(context.sfHost)
 
   if (useLightning) {
     return buildLightningActionUrl(action, baseUrl, objectId, objectApiName)
@@ -309,27 +311,28 @@ function buildClassicActionUrl(
   objectApiName: string,
   metadata: Record<string, any>
 ): string | null {
-  // Custom objects (DurableId starts with '01I') have a single setup page
+  const isCustomObject = objectId && objectId.startsWith('01I')
   if (action === 'list') {
     const keyPrefix = metadata?.KeyPrefix
     return keyPrefix
       ? `${baseUrl}/${keyPrefix}`
       : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
   }
-  if (objectId && objectId.startsWith('01I')) {
+  // Custom objects (DurableId starts with '01I') - use DurableId-based URL
+  if (isCustomObject) {
     return `${baseUrl}/${objectId}`
   }
   switch (action) {
     case 'fields':
-      return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+      return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}&setupid=${objectApiName}Fields`
     case 'layouts':
-      return `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}`
+      return `${baseUrl}/ui/setup/layout/PageLayouts?type=${objectApiName}&setupid=${objectApiName}Layouts`
     case 'recordtypes':
       return `${baseUrl}/setup/ui/recordtypeselect.jsp?type=${objectApiName}&setupid=${objectApiName}Records`
     case 'validationrules':
       return `${baseUrl}/p/setup/vr/listvr.jsp?type=${objectApiName}&setupid=${objectApiName}ValidationRules`
     case 'details':
-      return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+      return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}&setupid=${objectApiName}Fields`
     default:
       return null
   }

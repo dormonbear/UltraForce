@@ -133,15 +133,21 @@ const TOOLING_API_TYPES = [
 ]
 
 async function checkViewSetupPermission(apiHost: string, sessionKey: string): Promise<boolean> {
-  try {
-    const url = `https://${apiHost}/services/data/v${API_VERSION}/tooling/query?q=SELECT+Id+FROM+ApexClass+LIMIT+1`
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${sessionKey}` }
-    })
-    return response.ok
-  } catch {
-    return false
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const url = `https://${apiHost}/services/data/v${API_VERSION}/tooling/query?q=SELECT+Id+FROM+ApexClass+LIMIT+1`
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${sessionKey}` }
+      })
+      if (response.ok) return true
+      if (response.status === 403 || response.status === 401) return false
+      // Transient error (5xx, timeout) - retry once
+    } catch {
+      if (attempt > 0) return false
+    }
   }
+  // Default to true on ambiguous failures to avoid hiding types for admin users
+  return true
 }
 
 /** Probes the org to discover which metadata types the current user can access. */

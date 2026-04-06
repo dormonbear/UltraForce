@@ -1,27 +1,55 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import type { SearchResult, NavigationMode, RecordContext } from '~types'
+import type { SearchResult } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
 import SearchResults from './SearchResults'
 import SettingsPanel from './SettingsPanel'
 import EmptyState from './EmptyState'
+import HomeScreen from './HomeScreen'
+import IdPreview from './IdPreview'
 import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
 import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
+import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
+import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from '~lib/contextual-suggestions'
+import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
-import { logger } from '~lib/logger'
-import { useSettingsStore } from '~stores/settings-store'
+import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
+import { useFavoritesStore } from '~stores/favorites-store'
+import { useHistoryStore } from '~stores/history-store'
 import type { ObjectAction } from './ResultItem'
 
-// Salesforce ID validation: 15 or 18 alphanumeric characters
-function isSalesforceId(str: string): boolean {
-  const trimmed = str.trim()
-  return /^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$/.test(trimmed)
+const MODAL_INLINE_STYLE: React.CSSProperties = {
+  backdropFilter: 'blur(24px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(24px) saturate(180%)'
+}
+
+const ACTION_ICON_PROPS = { width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2' }
+
+function renderActionIcon(icon: string): React.ReactNode {
+  switch (icon) {
+    case 'layout':
+      return <svg {...ACTION_ICON_PROPS}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+    case 'type':
+      return <svg {...ACTION_ICON_PROPS}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    case 'sharing':
+      return <svg {...ACTION_ICON_PROPS}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    case 'history':
+      return <svg {...ACTION_ICON_PROPS}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    case 'related':
+      return <svg {...ACTION_ICON_PROPS}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    case 'clone':
+      return <svg {...ACTION_ICON_PROPS}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    case 'setup':
+      return <svg {...ACTION_ICON_PROPS}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    default:
+      return <svg {...ACTION_ICON_PROPS}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+  }
 }
 
 interface SearchModalProps {
@@ -32,6 +60,7 @@ interface SearchModalProps {
   onResultClick: (result: SearchResult) => void
   onIdNavigate?: (id: string) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
+  onNavigate?: (url: string) => void
   onPageLayoutClick?: () => void
   onRecordTypeClick?: () => void
   onFieldsClick?: () => void
@@ -45,13 +74,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
   onResultClick,
   onIdNavigate,
   onActionClick,
+  onNavigate,
   onPageLayoutClick,
   onRecordTypeClick,
   onFieldsClick
 }) => {
   // --- Store subscriptions ---
   const {
-    selectedTypes,
+    selectedTypes: rawSelectedTypes,
     shortcutKey,
     closeOnNavigate,
     autoLoadFields,
@@ -67,9 +97,58 @@ const SearchModal: React.FC<SearchModalProps> = ({
     setCustomCommands
   } = useSettingsStore()
 
+  // Guard against empty selectedTypes from corrupted storage or stale persist data
+  const selectedTypes = rawSelectedTypes?.length > 0 ? rawSelectedTypes : SETTINGS_DEFAULTS.selectedTypes
+
   const { sfHost, hasSession } = useSessionStore()
   const { isVisible, searchResults, isLoading, searchError, recordContext } = useSearchStore()
   const clearResults = useSearchStore((s) => s.clearResults)
+
+  // --- HomeScreen integration ---
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite)
+  const favoriteItems = useFavoritesStore((s) => s.items)
+  const removeHistoryItem = useHistoryStore((s) => s.removeItem)
+
+  const isFavoriteCheck = useCallback(
+    (id: string) => favoriteItems.some((i) => i.id === id),
+    [favoriteItems]
+  )
+
+  const handleToggleFavorite = useCallback(
+    (item: Omit<import('~stores/favorites-store').FavoriteItem, 'pinnedAt'>) => {
+      toggleFavorite(item)
+    },
+    [toggleFavorite]
+  )
+
+  const handleRemoveHistoryItem = useCallback(
+    (id: string) => {
+      removeHistoryItem(id)
+    },
+    [removeHistoryItem]
+  )
+
+  const handleHomeNavigate = useCallback(
+    (url: string) => {
+      if (onNavigate) {
+        onNavigate(url)
+      } else {
+        window.open(url, '_blank')
+      }
+      if (closeOnNavigate) {
+        onClose()
+      }
+    },
+    [onNavigate, closeOnNavigate, onClose]
+  )
+
+  // Track whether settings store has hydrated from chrome.storage
+  const [settingsReady, setSettingsReady] = useState(() => useSettingsStore.persist.hasHydrated())
+  useEffect(() => {
+    if (settingsReady) return
+    const unsub = useSettingsStore.persist.onFinishHydration(() => setSettingsReady(true))
+    return unsub
+  }, [settingsReady])
 
   // --- Local UI state ---
   const [query, setQuery] = useState('')
@@ -130,6 +209,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Parse command from query
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands, unsupportedTypes), [query, allCommands, unsupportedTypes])
+  const extractedId = useMemo(() => extractSalesforceId(query.trim()), [query])
+  const extractedIds = useMemo(() => extractAllSalesforceIds(query.trim()), [query])
+  const setupSuggestions = useMemo(
+    () => isSetupPage(window.location.pathname)
+      ? getSetupSuggestions(window.location.pathname, SETUP_SHORTCUTS)
+      : [],
+    []
+  )
 
   // Show/hide command hints
   useEffect(() => {
@@ -183,6 +270,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return () => clearTimeout(debounceTimer)
     }
 
+    // Wait for settings store hydration before normal search (respect user's selected types)
+    if (!settingsReady) {
+      return
+    }
+
     // Builtin command or normal search
     const searchTypes = parsedCommand.types || selectedTypes
     if (searchTypes.length === 0) {
@@ -194,7 +286,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage])
+  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -237,7 +329,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Record actions available when on a record page
   const recordActions = useMemo(() => {
     if (!recordContext) return []
-    const actions: { id: string; name: string; handler: () => void; icon: string }[] = []
+    const actions: { id: string; name: string; handler: () => void; icon: string; description?: string }[] = []
     if (onPageLayoutClick) {
       actions.push({ id: 'page-layout', name: 'Page Layout', handler: onPageLayoutClick, icon: 'layout' })
     }
@@ -247,11 +339,24 @@ const SearchModal: React.FC<SearchModalProps> = ({
     if (onFieldsClick) {
       actions.push({ id: 'fields', name: 'Fields', handler: onFieldsClick, icon: 'fields' })
     }
+    // Contextual suggestions (URL-based, no API calls)
+    if (sfHost) {
+      const suggestions = getRecordSuggestions(recordContext, sfHost)
+      for (const s of suggestions) {
+        actions.push({
+          id: s.id,
+          name: s.name,
+          handler: () => onNavigate?.(s.url),
+          icon: s.icon,
+          description: s.description
+        })
+      }
+    }
     return actions
-  }, [recordContext, onPageLayoutClick, onRecordTypeClick, onFieldsClick])
+  }, [recordContext, sfHost, onPageLayoutClick, onRecordTypeClick, onFieldsClick, onNavigate])
 
   // Track selected record action index (separate from search results)
-  const [selectedRecordActionIndex, setSelectedRecordActionIndex] = useState(0)
+  const [selectedRecordActionIndex, setSelectedRecordActionIndex] = useState(-1)
 
   const handleDismissUpdate = useCallback(() => {
     setShowUpdateNotification(false)
@@ -294,8 +399,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
         event.preventDefault()
         if (isInRecordActionsMode && recordActions[selectedRecordActionIndex]) {
           recordActions[selectedRecordActionIndex].handler()
-        } else if (isSalesforceId(query) && onIdNavigate) {
-          onIdNavigate(query.trim())
+        } else if (extractedId && onIdNavigate) {
+          onIdNavigate(extractedId)
         } else if (visibleResults[selectedIndex]) {
           onResultClick(visibleResults[selectedIndex])
         }
@@ -408,6 +513,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
           tabIndex={-1}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
+          style={MODAL_INLINE_STYLE}
         >
         {showSettings ? (
           <SettingsPanel
@@ -470,6 +576,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                           <span className="record-object-name">{recordContext.objectApiName}</span>
                         )}
                       </div>
+                      <div className="record-actions-list">
                       {recordActions.map((action, index) => (
                         <div
                           key={action.id}
@@ -477,42 +584,47 @@ const SearchModal: React.FC<SearchModalProps> = ({
                           onClick={action.handler}
                           role="button"
                           tabIndex={0}
+                          title={action.name}
                           onKeyDown={(e) => e.key === 'Enter' && action.handler()}
                         >
                           <span className="record-action-icon">
-                            {action.icon === 'layout' ? (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                <line x1="3" y1="9" x2="21" y2="9"/>
-                                <line x1="9" y1="21" x2="9" y2="9"/>
-                              </svg>
-                            ) : action.icon === 'type' ? (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                <line x1="16" y1="17" x2="8" y2="17"/>
-                              </svg>
-                            ) : (
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="8" y1="6" x2="21" y2="6"/>
-                                <line x1="8" y1="12" x2="21" y2="12"/>
-                                <line x1="8" y1="18" x2="21" y2="18"/>
-                                <line x1="3" y1="6" x2="3.01" y2="6"/>
-                                <line x1="3" y1="12" x2="3.01" y2="12"/>
-                                <line x1="3" y1="18" x2="3.01" y2="18"/>
-                              </svg>
-                            )}
+                            {renderActionIcon(action.icon)}
                           </span>
                           <span className="record-action-text">{action.name}</span>
                           <span className="record-action-desc">
-                            {action.icon === 'layout' ? 'Open page layout' : action.icon === 'type' ? 'Open record type' : 'Open fields list'}
+                            {action.description ?? action.name}
                           </span>
                         </div>
                       ))}
+                      </div>
                     </div>
                   )}
-                  <EmptyState type="start" selectedTypes={selectedTypes} />
+                  <HomeScreen
+                    onNavigate={handleHomeNavigate}
+                    onToggleFavorite={handleToggleFavorite}
+                    onRemoveHistoryItem={handleRemoveHistoryItem}
+                    selectedTypes={selectedTypes}
+                  />
+                  {setupSuggestions.length > 0 && (
+                    <div className="setup-suggestions">
+                      <div className="setup-suggestions-header">Related Setup Pages</div>
+                      <div className="setup-suggestions-list">
+                        {setupSuggestions.map((s) => (
+                          <div
+                            key={s.id}
+                            className="setup-suggestion-item"
+                            onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
+                          >
+                            <span className="setup-suggestion-name">{s.name}</span>
+                            <span className="setup-suggestion-category">{s.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
                 <EmptyState
@@ -520,8 +632,19 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   commandTypes={parsedCommand.types || []}
                   commandDescription={parsedCommand.command.description}
                 />
-              ) : !hasResults && isSalesforceId(query) ? (
-                <EmptyState type="id-navigation" query={query.trim()} />
+              ) : !hasResults && extractedIds.length > 0 && sfHost ? (
+                <div className="id-preview-list">
+                  {extractedIds.map((id) => (
+                    <IdPreview
+                      key={id}
+                      recordId={id}
+                      sfHost={sfHost}
+                      onNavigate={() => onIdNavigate?.(id)}
+                    />
+                  ))}
+                </div>
+              ) : !hasResults && extractedId ? (
+                <EmptyState type="id-navigation" query={extractedId} />
               ) : !hasResults ? (
                 <EmptyState type="empty" query={query} />
               ) : (
@@ -533,6 +656,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   onVisibleCountChange={handleVisibleCountChange}
                   collapsedGroups={collapsedGroups}
                   onToggleCollapse={handleToggleCollapse}
+                  onToggleFavorite={handleToggleFavorite}
+                  isFavorite={isFavoriteCheck}
                 />
               )}
             </div>

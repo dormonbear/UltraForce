@@ -8,6 +8,16 @@ UltraForce is a Chrome extension that provides fast metadata search and navigati
 
 Fast, reliable metadata search and navigation that works across all Salesforce domains -- the extension must never break the host Salesforce page or lose the user's session context.
 
+## Current Milestone: v2.0 Feature Expansion -- Smart Navigation & Productivity
+
+**Goal:** Evolve UltraForce from a metadata search tool into a Salesforce productivity launcher with smart navigation, history tracking, contextual suggestions, and favorites.
+
+**Target features:**
+- Smart ID Navigator -- auto-detect Salesforce IDs, record preview, one-keystroke navigation
+- Recent History + Frecency -- track visited records/setup pages, frecency ranking, modal home screen
+- Contextual Suggestions -- page-aware record actions, related lists, related setup pages
+- Setup Page Favorites -- pin setup pages, show on modal home screen
+
 ## Requirements
 
 ### Validated
@@ -22,49 +32,34 @@ Fast, reliable metadata search and navigation that works across all Salesforce d
 - :white_check_mark: Profile sub-menu search (permissions, users, object access) -- existing
 - :white_check_mark: Setup page shortcuts -- existing
 - :white_check_mark: Keyboard shield to suppress Salesforce shortcuts when modal is open -- existing
+- :white_check_mark: TypeScript errors fixed, characterization tests added -- Milestone 1 Phase 1
+- :white_check_mark: Module extraction (window-manager, salesforce-api decomposed) -- Milestone 1 Phase 2
+- :white_check_mark: Type safety (sfRest generic, typed event emitter) -- Milestone 1 Phase 2
+- :white_check_mark: Zustand stores + centralized storage service -- Milestone 1 Phase 3
+- :white_check_mark: CSS migration to proper CSS files, Inter font bundled -- Milestone 1 Phase 4
 
 ### Active
 
-- [ ] Split window-manager.ts (1715 lines) into focused modules: url-builder, navigation, record-context, setup-shortcuts, core orchestration
-- [ ] Split salesforce-api.ts (1206 lines) into metadata-types, metadata-fetcher, and orchestration facade
-- [ ] Migrate styles.ts (1374-line CSS-in-JS string) to proper CSS with bundled fonts
-- [ ] Introduce centralized storage service to replace scattered chrome.storage calls
-- [ ] Replace pervasive `any` types with explicit Salesforce API record interfaces
-- [ ] Make sfRest generic: `sfRest<T = unknown>()` instead of `Promise<any>`
-- :white_check_mark: Fix all 6 known TypeScript errors (ErrorBoundary children, recordContext, cookieStoreId, isBuiltin, null assignment) — Validated in Phase 1: Foundation & Safety Net
-- [ ] Add typed event emitter to replace `Set<Function>` pattern
-- [ ] Route all HTTP calls through sfRest (eliminate inline fetch in fetchAllPages)
-- [ ] Replace anonymous Apex user ID hack with standard REST endpoint
-- [ ] Remove DEBUG_FORCE_SHOW flag; use build-time env var if needed
-- :white_check_mark: Add characterization tests for window-manager.ts (66 tests) — Validated in Phase 1: Foundation & Safety Net
-- :white_check_mark: Add characterization tests for salesforce-api.ts (54 tests) — Validated in Phase 1: Foundation & Safety Net
-- [ ] Add unit tests for metadata-cache.ts (TTL, quota, refresh dedup)
-- [ ] Add component tests for SearchModal.tsx (keyboard nav, settings, error states)
-- [ ] Achieve 80%+ overall unit test coverage
-- [ ] Expand E2E tests to cover all core user flows
-- [ ] Remove legacy AngularJS code (js/, view/, reference/ directories) if replaced by modern code
-- [ ] Migrate state from WindowManager plain object to React state or Zustand
-- [ ] Introduce state management library (Zustand) for centralized state
+- [ ] Smart ID Navigator with record preview and one-keystroke navigation
+- [ ] Recent history tracking with frecency scoring across sessions
+- [ ] Modal home screen with favorites and recent history
+- [ ] Contextual page-aware suggestions and expanded record actions
+- [ ] Setup page favorites with pin/unpin support
 
 ### Out of Scope
 
-- New feature development -- this milestone focuses on quality and architecture only
 - Firefox or Safari extension support -- Chrome only
-- UI redesign -- visual appearance stays the same
 - Salesforce API version upgrades -- current API versions are sufficient
 - Performance optimization of search algorithms -- MiniSearch is working well
+- Clipboard monitoring outside the extension modal -- privacy concern, only detect within modal input
+- Cross-tab record tracking -- complexity too high for v2.0, defer to future
+- Quick Data Peek (hover preview cards) -- deferred, requires significant UI work
 
 ## Context
 
-This is Milestone 1 of the UltraForce project. The extension is functional and published, but the codebase has accumulated significant technical debt:
+Milestone 1 (Architecture & Quality) shipped: module extraction, Zustand stores, CSS migration, type safety improvements. The codebase is now well-structured with focused modules, proper state management patterns, and 72.64% test coverage.
 
-- **God class problem**: `window-manager.ts` (1715 lines) handles DOM, React, state, navigation, URL building, and more
-- **Mixed concerns**: `salesforce-api.ts` (1206 lines) mixes type definitions, fetching, caching, and formatting
-- **CSS-in-JS debt**: `styles.ts` is a 1374-line string with external Google Fonts dependency
-- **Type safety gaps**: Pervasive `any` types, especially in profile and API code
-- **Test coverage gaps**: The two largest files have zero unit tests
-- **6 active TypeScript errors**: Various type issues that need fixing
-- **Legacy code**: AngularJS files in js/, view/, reference/ may be dead code
+Milestone 2 builds on this foundation to add user-facing productivity features that transform UltraForce from a search tool into a Salesforce operating system.
 
 The codebase map is available at `.planning/codebase/` with detailed analysis of architecture, stack, conventions, testing, integrations, structure, and concerns.
 
@@ -104,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-04 after Phase 1 completion*
+*Last updated: 2026-04-06 after Milestone v2.0 started*

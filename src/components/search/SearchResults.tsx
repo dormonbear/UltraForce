@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react"
 import type { SearchResult } from "~types"
+import type { FavoriteItem } from "~stores/favorites-store"
 import ResultItem, { type ObjectAction } from "./ResultItem"
 
 interface SearchResultsProps {
@@ -10,6 +11,8 @@ interface SearchResultsProps {
   onVisibleCountChange?: (count: number) => void
   collapsedGroups?: Record<string, boolean>
   onToggleCollapse?: (type: string) => void
+  onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
+  isFavorite?: (id: string) => boolean
 }
 
 const METADATA_LABELS: Record<string, string> = {
@@ -29,7 +32,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   onActionClick,
   onVisibleCountChange,
   collapsedGroups: externalCollapsedGroups,
-  onToggleCollapse
+  onToggleCollapse,
+  onToggleFavorite,
+  isFavorite
 }) => {
   const [internalCollapsedGroups, setInternalCollapsedGroups] = useState<Record<string, boolean>>({})
 
@@ -82,6 +87,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
               isSelected={globalIndex === selectedIndex}
               onClick={() => onResultClick(result)}
               onActionClick={onActionClick}
+              isFavorite={isFavorite?.(result.id)}
+              onToggleFavorite={onToggleFavorite}
             />
           )
         })
