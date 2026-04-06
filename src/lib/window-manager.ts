@@ -22,6 +22,7 @@ import {
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 import { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl } from '~lib/navigation'
 import type { NavigationContext } from '~lib/navigation'
+import { fetchRecordPreview } from '~lib/record-preview'
 import {
   fetchRecordTypeId as fetchRecordTypeIdFn,
   resolveObjectApiNameFromRecord as resolveObjectApiNameFromRecordFn,
@@ -692,6 +693,22 @@ class UltraForceWindowManager {
         url: targetUrl
       })
       window.open(targetUrl, '_blank')
+
+      // Enrich history entry with resolved record name (fire-and-forget)
+      if (navContext.sfHost) {
+        fetchRecordPreview(navContext.sfHost, id)
+          .then((preview) => {
+            if (preview && preview.name !== 'Record not found' && preview.name !== 'No access') {
+              useHistoryStore.getState().recordVisit({
+                id,
+                name: `${preview.objectType}: ${preview.name}`,
+                type: preview.objectType,
+                url: targetUrl
+              })
+            }
+          })
+          .catch(() => {})
+      }
     }
     if (useSettingsStore.getState().closeOnNavigate) {
       this.hide()
