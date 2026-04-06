@@ -34,33 +34,6 @@ export function getRecordSuggestions(
   const baseUrl = `https://${sfHost}`
   const actions: ContextualAction[] = []
 
-  // Sharing settings — setup-level sharing rules for the object
-  actions.push({
-    id: 'view-sharing',
-    name: 'Sharing',
-    description: 'View sharing settings',
-    icon: 'sharing',
-    url: `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/SharingRules/view`
-  })
-
-  // Approval History
-  actions.push({
-    id: 'approval-history',
-    name: 'Approvals',
-    description: 'View approval processes',
-    icon: 'approval',
-    url: `${baseUrl}/lightning/setup/ApprovalProcesses/home`
-  })
-
-  // Feed Tracking
-  actions.push({
-    id: 'feed-tracking',
-    name: 'Feed Tracking',
-    description: 'Configure feed tracking',
-    icon: 'feed',
-    url: `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/FeedTracking/view`
-  })
-
   // Clone record
   actions.push({
     id: 'clone-record',
