@@ -106,8 +106,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   // --- HomeScreen integration ---
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite)
-  const isFavoriteCheck = useFavoritesStore((s) => s.isFavorite)
+  const favoriteItems = useFavoritesStore((s) => s.items)
   const removeHistoryItem = useHistoryStore((s) => s.removeItem)
+
+  const isFavoriteCheck = useCallback(
+    (id: string) => favoriteItems.some((i) => i.id === id),
+    [favoriteItems]
+  )
 
   const handleToggleFavorite = useCallback(
     (item: Omit<import('~stores/favorites-store').FavoriteItem, 'pinnedAt'>) => {
