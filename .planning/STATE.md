@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Feature Expansion -- Smart Navigation & Productivity
 status: active
-stopped_at: Milestone created, ready to start Phase 1
+stopped_at: Phase 1 complete, advancing to Phase 2 discussion
 last_updated: "2026-04-06T03:35:00.000Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 25
 ---
 
 # Project State
@@ -33,12 +33,12 @@ See: .planning/PROJECT.md (updated 2026-04-04)
 ## Current Position
 
 Milestone: 02 (Feature Expansion)
-Phase: 01 (Data Infrastructure) -- NOT STARTED
+Phase: 02 (Modal Home Screen) -- READY TO DISCUSS
 Plan: 0 of 1
-Status: Ready to plan and execute
+Status: Phase 1 complete (pre-existing code), advancing to Phase 2
 Last activity: 2026-04-06
 
-Progress: [----------] 0%
+Progress: [##--------] 25%
 
 ## Milestone 2 Features
 
@@ -51,7 +51,7 @@ Progress: [----------] 0%
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | Data Infrastructure (stores + hooks) | Not Started |
+| 1 | Data Infrastructure (stores + hooks) | Complete |
 | 2 | Modal Home Screen (favorites + history UI) | Not Started |
 | 3 | Smart ID Navigator (clipboard + preview) | Not Started |
 | 4 | Contextual Suggestions (expanded actions) | Not Started |
@@ -69,7 +69,7 @@ Progress: [----------] 0%
 
 ### Decisions (Milestone 2)
 
-- None yet
+- [Phase 01]: History + Favorites stores already implemented with frecency scoring and chrome.storage persistence
 
 ### Pending Todos
 
