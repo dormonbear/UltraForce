@@ -55,6 +55,37 @@ export function extractSalesforceId(input: string): string | null {
 }
 
 /**
+ * Extracts ALL Salesforce IDs from input text.
+ * Handles mixed content with multiple IDs, URLs, etc.
+ * Returns unique IDs (deduped), preferring 18-char over 15-char.
+ */
+export function extractAllSalesforceIds(input: string): string[] {
+  const trimmed = input.trim()
+  if (!trimmed) return []
+
+  // Single ID shortcut
+  if (isSalesforceId(trimmed)) return [trimmed]
+
+  // Find all ID-like patterns
+  const pattern = /\b[a-zA-Z0-9]{18}\b|\b[a-zA-Z0-9]{15}\b/g
+  const matches: string[] = []
+  const seen = new Set<string>()
+
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(trimmed)) !== null) {
+    const id = match[0]
+    // Use the first 15 chars as dedup key (18-char IDs share the same 15-char prefix)
+    const key = id.substring(0, 15)
+    if (!seen.has(key)) {
+      seen.add(key)
+      matches.push(id)
+    }
+  }
+
+  return matches
+}
+
+/**
  * Returns the 3-character key prefix from a Salesforce ID.
  * The key prefix identifies the object type (e.g., "001" = Account).
  */

@@ -152,7 +152,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   onClick={(e) => handleFavoriteToggle(e, item)}
                   title="Unpin"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                   </svg>
                 </button>
@@ -189,11 +189,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <span className="home-item-name">{item.name}</span>
                 <span className="home-item-time">{formatRelativeTime(item.lastVisitedAt)}</span>
                 <button
-                  className="home-item-action home-item-pin"
+                  className={`home-item-action home-item-pin${isFavorite(item.id) ? ' home-item-pinned' : ''}`}
                   onClick={(e) => handleFavoriteToggle(e, item)}
                   title={isFavorite(item.id) ? 'Unpin' : 'Pin to favorites'}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24"
+                  <svg width="14" height="14" viewBox="0 0 24 24"
                     fill={isFavorite(item.id) ? 'currentColor' : 'none'}
                     stroke="currentColor" strokeWidth="2"
                   >
@@ -205,7 +205,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   onClick={(e) => handleRemoveHistory(e, item.id)}
                   title="Remove from history"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18"/>
                     <line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>

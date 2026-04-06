@@ -354,6 +354,15 @@
   color: rgba(255, 193, 7, 1);
 }
 
+/* Always show the favorite button when item is pinned */
+.object-action-btn:has(.pin-icon-filled) {
+  opacity: 1;
+}
+
+.result-item .object-actions:has(.pin-icon-filled) {
+  opacity: 1;
+}
+
 /* Empty States */
 .search-empty {
   display: flex;
@@ -1588,6 +1597,15 @@ kbd {
   color: rgba(255, 200, 50, 1);
 }
 
+.home-item-pinned {
+  color: rgba(255, 200, 50, 0.6);
+  opacity: 1;
+}
+
+.home-item-pinned:hover {
+  color: rgba(255, 200, 50, 1);
+}
+
 .home-item-pin {
   color: rgba(255, 255, 255, 0.25);
 }
@@ -1597,6 +1615,28 @@ kbd {
 }
 
 /* ID Preview */
+.id-preview-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.id-preview-list .id-preview {
+  min-height: 80px;
+  padding: 16px 24px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.id-preview-list .id-preview:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.id-preview-list .id-preview:last-child {
+  border-bottom: none;
+}
+
 .id-preview {
   display: flex;
   flex-direction: column;
