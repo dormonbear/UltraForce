@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Feature Expansion -- Smart Navigation & Productivity
 status: active
-stopped_at: Phase 1 complete, advancing to Phase 2 discussion
+stopped_at: Phase 2 complete, ready for Phase 3 discussion
 last_updated: "2026-04-06T03:35:00.000Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 4
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
-  percent: 25
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -33,12 +33,12 @@ See: .planning/PROJECT.md (updated 2026-04-04)
 ## Current Position
 
 Milestone: 02 (Feature Expansion)
-Phase: 02 (Modal Home Screen) -- READY TO DISCUSS
+Phase: 03 (Smart ID Navigator) -- READY TO DISCUSS
 Plan: 0 of 1
-Status: Phase 1 complete (pre-existing code), advancing to Phase 2
+Status: Phase 2 complete, advancing to Phase 3
 Last activity: 2026-04-06
 
-Progress: [##--------] 25%
+Progress: [#####-----] 50%
 
 ## Milestone 2 Features
 
@@ -52,7 +52,7 @@ Progress: [##--------] 25%
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Data Infrastructure (stores + hooks) | Complete |
-| 2 | Modal Home Screen (favorites + history UI) | Not Started |
+| 2 | Modal Home Screen (favorites + history UI) | Complete |
 | 3 | Smart ID Navigator (clipboard + preview) | Not Started |
 | 4 | Contextual Suggestions (expanded actions) | Not Started |
 
@@ -70,6 +70,7 @@ Progress: [##--------] 25%
 ### Decisions (Milestone 2)
 
 - [Phase 01]: History + Favorites stores already implemented with frecency scoring and chrome.storage persistence
+- [Phase 02]: HomeScreen wired into SearchModal replacing EmptyState; pin/star icon added to ResultItem
 
 ### Pending Todos
 
