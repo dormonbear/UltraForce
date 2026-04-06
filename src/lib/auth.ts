@@ -15,6 +15,10 @@ export interface SfSession {
   hostname: string
 }
 
+export interface SfRestError extends Error {
+  status: number
+}
+
 /**
  * Get Salesforce host from background script
  * This retrieves the appropriate SF domain by checking cookies
@@ -60,9 +64,10 @@ export async function sfRest<T = unknown>(
     method?: string
     body?: unknown
     api?: 'normal' | 'bulk'
+    signal?: AbortSignal
   } = {}
 ): Promise<T> {
-  const { method = 'GET', body, api = 'normal' } = options
+  const { method = 'GET', body, api = 'normal', signal } = options
 
   const session = await getSession(sfHost)
   if (!session) {
@@ -89,7 +94,8 @@ export async function sfRest<T = unknown>(
   const response = await fetch(url, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined
+    body: body ? JSON.stringify(body) : undefined,
+    signal
   })
 
   if (!response.ok) {
@@ -100,7 +106,9 @@ export async function sfRest<T = unknown>(
       throw new Error('Session expired. Please refresh the page and try again.')
     }
 
-    throw new Error(`API Error ${response.status}: ${errorText}`)
+    const error = new Error(`API Error ${response.status}: ${errorText}`)
+    ;(error as SfRestError).status = response.status
+    throw error
   }
 
   trackApiRequest()

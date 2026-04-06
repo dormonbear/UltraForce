@@ -28,8 +28,27 @@ export function buildSetupUrl(sfHost: string | null, path: string): string | nul
   return `https://${setupHost}${path}`
 }
 
+// Metadata key prefixes that are Setup entities, not data records
+const SETUP_ENTITY_PREFIXES = [
+  '01I', // CustomObject definition
+  '01p', // ApexClass
+  '01q', // ApexTrigger
+  '066', // ApexPage
+  '099', // ApexComponent
+  '0Ab', // AuraDefinitionBundle
+  '0Rd', // LightningComponentBundle
+  '300', // Flow / FlowDefinition
+  '0PS'  // PermissionSet
+]
+
 export function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: string | null } {
   const path = window.location.pathname
+  const search = window.location.search || ''
+
+  // Skip URLs that are clearly Setup pages
+  if (path.includes('/lightning/setup/') || search.includes('setupid=')) {
+    return { objectApiName: null, recordId: null }
+  }
 
   const lightningMatch = path.match(/^\/lightning\/r\/([^/]+)\/([A-Za-z0-9]{15,18})(?:\/|$)/)
   if (lightningMatch && lightningMatch[1] && lightningMatch[2]) {
@@ -38,10 +57,21 @@ export function getCurrentRecordFromUrl(): { objectApiName: string | null; recor
 
   const classicMatch = path.match(/^\/([A-Za-z0-9]{15,18})(?:\/|$|\?)/)
   if (classicMatch && classicMatch[1]) {
-    return { objectApiName: null, recordId: classicMatch[1] }
+    const id = classicMatch[1]
+    const prefix = id.substring(0, 3)
+    if (SETUP_ENTITY_PREFIXES.includes(prefix)) {
+      return { objectApiName: null, recordId: null }
+    }
+    return { objectApiName: null, recordId: id }
   }
 
   return { objectApiName: null, recordId: null }
+}
+
+/** Returns true for Alibaba-hosted Salesforce domains (China region). */
+export function isChinaDomain(sfHost: string | null): boolean {
+  if (!sfHost) return false
+  return sfHost.includes('.sfcrmproducts.cn') || sfHost.includes('.sfcrmapps.cn')
 }
 
 export function shouldUseLightning(mode: NavigationMode, userPreference: boolean | null = null): boolean {
