@@ -1,5 +1,22 @@
 # Release Notes
 
+## v0.2.0
+
+Release Date: 2026-04-06
+
+### New Features
+
+- **Recent History + Frecency**: Modal home screen shows recently visited records and setup pages, ranked by frequency and recency. Remove items or pin them to favorites.
+- **Setup Page Favorites**: Pin frequently-used items to the top of the modal home screen. Star icon toggle available on search results and home screen. Persisted across sessions.
+- **Smart ID Navigator**: Paste Salesforce record IDs (15/18-char) or URLs into the search input to see record previews with object type and name. Supports pasting multiple IDs at once.
+- **Contextual Suggestions**: On record pages, quick actions for Clone and Object Setup. On setup pages, related setup pages in the same category are suggested.
+
+### Improvements
+
+- Modal empty state replaced with rich home screen showing favorites and recent history
+- Record action buttons no longer highlight by default
+- Favorite star icon consistent across all views (14x14, gold fill when pinned)
+
 ## v0.1.3
 
 Release Date: 2026-04-05
