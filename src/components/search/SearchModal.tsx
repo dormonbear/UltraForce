@@ -6,12 +6,14 @@ import SearchResults from './SearchResults'
 import SettingsPanel from './SettingsPanel'
 import EmptyState from './EmptyState'
 import HomeScreen from './HomeScreen'
+import IdPreview from './IdPreview'
 import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
 import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
+import { extractSalesforceId } from '~lib/id-utils'
 import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
@@ -23,12 +25,6 @@ import type { ObjectAction } from './ResultItem'
 const MODAL_INLINE_STYLE: React.CSSProperties = {
   backdropFilter: 'blur(24px) saturate(180%)',
   WebkitBackdropFilter: 'blur(24px) saturate(180%)'
-}
-
-// Salesforce ID validation: 15 or 18 alphanumeric characters
-function isSalesforceId(str: string): boolean {
-  const trimmed = str.trim()
-  return /^[a-zA-Z0-9]{15}$|^[a-zA-Z0-9]{18}$/.test(trimmed)
 }
 
 interface SearchModalProps {
@@ -183,6 +179,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Parse command from query
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands, unsupportedTypes), [query, allCommands, unsupportedTypes])
+  const extractedId = useMemo(() => extractSalesforceId(query.trim()), [query])
 
   // Show/hide command hints
   useEffect(() => {
@@ -352,8 +349,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
         event.preventDefault()
         if (isInRecordActionsMode && recordActions[selectedRecordActionIndex]) {
           recordActions[selectedRecordActionIndex].handler()
-        } else if (isSalesforceId(query) && onIdNavigate) {
-          onIdNavigate(query.trim())
+        } else if (extractedId && onIdNavigate) {
+          onIdNavigate(extractedId)
         } else if (visibleResults[selectedIndex]) {
           onResultClick(visibleResults[selectedIndex])
         }
@@ -587,8 +584,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   commandTypes={parsedCommand.types || []}
                   commandDescription={parsedCommand.command.description}
                 />
-              ) : !hasResults && isSalesforceId(query) ? (
-                <EmptyState type="id-navigation" query={query.trim()} />
+              ) : !hasResults && extractedId && sfHost ? (
+                <IdPreview
+                  recordId={extractedId}
+                  sfHost={sfHost}
+                  onNavigate={() => onIdNavigate?.(extractedId)}
+                />
+              ) : !hasResults && extractedId ? (
+                <EmptyState type="id-navigation" query={extractedId} />
               ) : !hasResults ? (
                 <EmptyState type="empty" query={query} />
               ) : (
