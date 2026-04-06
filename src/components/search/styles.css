@@ -1674,3 +1674,49 @@ kbd {
   font-size: 11px;
   cursor: pointer;
 }
+
+/* Setup Suggestions */
+.setup-suggestions {
+  padding: 8px 16px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.setup-suggestions-header {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.setup-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.setup-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.setup-suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.setup-suggestion-name {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.setup-suggestion-category {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+}
