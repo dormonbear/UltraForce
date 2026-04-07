@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.2.1
+
+Release Date: 2026-04-07
+
+### Bug Fixes
+
+- **Classic Object Navigation**: Fixed Custom Object search results opening the setup/definition page instead of the record list view in Classic mode
+
 ## v0.2.0
 
 Release Date: 2026-04-06
