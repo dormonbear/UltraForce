@@ -93,16 +93,40 @@ function notifyValueChange(input: HTMLInputElement, value: string): void {
   )
 }
 
+export interface KeyboardInterceptorOptions {
+  getInput: () => HTMLInputElement | null
+  getModal?: () => HTMLElement | null
+  getShadowRoot?: () => ShadowRoot | null
+}
+
 export function createKeyboardInterceptor(
-  getInput: () => HTMLInputElement | null,
+  getInputOrOpts: (() => HTMLInputElement | null) | KeyboardInterceptorOptions,
   getModal?: () => HTMLElement | null
 ): (e: KeyboardEvent) => void {
+  const opts: KeyboardInterceptorOptions = typeof getInputOrOpts === 'function'
+    ? { getInput: getInputOrOpts, getModal }
+    : getInputOrOpts
+
   return (e: KeyboardEvent) => {
     // Never intercept IME composition
     if (e.isComposing || (e as any).keyCode === 229) return
 
     // Never intercept modifier-only keys
     if (MODIFIER_KEYS.has(e.key)) return
+
+    // If focus is on a form element (input/textarea) that is NOT the search input,
+    // let it handle its own keyboard events (e.g. settings panel form fields)
+    if (opts.getShadowRoot) {
+      const shadowRoot = opts.getShadowRoot()
+      const activeEl = shadowRoot?.activeElement
+      const searchInput = opts.getInput()
+      if (activeEl && activeEl !== searchInput && (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)) {
+        // Still block Salesforce page shortcuts from firing
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        return
+      }
+    }
 
     const hasCtrlOrCmd = e.ctrlKey || e.metaKey
 
@@ -122,8 +146,8 @@ export function createKeyboardInterceptor(
         e.preventDefault()
       }
 
-      if (e.type === 'keydown' && getModal) {
-        const modal = getModal()
+      if (e.type === 'keydown' && opts.getModal) {
+        const modal = opts.getModal()
         if (modal) {
           const clone = new KeyboardEvent(e.type, {
             key: e.key,
@@ -156,7 +180,7 @@ export function createKeyboardInterceptor(
     // Only modify input on keydown
     if (e.type !== 'keydown') return
 
-    const input = getInput()
+    const input = opts.getInput()
     if (!input || input.value === undefined) {
       logger.debug('keyboard:no-input', { key: e.key, found: !!input })
       return
