@@ -195,13 +195,13 @@ function buildClassicUrl(result: SearchResult, baseUrl: string): string | null {
     case 'Flow':
       return `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
     case 'CustomObject': {
-      const objectDurableId = result.metadata?.DurableId
-      if (objectDurableId && objectDurableId.startsWith('01I')) {
-        return `${baseUrl}/${objectDurableId}`
-      }
       const keyPrefix = result.metadata?.KeyPrefix
       if (keyPrefix) {
         return `${baseUrl}/${keyPrefix}`
+      }
+      const objectDurableId = result.metadata?.DurableId
+      if (objectDurableId && objectDurableId.startsWith('01I')) {
+        return `${baseUrl}/${objectDurableId}`
       }
       const apiName = result.metadata?.QualifiedApiName
       return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${apiName}&setupid=${apiName}Fields`
