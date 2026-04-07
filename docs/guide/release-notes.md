@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.2.2
+
+Release Date: 2026-04-07
+
+### Bug Fixes
+
+- **Settings Panel Input**: Fixed custom command form inputs being unresponsive -- the keyboard interceptor was hijacking all keystrokes and routing them to the search input
+
 ## v0.2.1
 
 Release Date: 2026-04-07
