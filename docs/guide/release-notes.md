@@ -1,5 +1,21 @@
 # Release Notes
 
+## v0.2.2
+
+Release Date: 2026-04-07
+
+### New Features
+
+- (describe new features here)
+
+### Improvements
+
+- (describe improvements here)
+
+### Bug Fixes
+
+- (describe bug fixes here)
+
 ## v0.2.1
 
 Release Date: 2026-04-07
