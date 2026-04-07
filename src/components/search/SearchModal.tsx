@@ -363,6 +363,16 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }, [])
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    // When settings panel is open, only handle Escape to close it
+    if (showSettings) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        setShowSettings(false)
+      }
+      return
+    }
+
     // When query is empty and we have record actions, handle navigation for record actions
     const isInRecordActionsMode = !query.trim() && recordActions.length > 0 && hasSession && !isLoading
 
@@ -370,11 +380,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
       case 'Escape':
         event.preventDefault()
         event.stopPropagation()
-        if (showSettings) {
-          setShowSettings(false)
-        } else {
-          onClose()
-        }
+        onClose()
         break
 
       case 'ArrowDown':

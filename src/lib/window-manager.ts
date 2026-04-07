@@ -298,10 +298,11 @@ class UltraForceWindowManager {
     document.documentElement.setAttribute('data-ultraforce-modal-open', '')
     logger.debug('keyboard:shield activated')
 
-    this.keyboardInterceptor = createKeyboardInterceptor(
-      () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
-      () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null
-    )
+    this.keyboardInterceptor = createKeyboardInterceptor({
+      getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
+      getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
+      getShadowRoot: () => this.shadowRoot ?? null
+    })
 
     window.addEventListener('keydown', this.keyboardInterceptor, true)
     window.addEventListener('keyup', this.keyboardInterceptor, true)
