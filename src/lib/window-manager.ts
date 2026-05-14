@@ -8,7 +8,8 @@ import { logger } from '~lib/logger'
 import { useSettingsStore } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
-import { useHistoryStore } from '~stores/history-store'
+import { useHistoryStore, setHistoryOrgScope } from '~stores/history-store'
+import { setFavoritesOrgScope } from '~stores/favorites-store'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
 import {
@@ -240,6 +241,10 @@ class UltraForceWindowManager {
       const sfHost = await getSfHost(window.location.href)
       if (sfHost) {
         this.log('SF Host detected:', sfHost)
+
+        // Scope per-org persisted stores BEFORE issuing any session-dependent reads
+        // so recent/favorites cannot leak across orgs when multiple tabs are open.
+        await Promise.all([setHistoryOrgScope(sfHost), setFavoritesOrgScope(sfHost)])
 
         const session = await getSession(sfHost)
         const hasSession = session !== null

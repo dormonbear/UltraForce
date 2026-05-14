@@ -3,7 +3,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PersistStorage } from 'zustand/middleware'
-import { STORAGE_KEYS, storageGet, storageSet, storageRemove } from '~lib/storage-service'
+import {
+  STORAGE_KEYS,
+  PENDING_FAVORITES_KEY,
+  favoritesKey,
+  storageGet,
+  storageSet,
+  storageRemove
+} from '~lib/storage-service'
+import { logger } from '~lib/logger'
 
 export interface FavoriteItem {
   id: string
@@ -35,16 +43,20 @@ export type FavoritesStore = FavoritesState & FavoritesActions
 
 const MAX_FAVORITES = 20
 
+// Writes/reads no-op while persist name is still the pending placeholder (sfHost unknown).
 const chromeFavoritesStorage: PersistStorage<Partial<FavoritesState>> = {
   getItem: async (name) => {
+    if (name === PENDING_FAVORITES_KEY) return null
     const value = await storageGet<Partial<FavoritesState>>(name)
     if (!value) return null
     return { state: value }
   },
   setItem: async (name, value) => {
+    if (name === PENDING_FAVORITES_KEY) return
     await storageSet(name, value.state)
   },
   removeItem: async (name) => {
+    if (name === PENDING_FAVORITES_KEY) return
     await storageRemove(name)
   }
 }
@@ -83,9 +95,49 @@ export const useFavoritesStore = create<FavoritesStore>()(
       clearFavorites: () => set({ items: [] })
     }),
     {
-      name: STORAGE_KEYS.FAVORITES,
+      name: PENDING_FAVORITES_KEY,
       storage: chromeFavoritesStorage,
-      partialize: ({ items }) => ({ items })
+      partialize: ({ items }) => ({ items }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        items: (persistedState as { items?: FavoriteItem[] } | undefined)?.items ?? []
+      })
     }
   )
 )
+
+let currentFavoritesHost: string | null = null
+
+/**
+ * Bind the favorites store to a specific Salesforce host. Mirrors setHistoryOrgScope:
+ * isolates favorites across orgs, migrates legacy global key on first scope.
+ */
+export async function setFavoritesOrgScope(host: string): Promise<void> {
+  if (!host) return
+  if (currentFavoritesHost === host) return
+  currentFavoritesHost = host
+
+  const scopedKey = favoritesKey(host)
+
+  try {
+    const scopedExisting = await storageGet<Partial<FavoritesState>>(scopedKey)
+    if (!scopedExisting) {
+      const legacy = await storageGet<Partial<FavoritesState>>(STORAGE_KEYS.FAVORITES)
+      if (legacy && Array.isArray(legacy.items) && legacy.items.length > 0) {
+        await storageSet(scopedKey, legacy)
+        await storageRemove(STORAGE_KEYS.FAVORITES)
+        logger.info('favorites:migrated legacy global key', { host, count: legacy.items.length })
+      }
+    }
+  } catch (error) {
+    logger.error('favorites:migration failed', { host, error })
+  }
+
+  useFavoritesStore.persist.setOptions({ name: scopedKey })
+  await useFavoritesStore.persist.rehydrate()
+}
+
+/** Test-only helper: forget the bound host so setFavoritesOrgScope can be re-applied. */
+export function _resetFavoritesOrgScope(): void {
+  currentFavoritesHost = null
+}
