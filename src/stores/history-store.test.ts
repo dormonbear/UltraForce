@@ -1,11 +1,34 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useHistoryStore, calculateFrecency, sortByFrecency, type HistoryItem } from './history-store'
+import {
+  useHistoryStore,
+  setHistoryOrgScope,
+  _resetHistoryOrgScope,
+  calculateFrecency,
+  sortByFrecency,
+  type HistoryItem
+} from './history-store'
+
+const fakeStore = new Map<string, unknown>()
+const storageGetMock = vi.fn(async (key: string) => fakeStore.get(key))
+const storageSetMock = vi.fn(async (key: string, value: unknown) => {
+  fakeStore.set(key, value)
+})
+const storageRemoveMock = vi.fn(async (keys: string | string[]) => {
+  const list = Array.isArray(keys) ? keys : [keys]
+  list.forEach((k) => fakeStore.delete(k))
+})
+
+vi.mock('~lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
 
 vi.mock('~lib/storage-service', () => ({
   STORAGE_KEYS: { HISTORY: 'ultraforce_history' },
-  storageGet: vi.fn().mockResolvedValue(undefined),
-  storageSet: vi.fn().mockResolvedValue(undefined),
-  storageRemove: vi.fn().mockResolvedValue(undefined)
+  PENDING_HISTORY_KEY: 'ultraforce_history__pending',
+  historyKey: (host: string) => `ultraforce_history__${host}`,
+  storageGet: (k: string) => storageGetMock(k),
+  storageSet: (k: string, v: unknown) => storageSetMock(k, v),
+  storageRemove: (k: string | string[]) => storageRemoveMock(k)
 }))
 
 function makeItem(overrides: Partial<HistoryItem> = {}): HistoryItem {
@@ -24,6 +47,11 @@ function makeItem(overrides: Partial<HistoryItem> = {}): HistoryItem {
 describe('history-store', () => {
   beforeEach(() => {
     useHistoryStore.setState({ items: [] })
+    fakeStore.clear()
+    storageGetMock.mockClear()
+    storageSetMock.mockClear()
+    storageRemoveMock.mockClear()
+    _resetHistoryOrgScope()
   })
 
   describe('recordVisit', () => {
@@ -113,6 +141,66 @@ describe('history-store', () => {
 
       useHistoryStore.getState().clearHistory()
       expect(useHistoryStore.getState().items).toHaveLength(0)
+    })
+  })
+
+  describe('setHistoryOrgScope', () => {
+    const HOST_A = 'a--stg.sandbox.my.salesforce.com'
+    const HOST_B = 'b.my.salesforce.com'
+
+    it('isolates items across hosts', async () => {
+      await setHistoryOrgScope(HOST_A)
+      useHistoryStore.getState().recordVisit({
+        id: 'stg-1',
+        name: 'Stg item',
+        type: 'Account',
+        url: `https://${HOST_A}/stg-1`
+      })
+      // Allow the persist middleware to flush asynchronously.
+      await new Promise((r) => setTimeout(r, 0))
+
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST_B)
+      expect(useHistoryStore.getState().items).toHaveLength(0)
+
+      useHistoryStore.getState().recordVisit({
+        id: 'live-1',
+        name: 'Live item',
+        type: 'Account',
+        url: `https://${HOST_B}/live-1`
+      })
+      await new Promise((r) => setTimeout(r, 0))
+
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST_A)
+      const items = useHistoryStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(items[0].id).toBe('stg-1')
+    })
+
+    it('migrates legacy global key on first scope', async () => {
+      fakeStore.set('ultraforce_history', { items: [makeItem({ id: 'legacy' })] })
+
+      await setHistoryOrgScope(HOST_A)
+
+      expect(fakeStore.get(`ultraforce_history__${HOST_A}`)).toBeDefined()
+      expect(fakeStore.get('ultraforce_history')).toBeUndefined()
+      expect(useHistoryStore.getState().items[0]?.id).toBe('legacy')
+    })
+
+    it('does not migrate when scoped key already exists', async () => {
+      fakeStore.set('ultraforce_history', { items: [makeItem({ id: 'legacy' })] })
+      fakeStore.set(`ultraforce_history__${HOST_A}`, { items: [makeItem({ id: 'scoped' })] })
+
+      await setHistoryOrgScope(HOST_A)
+
+      expect(fakeStore.get('ultraforce_history')).toBeDefined()
+      expect(useHistoryStore.getState().items[0]?.id).toBe('scoped')
+    })
+
+    it('no-ops on empty host', async () => {
+      await setHistoryOrgScope('')
+      expect(storageGetMock).not.toHaveBeenCalled()
     })
   })
 })

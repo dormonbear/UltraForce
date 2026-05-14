@@ -1,11 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useFavoritesStore, type FavoriteItem } from './favorites-store'
+import {
+  useFavoritesStore,
+  setFavoritesOrgScope,
+  _resetFavoritesOrgScope,
+  type FavoriteItem
+} from './favorites-store'
+
+const fakeStore = new Map<string, unknown>()
+const storageGetMock = vi.fn(async (key: string) => fakeStore.get(key))
+const storageSetMock = vi.fn(async (key: string, value: unknown) => {
+  fakeStore.set(key, value)
+})
+const storageRemoveMock = vi.fn(async (keys: string | string[]) => {
+  const list = Array.isArray(keys) ? keys : [keys]
+  list.forEach((k) => fakeStore.delete(k))
+})
+
+vi.mock('~lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
 
 vi.mock('~lib/storage-service', () => ({
   STORAGE_KEYS: { FAVORITES: 'ultraforce_favorites' },
-  storageGet: vi.fn().mockResolvedValue(undefined),
-  storageSet: vi.fn().mockResolvedValue(undefined),
-  storageRemove: vi.fn().mockResolvedValue(undefined)
+  PENDING_FAVORITES_KEY: 'ultraforce_favorites__pending',
+  favoritesKey: (host: string) => `ultraforce_favorites__${host}`,
+  storageGet: (k: string) => storageGetMock(k),
+  storageSet: (k: string, v: unknown) => storageSetMock(k, v),
+  storageRemove: (k: string | string[]) => storageRemoveMock(k)
 }))
 
 function makeFavorite(overrides: Partial<FavoriteItem> = {}): FavoriteItem {
@@ -22,6 +43,11 @@ function makeFavorite(overrides: Partial<FavoriteItem> = {}): FavoriteItem {
 describe('favorites-store', () => {
   beforeEach(() => {
     useFavoritesStore.setState({ items: [] })
+    fakeStore.clear()
+    storageGetMock.mockClear()
+    storageSetMock.mockClear()
+    storageRemoveMock.mockClear()
+    _resetFavoritesOrgScope()
   })
 
   describe('addFavorite', () => {
@@ -150,6 +176,46 @@ describe('favorites-store', () => {
 
       useFavoritesStore.getState().clearFavorites()
       expect(useFavoritesStore.getState().items).toHaveLength(0)
+    })
+  })
+
+  describe('setFavoritesOrgScope', () => {
+    const HOST_A = 'a--stg.sandbox.my.salesforce.com'
+    const HOST_B = 'b.my.salesforce.com'
+
+    it('isolates favorites across hosts', async () => {
+      await setFavoritesOrgScope(HOST_A)
+      useFavoritesStore.getState().addFavorite({
+        id: 'stg-fav',
+        name: 'Stg pinned',
+        type: 'CustomObject',
+        url: `https://${HOST_A}/stg-fav`
+      })
+      await new Promise((r) => setTimeout(r, 0))
+
+      _resetFavoritesOrgScope()
+      await setFavoritesOrgScope(HOST_B)
+      expect(useFavoritesStore.getState().items).toHaveLength(0)
+    })
+
+    it('migrates legacy global key on first scope', async () => {
+      fakeStore.set('ultraforce_favorites', { items: [makeFavorite({ id: 'legacy' })] })
+
+      await setFavoritesOrgScope(HOST_A)
+
+      expect(fakeStore.get(`ultraforce_favorites__${HOST_A}`)).toBeDefined()
+      expect(fakeStore.get('ultraforce_favorites')).toBeUndefined()
+      expect(useFavoritesStore.getState().items[0]?.id).toBe('legacy')
+    })
+
+    it('does not migrate when scoped key already exists', async () => {
+      fakeStore.set('ultraforce_favorites', { items: [makeFavorite({ id: 'legacy' })] })
+      fakeStore.set(`ultraforce_favorites__${HOST_A}`, { items: [makeFavorite({ id: 'scoped' })] })
+
+      await setFavoritesOrgScope(HOST_A)
+
+      expect(fakeStore.get('ultraforce_favorites')).toBeDefined()
+      expect(useFavoritesStore.getState().items[0]?.id).toBe('scoped')
     })
   })
 })
