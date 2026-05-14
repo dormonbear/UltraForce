@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.2.3
+
+Release Date: 2026-05-14
+
+### Bug Fixes
+
+- **Cross-Org Recent / Favorites Leak**: Fixed a bug where opening two Salesforce org tabs (e.g. Sandbox + Production) caused the Recent list and Favorites to leak across orgs -- clicking an item from one org could navigate to the other. History and favorites are now isolated per host. Existing single-org data is automatically migrated on first launch.
+
 ## v0.2.2
 
 Release Date: 2026-04-07
