@@ -110,6 +110,7 @@ import { searchSalesforceMetadata, executeCustomCommand } from './salesforce-api
 import { useSearchStore } from '~stores/search-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
+import { useHistoryStore } from '~stores/history-store'
 
 const mockGetSfHost = vi.mocked(getSfHost)
 const mockGetSession = vi.mocked(getSession)
@@ -123,6 +124,7 @@ function resetStores(): void {
   useSearchStore.getState().reset()
   useSessionStore.getState().reset()
   useSettingsStore.setState(SETTINGS_DEFAULTS)
+  useHistoryStore.setState({ items: [] })
 }
 
 // Helper to destroy singleton and reset static fields
@@ -678,6 +680,28 @@ describe('UltraForceWindowManager', () => {
       )
     })
 
+    it('should record User command results in recent history', async () => {
+      const handler = (instance as any).handleResultClick.bind(instance)
+
+      handler({
+        id: '005Dn000001abcdef',
+        name: 'Test Admin',
+        type: 'User',
+        description: 'test@example.com | System Administrator'
+      })
+
+      expect(useHistoryStore.getState().items).toEqual([
+        expect.objectContaining({
+          id: '005Dn000001abcdef',
+          name: 'Test Admin',
+          type: 'User',
+          description: 'test@example.com | System Administrator',
+          url: expect.stringContaining('ManageUsers'),
+          visitCount: 1
+        })
+      ])
+    })
+
     it('should navigate to custom object list page', async () => {
       const handler = (instance as any).handleResultClick.bind(instance)
 
@@ -724,6 +748,26 @@ describe('UltraForceWindowManager', () => {
       )
     })
 
+    it('should record Profile command results in recent history', async () => {
+      const handler = (instance as any).handleResultClick.bind(instance)
+
+      handler({
+        id: '00eDn000001abc',
+        name: 'System Administrator',
+        type: 'Profile'
+      })
+
+      expect(useHistoryStore.getState().items).toEqual([
+        expect.objectContaining({
+          id: '00eDn000001abc',
+          name: 'System Administrator',
+          type: 'Profile',
+          url: expect.stringContaining('EnhancedProfiles'),
+          visitCount: 1
+        })
+      ])
+    })
+
     it('should open setup shortcut URL directly', async () => {
       const handler = (instance as any).handleResultClick.bind(instance)
 
@@ -737,6 +781,52 @@ describe('UltraForceWindowManager', () => {
       expect(openSpy).toHaveBeenCalledWith(
         'https://myorg.my.salesforce-setup.com/lightning/setup/ApexDebugLogs/home',
         '_blank'
+      )
+    })
+
+    it('should prefer a result URL and record it in recent history', async () => {
+      const handler = (instance as any).handleResultClick.bind(instance)
+      const url = 'https://myorg.my.salesforce.com/lightning/r/User/005Dn000001abcdef/view'
+
+      handler({
+        id: '005Dn000001abcdef',
+        name: 'Test Admin',
+        type: 'User',
+        url
+      })
+
+      expect(openSpy).toHaveBeenCalledWith(url, '_blank')
+      expect(useHistoryStore.getState().items[0]).toEqual(
+        expect.objectContaining({
+          id: '005Dn000001abcdef',
+          name: 'Test Admin',
+          type: 'User',
+          url
+        })
+      )
+    })
+
+    it('should refresh recent history when opening an existing recent item by URL', async () => {
+      const handler = (instance as any).handleDirectNavigate.bind(instance)
+      const url = 'https://myorg.my.salesforce.com/lightning/setup/EnhancedProfiles/page?address=%2F00eDn000001abc'
+
+      useHistoryStore.getState().recordVisit({
+        id: '00eDn000001abc',
+        name: 'System Administrator',
+        type: 'Profile',
+        url
+      })
+      const firstVisit = useHistoryStore.getState().items[0]
+
+      handler(url)
+
+      expect(openSpy).toHaveBeenCalledWith(url, '_blank')
+      expect(useHistoryStore.getState().items[0]).toEqual(
+        expect.objectContaining({
+          id: firstVisit.id,
+          type: firstVisit.type,
+          visitCount: 2
+        })
       )
     })
 

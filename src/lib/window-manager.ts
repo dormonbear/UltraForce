@@ -374,7 +374,7 @@ class UltraForceWindowManager {
           onIdNavigate: this.handleIdNavigate.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onNavigate: (url: string) => {
-            window.open(url, '_blank')
+            this.handleDirectNavigate(url)
           },
           onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
           onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
@@ -677,7 +677,7 @@ class UltraForceWindowManager {
     this.emit('resultClick', result)
 
     const navContext = this.getNavigationContext()
-    const targetUrl = buildNavigationUrl(result, navContext)
+    const targetUrl = result.url || buildNavigationUrl(result, navContext)
     if (targetUrl) {
       this.trackNavigation(result, targetUrl)
       window.open(targetUrl, '_blank')
@@ -739,8 +739,17 @@ class UltraForceWindowManager {
     }
   }
 
+  /** Open a known URL and refresh its existing recent entry when present. */
+  private handleDirectNavigate(url: string): void {
+    const historyItem = useHistoryStore.getState().items.find((item) => item.url === url)
+    if (historyItem) {
+      this.trackNavigation(historyItem, url)
+    }
+    window.open(url, '_blank')
+  }
+
   /** Record a navigation event for history tracking. */
-  private trackNavigation(result: SearchResult, url: string): void {
+  private trackNavigation(result: Pick<SearchResult, 'id' | 'name' | 'type' | 'description'>, url: string): void {
     useHistoryStore.getState().recordVisit({
       id: result.id,
       name: result.name,

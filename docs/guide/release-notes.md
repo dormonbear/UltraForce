@@ -1,5 +1,17 @@
 # Release Notes
 
+## v0.2.5
+
+Release Date: 2026-05-22
+
+### Improvements
+
+- **Recent History Navigation**: Opening an existing Recent or Favorite item now refreshes its visit count and recency score.
+
+### Bug Fixes
+
+- **Command Result Recents**: Fixed `:u`, `:p`, and other command search results not always appearing in the Recent list after opening them.
+
 ## v0.2.4
 
 Release Date: 2026-05-22
