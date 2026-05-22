@@ -30,6 +30,7 @@ export interface SfEntityDefinition {
   Label: string
   DurableId: string
   KeyPrefix: string | null
+  IsCustomSetting?: boolean
 }
 
 export interface SfFieldDefinition {
@@ -149,7 +150,7 @@ export const METADATA_TYPES: Record<string, { query: string }> = {
     query: `SELECT Id, DeveloperName, NamespacePrefix, MasterLabel, LastModifiedDate, LastModifiedBy.Name FROM AuraDefinitionBundle ORDER BY DeveloperName ASC LIMIT 10000`
   },
   CustomObject: {
-    query: `SELECT QualifiedApiName, Label, DurableId, KeyPrefix FROM EntityDefinition WHERE IsCustomizable = true AND (NOT QualifiedApiName LIKE '%__mdt') ORDER BY QualifiedApiName ASC LIMIT 10000`
+    query: `SELECT QualifiedApiName, Label, DurableId, KeyPrefix, IsCustomSetting FROM EntityDefinition WHERE IsCustomizable = true AND IsCustomSetting = false AND (NOT QualifiedApiName LIKE '%__mdt') ORDER BY QualifiedApiName ASC LIMIT 10000`
   },
   Flow: {
     query: `SELECT Id, MasterLabel, VersionNumber, Status FROM Flow ORDER BY MasterLabel ASC LIMIT 10000`

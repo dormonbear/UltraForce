@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { SearchResult } from '~types'
 
 // Mock dependencies before imports
 vi.mock('./auth', () => ({
@@ -48,7 +47,6 @@ vi.mock('./domain-utils', () => ({
 import { fetchAllPages, fetchMetadataFromAPI, fetchFieldsForObject, getMetadataWithCache } from './metadata-fetcher'
 import { sfRest } from './auth'
 import { MetadataCache } from './metadata-cache'
-import { buildSearchIndex, hasSearchIndex } from './fuzzy-search'
 
 const mockSfRest = vi.mocked(sfRest)
 
@@ -182,6 +180,19 @@ describe('fetchMetadataFromAPI', () => {
       expect.stringContaining('/services/data/v62.0/query?q=')
     )
   })
+
+  it('excludes custom settings when fetching CustomObject metadata', async () => {
+    mockSfRest.mockResolvedValueOnce({
+      records: [],
+      done: true,
+      totalSize: 0
+    })
+
+    await fetchMetadataFromAPI('CustomObject', 'test.salesforce.com')
+    const path = mockSfRest.mock.calls[0][1]
+    const encodedQuery = new URLSearchParams(path.split('?')[1]).get('q')
+    expect(encodedQuery).toContain('IsCustomSetting = false')
+  })
 })
 
 describe('fetchFieldsForObject', () => {
@@ -272,5 +283,28 @@ describe('getMetadataWithCache', () => {
     // Should skip cache and fetch fresh
     expect(result.fromCache).toBe(false)
     expect(mockCache.get).not.toHaveBeenCalled()
+  })
+
+  it('refreshes stale CustomObject cache that predates IsCustomSetting filtering', async () => {
+    const mockCache = {
+      get: vi.fn().mockResolvedValue([{ DurableId: '01I001', QualifiedApiName: 'Old_Setting__c', Label: 'Old Setting' }]),
+      set: vi.fn(),
+      delete: vi.fn()
+    }
+    vi.mocked(MetadataCache.getInstance).mockReturnValue(mockCache as any)
+
+    mockSfRest.mockResolvedValueOnce({
+      records: [{ DurableId: '01I002', QualifiedApiName: 'Account', Label: 'Account', IsCustomSetting: false }],
+      done: true,
+      totalSize: 1
+    })
+
+    const result = await getMetadataWithCache('CustomObject', 'test.salesforce.com')
+    expect(result).toEqual({
+      data: [{ DurableId: '01I002', QualifiedApiName: 'Account', Label: 'Account', IsCustomSetting: false }],
+      fromCache: false
+    })
+    expect(mockCache.delete).toHaveBeenCalledWith('test.salesforce.com', 'CustomObject')
+    expect(mockCache.set).toHaveBeenCalled()
   })
 })
