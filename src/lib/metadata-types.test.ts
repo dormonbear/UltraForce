@@ -59,6 +59,12 @@ describe('METADATA_TYPES', () => {
   it('only has the expected 17 types', () => {
     expect(Object.keys(METADATA_TYPES).sort()).toEqual(expectedTypes.sort())
   })
+
+  it('excludes custom settings from CustomObject search', () => {
+    const query = METADATA_TYPES.CustomObject.query
+    expect(query).toContain('IsCustomSetting = false')
+    expect(query).toContain('IsCustomSetting')
+  })
 })
 
 describe('SearchOptions interface', () => {
@@ -92,7 +98,8 @@ describe('Salesforce record interfaces', () => {
       QualifiedApiName: 'Account',
       Label: 'Account',
       DurableId: 'Account',
-      KeyPrefix: '001'
+      KeyPrefix: '001',
+      IsCustomSetting: false
     }
     expect(record.QualifiedApiName).toBe('Account')
   })

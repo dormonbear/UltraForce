@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.2.4
+
+Release Date: 2026-05-22
+
+### Bug Fixes
+
+- **Custom Setting Search Grouping**: Fixed custom settings appearing twice in search results by excluding `IsCustomSetting` entities from the Custom Objects index. Existing stale Custom Object metadata cache is refreshed automatically.
+
 ## v0.2.3
 
 Release Date: 2026-05-14
