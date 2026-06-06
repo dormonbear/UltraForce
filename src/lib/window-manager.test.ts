@@ -103,7 +103,6 @@ vi.mock('~components/ErrorBoundary', () => ({
 }))
 
 import UltraForceWindowManager from './window-manager'
-import type { WindowManagerState } from './window-manager'
 import { getSfHost, getSession, sfRest } from './auth'
 import { createKeyboardInterceptor } from './keyboard-interceptor'
 import { searchSalesforceMetadata, executeCustomCommand } from './salesforce-api'

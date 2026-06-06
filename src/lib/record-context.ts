@@ -1,6 +1,6 @@
 import { sfRest, API_VERSION } from './auth'
 import { isApiAvailable } from './salesforce-api'
-import { buildSetupUrl, shouldUseLightning, getSetupHost } from './url-builder'
+import { buildSetupUrl, shouldUseLightning } from './url-builder'
 import { logger } from './logger'
 import type { NavigationMode } from '~types'
 

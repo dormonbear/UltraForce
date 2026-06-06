@@ -235,10 +235,4 @@ export class MetadataCache {
       logger.error('cache:cleanup', { error })
     }
   }
-
-  async warmup(orgId: string, metadataTypes: string[]): Promise<void> {
-    document.dispatchEvent(
-      new CustomEvent('metadataWarmupRequest', { detail: { orgId, metadataTypes } })
-    )
-  }
 }
