@@ -13,7 +13,6 @@ import { setFavoritesOrgScope } from '~stores/favorites-store'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
 import {
-  getSetupHost,
   buildSetupUrl,
   resolveSetupShortcutPath,
   getCurrentRecordFromUrl,
@@ -28,9 +27,7 @@ import {
   fetchRecordTypeId as fetchRecordTypeIdFn,
   resolveObjectApiNameFromRecord as resolveObjectApiNameFromRecordFn,
   getCurrentRecordLayoutInfo as getCurrentRecordLayoutInfoFn,
-  getCurrentUserProfileId as getCurrentUserProfileIdFn,
   getUserLightningPreference as getUserLightningPreferenceFn,
-  getLayoutAssignment as getLayoutAssignmentFn,
   handleFieldsNavigation as handleFieldsNavigationFn,
   handleRecordTypeNavigation as handleRecordTypeNavigationFn
 } from '~lib/record-context'
