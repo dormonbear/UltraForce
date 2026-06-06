@@ -369,5 +369,339 @@ describe('buildActionUrl', () => {
       })
       expect(buildActionUrl(stdResult, 'unknown' as any, classicCtx)).toBeNull()
     })
+
+    it('should build classic layouts url for standard objects', () => {
+      const stdResult = makeResult({
+        type: 'CustomObject',
+        metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
+      })
+      const url = buildActionUrl(stdResult, 'layouts', classicCtx)
+      expect(url).toBe(
+        'https://test.my.salesforce.com/ui/setup/layout/PageLayouts?type=Account&setupid=AccountLayouts'
+      )
+    })
+
+    it('should build classic recordtypes url for standard objects', () => {
+      const stdResult = makeResult({
+        type: 'CustomObject',
+        metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
+      })
+      const url = buildActionUrl(stdResult, 'recordtypes', classicCtx)
+      expect(url).toBe(
+        'https://test.my.salesforce.com/setup/ui/recordtypeselect.jsp?type=Account&setupid=AccountRecords'
+      )
+    })
+
+    it('should build classic validationrules url for standard objects', () => {
+      const stdResult = makeResult({
+        type: 'CustomObject',
+        metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
+      })
+      const url = buildActionUrl(stdResult, 'validationrules', classicCtx)
+      expect(url).toBe(
+        'https://test.my.salesforce.com/p/setup/vr/listvr.jsp?type=Account&setupid=AccountValidationRules'
+      )
+    })
+
+    it('should build classic details url for standard objects', () => {
+      const stdResult = makeResult({
+        type: 'CustomObject',
+        metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
+      })
+      const url = buildActionUrl(stdResult, 'details', classicCtx)
+      expect(url).toBe(
+        'https://test.my.salesforce.com/p/setup/layout/LayoutFieldList?type=Account&setupid=AccountFields'
+      )
+    })
+  })
+
+  describe('China domain forces Lightning actions', () => {
+    const chinaCtx: NavigationContext = {
+      sfHost: 'mycompany.my.sfcrmproducts.cn',
+      navigationMode: 'classic',
+      userLightningPreference: false
+    }
+
+    it('should use Lightning ObjectManager url on China domain even in classic mode', () => {
+      const result = makeResult({
+        type: 'CustomObject',
+        metadata: { DurableId: '01Ixxx', QualifiedApiName: 'Account' }
+      })
+      const url = buildActionUrl(result, 'fields', chinaCtx)
+      expect(url).toBe(
+        'https://mycompany.my.sfcrmproducts.cn/lightning/setup/ObjectManager/01Ixxx/FieldsAndRelationships/view'
+      )
+    })
+  })
+})
+
+describe('buildNavigationUrl additional Lightning branches', () => {
+  it('should build ApexPage url', () => {
+    const result = makeResult({ type: 'ApexPage', id: '066xxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/lightning/setup/ApexPages/page?address=%2F066xxx')
+  })
+
+  it('should build ApexComponent url', () => {
+    const result = makeResult({ type: 'ApexComponent', id: '077xxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/lightning/setup/ApexComponents/page?address=%2F077xxx')
+  })
+
+  it('should build LightningComponentBundle url', () => {
+    const result = makeResult({ type: 'LightningComponentBundle', id: '0Rbxxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce.com/lightning/setup/LightningComponentBundles/page?address=%2F0Rbxxx'
+    )
+  })
+
+  it('should build AuraDefinitionBundle url', () => {
+    const result = makeResult({ type: 'AuraDefinitionBundle', id: '0Abxxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/lightning/setup/AuraBundles/page?address=%2F0Abxxx')
+  })
+
+  it('should fall back to generic record view when CustomField lacks object/field info', () => {
+    const result = makeResult({ type: 'CustomField', id: '00Nxxx', metadata: {} })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/lightning/r/CustomField/00Nxxx/view')
+  })
+
+  it('should build FieldPermission url', () => {
+    const result = makeResult({
+      type: 'FieldPermission',
+      id: 'fp001',
+      metadata: { profileId: '00e001', SobjectType: 'Account' }
+    })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DFieldPermissions%26o%3DAccount'
+    )
+  })
+
+  it('should build CustomPermissionAccess url', () => {
+    const result = makeResult({ type: 'CustomPermissionAccess', id: 'cp001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DCustomPermissions'
+    )
+  })
+
+  it('should build ApexClassAccess url', () => {
+    const result = makeResult({ type: 'ApexClassAccess', id: 'ac001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DApexClassAccess'
+    )
+  })
+
+  it('should build VFPageAccess url', () => {
+    const result = makeResult({ type: 'VFPageAccess', id: 'vf001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DApexPageAccess'
+    )
+  })
+
+  it('should build ConnectedAppAccess url', () => {
+    const result = makeResult({ type: 'ConnectedAppAccess', id: 'ca001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DConnectedAppSettings'
+    )
+  })
+
+  it('should build AssignedAppAccess url', () => {
+    const result = makeResult({ type: 'AssignedAppAccess', id: 'aa001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DObjectsAndTabs'
+    )
+  })
+
+  it('should build ProfileSetupLink url', () => {
+    const result = makeResult({
+      type: 'ProfileSetupLink',
+      id: 'psl001',
+      metadata: { profileId: '00e001', section: 'LoginIpRanges' }
+    })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/Profiles/page?address=%2F00e001%3Fs%3DLoginIpRanges'
+    )
+  })
+
+  it('should build CustomMetadataType record url for non-type-definition', () => {
+    const result = makeResult({
+      type: 'CustomMetadataType',
+      id: 'm01xxx',
+      metadata: { Id: 'm01record' }
+    })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01record'
+    )
+  })
+
+  it('should build CustomSetting record url for non-definition', () => {
+    const result = makeResult({
+      type: 'CustomSetting',
+      id: '01Nrecord',
+      metadata: { DurableId: '01Ndurable' }
+    })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/CustomSettings/page?address=%2F01Nrecord'
+    )
+  })
+
+  it('should build CustomQuery url', () => {
+    const result = makeResult({ type: 'CustomQuery', id: '001xxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/lightning/r/sObject/001xxx/view')
+  })
+
+  it('should build Group url', () => {
+    const result = makeResult({ type: 'Group', id: '00Gxxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe(
+      'https://test.my.salesforce-setup.com/lightning/setup/PublicGroups/page?address=%2Fsetup%2Fown%2Fgroupdetail.jsp%3Fid%3D00Gxxx'
+    )
+  })
+
+  it('should build Dashboard url', () => {
+    const result = makeResult({ type: 'Dashboard', id: '01Zxxx' })
+    const url = buildNavigationUrl(result, lightningCtx)
+    expect(url).toBe('https://test.my.salesforce.com/lightning/r/Dashboard/01Zxxx/view')
+  })
+})
+
+describe('buildNavigationUrl additional Classic branches', () => {
+  it('should build ObjectPermission classic url', () => {
+    const result = makeResult({
+      type: 'ObjectPermission',
+      id: 'op001',
+      metadata: { profileId: '00e001', objectRef: 'Account' }
+    })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=ObjectsAndTabs&o=Account')
+  })
+
+  it('should build ObjectPermission classic url falling back to name', () => {
+    const result = makeResult({
+      type: 'ObjectPermission',
+      id: 'op001',
+      name: 'Contact',
+      metadata: { profileId: '00e001' }
+    })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=ObjectsAndTabs&o=Contact')
+  })
+
+  it('should build FieldPermission classic url', () => {
+    const result = makeResult({
+      type: 'FieldPermission',
+      id: 'fp001',
+      metadata: { profileId: '00e001', SobjectType: 'Account' }
+    })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=FieldPermissions&o=Account')
+  })
+
+  it('should build CustomPermissionAccess classic url', () => {
+    const result = makeResult({ type: 'CustomPermissionAccess', id: 'cp001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=CustomPermissions')
+  })
+
+  it('should build ApexClassAccess classic url', () => {
+    const result = makeResult({ type: 'ApexClassAccess', id: 'ac001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=ApexClassAccess')
+  })
+
+  it('should build VFPageAccess classic url', () => {
+    const result = makeResult({ type: 'VFPageAccess', id: 'vf001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=ApexPageAccess')
+  })
+
+  it('should build ConnectedAppAccess classic url', () => {
+    const result = makeResult({ type: 'ConnectedAppAccess', id: 'ca001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=ConnectedAppSettings')
+  })
+
+  it('should build AssignedAppAccess classic url', () => {
+    const result = makeResult({ type: 'AssignedAppAccess', id: 'aa001', metadata: { profileId: '00e001' } })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=ObjectsAndTabs')
+  })
+
+  it('should build ProfileSetupLink classic url', () => {
+    const result = makeResult({
+      type: 'ProfileSetupLink',
+      id: 'psl001',
+      metadata: { profileId: '00e001', section: 'LoginIpRanges' }
+    })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00e001?s=LoginIpRanges')
+  })
+
+  it('should fall back to result id when CustomField has no DurableId', () => {
+    const result = makeResult({ type: 'CustomField', id: '00Nfallback', metadata: {} })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/00Nfallback')
+  })
+
+  it('should build CustomLabel classic url', () => {
+    const result = makeResult({ type: 'CustomLabel', id: '101xxx' })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/101xxx')
+  })
+
+  it('should build CustomMetadataType classic url', () => {
+    const result = makeResult({
+      type: 'CustomMetadataType',
+      id: 'm01xxx',
+      metadata: { Id: 'm01record' }
+    })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/m01record')
+  })
+
+  it('should build CustomSetting classic record url for non-definition', () => {
+    const result = makeResult({
+      type: 'CustomSetting',
+      id: '01Nrecord',
+      metadata: { DurableId: '01Ndurable' }
+    })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/01Nrecord')
+  })
+
+  it('should build CustomQuery classic url', () => {
+    const result = makeResult({ type: 'CustomQuery', id: '001xxx' })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/001xxx')
+  })
+
+  it('should build Queue classic url', () => {
+    const result = makeResult({ type: 'Queue', id: '00Gxxx' })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/p/own/Queue/d?id=00Gxxx&setupid=Queues')
+  })
+
+  it('should build Group classic url', () => {
+    const result = makeResult({ type: 'Group', id: '00Gxxx' })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/setup/own/groupdetail.jsp?id=00Gxxx&setupid=PublicGroups')
+  })
+
+  it('should build default classic url for unknown types', () => {
+    const result = makeResult({ type: 'SomeNewType' as any, id: 'xxx123' })
+    const url = buildNavigationUrl(result, classicCtx)
+    expect(url).toBe('https://test.my.salesforce.com/xxx123')
   })
 })
