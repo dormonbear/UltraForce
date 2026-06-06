@@ -69,3 +69,6 @@ backup/
 
 # Playwright MCP screenshots
 .playwright-mcp/
+
+# CodeGraph local index (regenerated from source)
+.codegraph/
