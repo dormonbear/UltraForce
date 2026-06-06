@@ -58,8 +58,8 @@ export function isSalesforceDomain(hostname: string): boolean {
 
 /**
  * Escape a string for safe use in SOQL queries.
- * Handles both backslashes and single quotes.
+ * Handles backslashes, single quotes, and LIKE wildcards (% and _).
  */
 export function escapeSoql(input: string): string {
-  return input.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  return input.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/_/g, '\\_')
 }

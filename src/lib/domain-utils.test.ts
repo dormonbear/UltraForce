@@ -97,6 +97,14 @@ describe('escapeSoql', () => {
     expect(escapeSoql("test\\'value")).toBe("test\\\\\\'value")
   })
 
+  it('should escape LIKE wildcard percent', () => {
+    expect(escapeSoql('50%')).toBe('50\\%')
+  })
+
+  it('should escape LIKE wildcard underscore', () => {
+    expect(escapeSoql('a_b')).toBe('a\\_b')
+  })
+
   it('should return unchanged string without special characters', () => {
     expect(escapeSoql('normal string')).toBe('normal string')
   })
