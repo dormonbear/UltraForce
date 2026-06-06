@@ -218,4 +218,50 @@ describe('favorites-store', () => {
       expect(useFavoritesStore.getState().items[0]?.id).toBe('scoped')
     })
   })
+
+  describe('capacity and toggle edges', () => {
+    it('caps favorites at MAX_FAVORITES (20), dropping the oldest', () => {
+      const add = useFavoritesStore.getState().addFavorite
+      for (let i = 0; i < 25; i++) {
+        add({ id: `id${i}`, name: `N${i}`, type: 'ApexClass', url: `u${i}` })
+      }
+      const items = useFavoritesStore.getState().items
+      expect(items).toHaveLength(20)
+      expect(items[0].id).toBe('id24')
+      expect(items.some((i) => i.id === 'id0')).toBe(false)
+    })
+
+    it('addFavorite is a no-op for an already-pinned id', () => {
+      const { addFavorite } = useFavoritesStore.getState()
+      addFavorite({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      addFavorite({ id: 'a', name: 'A renamed', type: 'User', url: 'u2' })
+      const items = useFavoritesStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(items[0].name).toBe('A')
+    })
+
+    it('toggleFavorite returns false and removes when already pinned', () => {
+      const store = useFavoritesStore.getState()
+      store.addFavorite({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      const pinned = useFavoritesStore.getState().toggleFavorite({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      expect(pinned).toBe(false)
+      expect(useFavoritesStore.getState().isFavorite('a')).toBe(false)
+    })
+
+    it('toggleFavorite returns true and adds when not pinned', () => {
+      const added = useFavoritesStore.getState().toggleFavorite({ id: 'b', name: 'B', type: 'User', url: 'u' })
+      expect(added).toBe(true)
+      expect(useFavoritesStore.getState().isFavorite('b')).toBe(true)
+    })
+  })
+
+  describe('org scope isolation', () => {
+    it('clears items when switching to an unpersisted org', async () => {
+      await setFavoritesOrgScope('orgA.my.salesforce.com')
+      useFavoritesStore.getState().addFavorite({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      _resetFavoritesOrgScope()
+      await setFavoritesOrgScope('orgB.my.salesforce.com')
+      expect(useFavoritesStore.getState().items).toEqual([])
+    })
+  })
 })
