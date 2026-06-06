@@ -21,7 +21,12 @@ import './index'
 
 // vitest-chrome exposes a callListeners() helper that dispatches to every
 // registered onMessage listener; the module registers its handler at import.
-function invoke(request: any, sender: Partial<chrome.runtime.MessageSender> = {}): Promise<any> {
+const SF_SENDER = { url: 'https://myorg.my.salesforce.com/lightning/page' }
+
+function invoke(
+  request: any,
+  sender: Partial<chrome.runtime.MessageSender> = SF_SENDER
+): Promise<any> {
   return new Promise((resolve) => {
     const sendResponse = (response: any) => resolve(response)
     ;(chrome.runtime.onMessage as any).callListeners(request, sender, sendResponse)
@@ -56,6 +61,30 @@ describe('background message handlers', () => {
     expect(chrome.cookies.get).toHaveBeenCalledWith(
       expect.objectContaining({ url: 'https://myorg.my.salesforce.com', name: 'sid' })
     )
+  })
+
+  it('getSession returns null for a non-Salesforce sender url', async () => {
+    chrome.cookies.get.mockResolvedValue({
+      domain: 'myorg.my.salesforce.com',
+      value: 'SID_VALUE',
+      name: 'sid'
+    } as chrome.cookies.Cookie)
+    const res = await invoke(
+      { message: 'getSession', sfHost: 'myorg.my.salesforce.com' },
+      { url: 'https://evil.example.com/page' }
+    )
+    expect(res).toBeNull()
+    expect(chrome.cookies.get).not.toHaveBeenCalled()
+  })
+
+  it('getSession returns null when the sender url is missing', async () => {
+    chrome.cookies.get.mockResolvedValue({
+      domain: 'myorg.my.salesforce.com',
+      value: 'SID_VALUE',
+      name: 'sid'
+    } as chrome.cookies.Cookie)
+    const res = await invoke({ message: 'getSession', sfHost: 'myorg.my.salesforce.com' }, {})
+    expect(res).toBeNull()
   })
 
   it('getSession returns null when no sid cookie exists', async () => {

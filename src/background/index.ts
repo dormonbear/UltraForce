@@ -29,14 +29,30 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 })
 
+// Defense-in-depth: only respond to senders running on Salesforce-family
+// domains. Content scripts are injected on these domains, so in production
+// sender.url is always a valid Salesforce URL.
+function isTrustedSender(sender: chrome.runtime.MessageSender): boolean {
+  const url = sender.url || sender.origin
+  return !!url && isSalesforceTab(url)
+}
+
 // Message handling
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.message === 'getSfHost') {
+    if (!isTrustedSender(sender)) {
+      sendResponse(null)
+      return false
+    }
     handleGetSfHost(request, sender, sendResponse)
     return true
   }
 
   if (request.message === 'getSession') {
+    if (!isTrustedSender(sender)) {
+      sendResponse(null)
+      return false
+    }
     handleGetSession(request, sender, sendResponse)
     return true
   }
