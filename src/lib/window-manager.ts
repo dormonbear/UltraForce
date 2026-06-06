@@ -198,7 +198,11 @@ class UltraForceWindowManager {
 
     if (this.options.useShadowDOM) {
       try {
-        this.shadowRoot = this.containerElement.attachShadow({ mode: 'closed' })
+        // Production uses 'closed' to fully isolate the extension UI from the host page.
+        // E2E builds (PLASMO_PUBLIC_E2E=true) use 'open' so Playwright can read/click
+        // inside the modal; style isolation is identical for both modes.
+        const shadowMode = process.env.PLASMO_PUBLIC_E2E === 'true' ? 'open' : 'closed'
+        this.shadowRoot = this.containerElement.attachShadow({ mode: shadowMode })
         this.log('Shadow DOM created for style isolation')
       } catch {
         logger.warn('Shadow DOM not supported, falling back to regular DOM')
