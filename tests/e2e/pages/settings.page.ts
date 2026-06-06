@@ -43,6 +43,16 @@ export class SettingsPage {
     }, enabled)
   }
 
+  async setCustomCommands(commands: Record<string, unknown>) {
+    const sw = await this.getServiceWorker()
+    await sw.evaluate(async (cmds) => {
+      const stored = await chrome.storage.local.get('ultraforce_search_settings')
+      const settings = stored.ultraforce_search_settings || {}
+      settings.customCommands = cmds
+      await chrome.storage.local.set({ ultraforce_search_settings: settings })
+    }, commands)
+  }
+
   async getSettings(): Promise<Record<string, any>> {
     const sw = await this.getServiceWorker()
     return sw.evaluate(async () => {
