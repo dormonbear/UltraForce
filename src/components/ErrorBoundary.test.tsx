@@ -140,6 +140,29 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Auto-retry in 5 seconds...')).toBeInTheDocument()
   })
 
+  it('should stop auto-retrying after the max retry count', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    render(
+      <ErrorBoundary>
+        <ThrowingChild shouldThrow={true} />
+      </ErrorBoundary>
+    )
+
+    // Child always throws -> each auto-retry re-throws and reschedules until the cap.
+    // After 3 retries the boundary must stop scheduling further timers.
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(5000)
+      })
+    }
+
+    const retryTimers = setTimeoutSpy.mock.calls.filter((call) => call[1] === 5000)
+    expect(retryTimers.length).toBe(3)
+    // Terminal state: auto-retry note no longer shown
+    expect(screen.queryByText('Auto-retry in 5 seconds...')).not.toBeInTheDocument()
+    expect(screen.getByText('UltraForce encountered an error')).toBeInTheDocument()
+  })
+
   it('should handle storage errors silently during error logging', async () => {
     chrome.storage.local.set.mockRejectedValue(new Error('quota exceeded'))
     render(

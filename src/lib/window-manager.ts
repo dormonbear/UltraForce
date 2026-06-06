@@ -253,7 +253,9 @@ class UltraForceWindowManager {
         this.log('Session status:', hasSession ? 'Active' : 'None')
 
         if (hasSession) {
-          this.fetchLightningPreference().catch(() => {})
+          this.fetchLightningPreference().catch((error) =>
+            logger.warn('fetchLightningPreference failed', { error })
+          )
         }
       }
     } catch (error) {
@@ -304,16 +306,22 @@ class UltraForceWindowManager {
     document.documentElement.setAttribute('data-ultraforce-modal-open', '')
     logger.debug('keyboard:shield activated')
 
-    this.keyboardInterceptor = createKeyboardInterceptor({
-      getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
-      getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
-      getShadowRoot: () => this.shadowRoot ?? null
-    })
+    // A failing interceptor must never break the host page; degrade gracefully.
+    try {
+      this.keyboardInterceptor = createKeyboardInterceptor({
+        getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
+        getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
+        getShadowRoot: () => this.shadowRoot ?? null
+      })
 
-    window.addEventListener('keydown', this.keyboardInterceptor, true)
-    window.addEventListener('keyup', this.keyboardInterceptor, true)
-    window.addEventListener('keypress', this.keyboardInterceptor, true)
-    logger.debug('keyboard:interceptor added')
+      window.addEventListener('keydown', this.keyboardInterceptor, true)
+      window.addEventListener('keyup', this.keyboardInterceptor, true)
+      window.addEventListener('keypress', this.keyboardInterceptor, true)
+      logger.debug('keyboard:interceptor added')
+    } catch (error) {
+      this.keyboardInterceptor = null
+      logger.error('Failed to attach keyboard interceptor', { error })
+    }
 
     await this.renderComponent()
     this.emit('show', this.getState())
@@ -714,7 +722,7 @@ class UltraForceWindowManager {
               })
             }
           })
-          .catch(() => {})
+          .catch((error) => logger.warn('record preview enrichment failed', { error }))
       }
     }
     if (useSettingsStore.getState().closeOnNavigate) {

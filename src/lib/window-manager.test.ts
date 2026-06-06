@@ -105,6 +105,7 @@ vi.mock('~components/ErrorBoundary', () => ({
 import UltraForceWindowManager from './window-manager'
 import { getSfHost, getSession, sfRest } from './auth'
 import { createKeyboardInterceptor } from './keyboard-interceptor'
+import { logger } from './logger'
 import { searchSalesforceMetadata, executeCustomCommand } from './salesforce-api'
 import { useSearchStore } from '~stores/search-store'
 import { useSessionStore } from '~stores/session-store'
@@ -275,6 +276,18 @@ describe('UltraForceWindowManager', () => {
       await instance.show()
 
       expect(mockCreateKeyboardInterceptor).toHaveBeenCalled()
+    })
+
+    it('should not throw when keyboard interceptor creation fails', async () => {
+      const instance = await UltraForceWindowManager.getInstance()
+      mockCreateKeyboardInterceptor.mockImplementationOnce(() => {
+        throw new Error('interceptor boom')
+      })
+
+      // Modal must still show; a failing interceptor must not break the host page.
+      await expect(instance.show()).resolves.not.toThrow()
+      expect(instance.isVisible()).toBe(true)
+      expect(vi.mocked(logger.error)).toHaveBeenCalled()
     })
   })
 
