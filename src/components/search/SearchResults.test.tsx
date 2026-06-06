@@ -58,6 +58,17 @@ describe('SearchResults', () => {
     expect(screen.getByText('Apex Classes')).toBeTruthy()
   })
 
+  it('exposes the results container as a listbox with options', () => {
+    const onResultClick = vi.fn()
+    render(<SearchResults results={results} selectedIndex={1} onResultClick={onResultClick} />)
+    expect(screen.getByRole('listbox', { name: 'Search results' })).toBeTruthy()
+    const options = screen.getAllByRole('option')
+    expect(options).toHaveLength(3)
+    expect(options[1].getAttribute('aria-selected')).toBe('true')
+    expect(options[0].getAttribute('aria-selected')).toBe('false')
+    expect(options[2].getAttribute('aria-selected')).toBe('false')
+  })
+
   it('fires onResultClick with the clicked result', () => {
     const onResultClick = vi.fn()
     render(<SearchResults results={results} selectedIndex={0} onResultClick={onResultClick} />)

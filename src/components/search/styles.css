@@ -1392,6 +1392,16 @@ kbd {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .firework-particle,
+  .update-celebration-icon {
+    animation: none;
+  }
+  .firework-particle {
+    opacity: 0;
+  }
+}
+
 /* ================================================================
    HomeScreen - Favorites + Recent History
    ================================================================ */

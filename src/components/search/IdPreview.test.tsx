@@ -28,6 +28,25 @@ describe('IdPreview', () => {
     expect(screen.getByText('Resolving record...')).toBeTruthy()
   })
 
+  it('announces the loading state via a polite live region', () => {
+    mockFetchPreview.mockReturnValue(new Promise(() => {}))
+
+    render(<IdPreview recordId={TEST_ID} sfHost={TEST_HOST} onNavigate={vi.fn()} />)
+
+    const status = screen.getByRole('status')
+    expect(status).toHaveAttribute('aria-live', 'polite')
+  })
+
+  it('announces the error state via an alert live region', async () => {
+    mockFetchPreview.mockResolvedValue(null)
+
+    render(<IdPreview recordId={TEST_ID} sfHost={TEST_HOST} onNavigate={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeTruthy()
+    })
+  })
+
   it('renders resolved preview with object type and name', async () => {
     mockFetchPreview.mockResolvedValue({
       id: TEST_ID,

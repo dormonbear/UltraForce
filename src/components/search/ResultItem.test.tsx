@@ -51,6 +51,19 @@ describe('ResultItem', () => {
     expect(item?.classList.contains('selected')).toBe(true)
   })
 
+  it('exposes the row as an option reflecting selection', () => {
+    const { rerender } = render(<ResultItem {...defaultProps} isSelected={false} />)
+    const option = screen.getByRole('option')
+    expect(option.getAttribute('aria-selected')).toBe('false')
+    rerender(<ResultItem {...defaultProps} isSelected={true} />)
+    expect(screen.getByRole('option').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('labels the pin button by its title for screen readers', () => {
+    render(<ResultItem {...defaultProps} onToggleFavorite={vi.fn()} isFavorite={false} />)
+    expect(screen.getByRole('button', { name: 'Pin to favorites' })).toBeTruthy()
+  })
+
   it('should call onClick when clicked', () => {
     render(<ResultItem {...defaultProps} />)
     fireEvent.click(screen.getByText('TestClass'))

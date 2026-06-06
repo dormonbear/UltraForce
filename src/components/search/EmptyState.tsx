@@ -47,7 +47,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
 
   if (type === 'loading') {
     return (
-      <div className="loading-container">
+      <div className="loading-container" role="status" aria-live="polite">
         <div className="spinner" />
         <span>Searching...</span>
       </div>
@@ -120,7 +120,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
   if (type === 'error') {
     const lines = (errorMessage || 'An error occurred').split('\n')
     return (
-      <div className="search-empty search-error">
+      <div className="search-empty search-error" role="alert">
         <div className="empty-icon">⚠️</div>
         <div className="empty-title">Search Error</div>
         <div className="empty-desc error-message">

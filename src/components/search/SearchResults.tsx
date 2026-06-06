@@ -99,7 +99,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   let currentIndex = 0
 
   return (
-    <div className="search-results" data-ultraforce-results>
+    <div className="search-results" data-ultraforce-results role="listbox" aria-label="Search results">
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 
