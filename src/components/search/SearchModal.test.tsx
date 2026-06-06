@@ -81,6 +81,41 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('accessibility', () => {
+    it('exposes the modal as a dialog with an accessible name', () => {
+      renderModal()
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toBeInTheDocument()
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      expect(dialog).toHaveAccessibleName('UltraForce search')
+    })
+
+    it('labels the search input', () => {
+      renderModal()
+      expect(screen.getByRole('textbox', { name: /search/i })).toBeInTheDocument()
+    })
+
+    it('labels the settings button', () => {
+      renderModal()
+      expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    })
+
+    it('restores focus to the previously focused element on close', () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+      expect(document.activeElement).toBe(trigger)
+
+      const { unmount } = renderModal()
+      // Modal grabs focus on open
+      expect(document.activeElement).not.toBe(trigger)
+
+      unmount()
+      expect(document.activeElement).toBe(trigger)
+      document.body.removeChild(trigger)
+    })
+  })
+
   describe('visibility', () => {
     it('should render search input when store isVisible is true', () => {
       renderModal()

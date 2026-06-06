@@ -21,6 +21,7 @@ const ActionButton: React.FC<{
   <button
     className="object-action-btn"
     title={title}
+    aria-label={title}
     onClick={onClick}
   >
     {icon}
@@ -83,6 +84,8 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
       className={`result-item ${isSelected ? 'selected' : ''}`}
       data-ultraforce-result-item
       data-selected={isSelected}
+      role="option"
+      aria-selected={isSelected}
       onClick={onClick}
     >
       <div className="result-info">

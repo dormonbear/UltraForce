@@ -162,6 +162,20 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [updateVersion, setUpdateVersion] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
+  // Element that had focus in the host page before the modal opened; restored on close.
+  // Captured during the first render (lazy useState initializer) because the input's
+  // autoFocus steals focus before effects run.
+  const [previouslyFocused] = useState<Element | null>(() => document.activeElement)
+
+  // Restore host-page focus when the modal unmounts/closes.
+  useEffect(() => {
+    return () => {
+      const previous = previouslyFocused as HTMLElement | null
+      if (previous && typeof previous.focus === 'function') {
+        previous.focus()
+      }
+    }
+  }, [previouslyFocused])
 
   // Focus management
   useEffect(() => {
@@ -517,6 +531,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
           data-ultraforce-modal
           ref={modalRef}
           tabIndex={-1}
+          role="dialog"
+          aria-modal="true"
+          aria-label="UltraForce search"
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
           style={MODAL_INLINE_STYLE}
@@ -693,6 +710,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   setShowSettings(true)
                 }}
                 title="Settings"
+                aria-label="Settings"
               >
                 <svg
                   width="18"

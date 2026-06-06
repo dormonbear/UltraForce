@@ -121,6 +121,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           placeholder={
             displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'
           }
+          aria-label="Search Salesforce metadata"
           className="search-input"
           data-ultraforce-input
           autoFocus
