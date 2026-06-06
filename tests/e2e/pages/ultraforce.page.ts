@@ -155,4 +155,18 @@ export class UltraForcePage {
     }
     return { opened: false, url: '' }
   }
+
+  async openHome(): Promise<void> {
+    await this.openModal()
+    await this.clearInput()
+    await this.wait(800)
+  }
+
+  async resultTexts(): Promise<string[]> {
+    return this.page.evaluate(() => {
+      const host = document.querySelector('[id^="ultraforce-modal"]')
+      const root = (host as HTMLElement | null)?.shadowRoot ?? document
+      return Array.from(root.querySelectorAll('[data-ultraforce-result-item] .result-name')).map((n) => n.textContent || '')
+    })
+  }
 }
