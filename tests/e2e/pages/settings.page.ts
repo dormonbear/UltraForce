@@ -67,4 +67,42 @@ export class SettingsPage {
       await chrome.storage.local.remove('ultraforce_search_settings')
     })
   }
+
+  /**
+   * Seed the version-check state so the extension believes it was just updated.
+   * Writes { lastVersion, hasShownNotification: false } to ultraforce_version_check.
+   * Setting lastVersion to a value different from the current manifest version (and
+   * not empty) makes checkForUpdate() report hasUpdate === true on next modal open.
+   */
+  async seedLastVersion(version: string) {
+    const sw = await this.getServiceWorker()
+    await sw.evaluate(async (v) => {
+      await chrome.storage.local.set({
+        ultraforce_version_check: { lastVersion: v, hasShownNotification: false }
+      })
+    }, version)
+  }
+
+  /** Read the current version-check state from storage. */
+  async getVersionCheckState(): Promise<{ lastVersion: string; hasShownNotification: boolean } | undefined> {
+    const sw = await this.getServiceWorker()
+    return sw.evaluate(async () => {
+      const stored = await chrome.storage.local.get('ultraforce_version_check')
+      return stored.ultraforce_version_check
+    })
+  }
+
+  /** Read the extension's current manifest version. */
+  async getManifestVersion(): Promise<string> {
+    const sw = await this.getServiceWorker()
+    return sw.evaluate(() => chrome.runtime.getManifest().version)
+  }
+
+  /** Clear the version-check state from storage. */
+  async clearVersionCheck() {
+    const sw = await this.getServiceWorker()
+    await sw.evaluate(async () => {
+      await chrome.storage.local.remove('ultraforce_version_check')
+    })
+  }
 }
