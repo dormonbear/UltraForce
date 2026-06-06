@@ -241,4 +241,54 @@ export class UltraForcePage {
     await item.getByTitle('Unpin').click()
     await this.wait(400)
   }
+
+  // --- Settings panel helpers (open-shadow build) ---
+
+  /** Open the Settings panel by clicking the gear button in the modal footer. */
+  async openSettings(): Promise<void> {
+    await this.page.locator('[data-ultraforce-settings-button]').click()
+    await this.page.locator('[data-ultraforce-settings]').waitFor({ state: 'visible', timeout: 5000 })
+    await this.wait(400)
+  }
+
+  /** The Settings panel root locator. */
+  settingsPanel() {
+    return this.page.locator('[data-ultraforce-settings]')
+  }
+
+  /** Custom-command rows in the Custom Commands section (rows with an Edit button). */
+  customCommandRows() {
+    return this.settingsPanel().locator('.command-row').filter({ has: this.page.getByTitle('Edit', { exact: true }) })
+  }
+
+  /** Descriptions of all custom commands currently listed. */
+  async customCommandDescriptions(): Promise<string[]> {
+    return this.customCommandRows().locator('.command-desc').allTextContents()
+  }
+
+  /**
+   * Fill and submit the custom-command form. Assumes the form is already shown
+   * (after clicking "+ Add Command" or "Edit"). Clicks Save at the end.
+   */
+  async fillCommandForm(key: string, description: string, soql: string): Promise<void> {
+    const form = this.settingsPanel().locator('.command-edit-form')
+    await form.getByPlaceholder('e.g. log').fill(key)
+    await form.getByPlaceholder('e.g. My Logs').fill(description)
+    await form.locator('.command-textarea').fill(soql)
+    await form.getByRole('button', { name: 'Save' }).click()
+    await this.wait(400)
+  }
+
+  /** Click "+ Add Command" to reveal the new-command form. */
+  async clickAddCommand(): Promise<void> {
+    await this.settingsPanel().getByRole('button', { name: '+ Add Command' }).click()
+    await this.wait(300)
+  }
+
+  /** Delete the custom command whose description contains the given text (accepts confirm dialog). */
+  async deleteCommandByDescription(description: string): Promise<void> {
+    const row = this.customCommandRows().filter({ hasText: description }).first()
+    await row.getByTitle('Delete', { exact: true }).click()
+    await this.wait(400)
+  }
 }
