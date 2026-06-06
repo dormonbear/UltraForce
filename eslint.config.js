@@ -58,6 +58,8 @@ export default [
       // General
       'no-console': 'off',
       'no-unused-vars': 'off',
+      // TS compiler handles undefined checks; core no-undef misreads DOM lib types & Node globals
+      'no-undef': 'off',
       'prefer-const': 'warn',
       'no-empty': ['error', { allowEmptyCatch: true }],
       'no-case-declarations': 'off',
