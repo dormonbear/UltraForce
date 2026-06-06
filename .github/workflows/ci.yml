@@ -35,6 +35,10 @@ jobs:
       - name: Type Check
         run: pnpm type-check
 
+      - name: Audit Dependencies
+        run: pnpm audit --audit-level=moderate
+        continue-on-error: true
+
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest
