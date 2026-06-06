@@ -203,6 +203,59 @@ describe('history-store', () => {
       expect(storageGetMock).not.toHaveBeenCalled()
     })
   })
+
+  describe('frecency refresh on re-open', () => {
+    it('moves a re-visited low-frecency item ahead of a stale high-count item', () => {
+      const store = useHistoryStore.getState()
+      const now = Date.now()
+      useHistoryStore.setState({
+        items: [
+          { id: 'stale', name: 'Stale', type: 'ApexClass', url: 'u1', visitCount: 10, lastVisitedAt: now - 30 * 864e5, firstVisitedAt: now - 60 * 864e5 },
+          { id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2', visitCount: 1, lastVisitedAt: now - 20 * 864e5, firstVisitedAt: now - 20 * 864e5 }
+        ]
+      })
+      store.recordVisit({ id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2' })
+      const items = useHistoryStore.getState().items
+      const sorted = sortByFrecency(items)
+      expect(sorted[0].id).toBe('fresh')
+    })
+
+    it('keeps description when recordVisit omits it', () => {
+      const store = useHistoryStore.getState()
+      store.recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u', description: 'first@x.com | Admin' })
+      store.recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      const item = useHistoryStore.getState().items.find((i) => i.id === 'a')
+      expect(item?.description).toBe('first@x.com | Admin')
+      expect(item?.visitCount).toBe(2)
+    })
+
+    it('treats same id with different type as distinct entries', () => {
+      const store = useHistoryStore.getState()
+      store.recordVisit({ id: 'x', name: 'X', type: 'ApexClass', url: 'u1' })
+      store.recordVisit({ id: 'x', name: 'X', type: 'Flow', url: 'u2' })
+      expect(useHistoryStore.getState().items).toHaveLength(2)
+    })
+  })
+
+  describe('org scope isolation', () => {
+    it('writes to a host-scoped key after setHistoryOrgScope', async () => {
+      await setHistoryOrgScope('orgA.my.salesforce.com')
+      useHistoryStore.getState().recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      await Promise.resolve()
+      expect(storageSetMock).toHaveBeenCalledWith(
+        'ultraforce_history__orgA.my.salesforce.com',
+        expect.objectContaining({ items: expect.any(Array) })
+      )
+    })
+
+    it('clears in-memory items when switching to an org with no persisted data', async () => {
+      await setHistoryOrgScope('orgA.my.salesforce.com')
+      useHistoryStore.getState().recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope('orgB.my.salesforce.com')
+      expect(useHistoryStore.getState().items).toEqual([])
+    })
+  })
 })
 
 describe('frecency', () => {
