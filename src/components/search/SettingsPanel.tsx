@@ -3,6 +3,7 @@ import type { CustomCommand, NavigationMode } from '~types'
 import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands, filterCommandsBySupported } from '~lib/command-parser'
 import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
 import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~lib/salesforce-api'
+import { logger } from '~lib/logger'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -97,9 +98,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isRebuilding, setIsRebuilding] = useState(false)
 
   useEffect(() => {
-    getApiStats().then(setApiStats).catch(() => {})
+    getApiStats()
+      .then(setApiStats)
+      .catch((error) => logger.warn('getApiStats failed', { error }))
     if (sfHost) {
-      getUnsupportedTypes(sfHost).then(setUnsupportedTypes).catch(() => {})
+      getUnsupportedTypes(sfHost)
+        .then(setUnsupportedTypes)
+        .catch((error) => logger.warn('getUnsupportedTypes failed', { error }))
     }
   }, [sfHost])
 

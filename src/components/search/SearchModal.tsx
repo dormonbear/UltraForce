@@ -11,6 +11,7 @@ import CommandHints from './CommandHints'
 import UpdateNotification from './UpdateNotification'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
+import { logger } from '~lib/logger'
 import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
@@ -198,7 +199,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Load unsupported types for current org
   useEffect(() => {
     if (sfHost) {
-      getUnsupportedTypes(sfHost).then(setUnsupportedTypes).catch(() => {})
+      getUnsupportedTypes(sfHost)
+        .then(setUnsupportedTypes)
+        .catch((error) => logger.warn('getUnsupportedTypes failed', { error }))
     }
   }, [sfHost])
 
@@ -211,9 +214,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
         if (hasUpdate) {
           setShowUpdateNotification(true)
           setUpdateVersion(currentVersion)
-          markNotificationAsShown().catch(() => {})
+          markNotificationAsShown().catch((error) =>
+            logger.warn('markNotificationAsShown failed', { error })
+          )
         }
-      }).catch(() => {})
+      }).catch((error) => logger.warn('checkForUpdate failed', { error }))
     }
   }, [isVisible])
 

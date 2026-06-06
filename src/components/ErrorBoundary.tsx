@@ -7,7 +7,11 @@ interface ErrorBoundaryState {
   error: Error | null
   errorInfo: ErrorInfo | null
   errorId: string
+  retryCount: number
 }
+
+// Cap auto-retries so a child that always throws cannot loop forever.
+const MAX_AUTO_RETRIES = 3
 
 interface ErrorBoundaryProps {
   children?: React.ReactNode
@@ -31,7 +35,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       hasError: false,
       error: null,
       errorInfo: null,
-      errorId: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      errorId: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      retryCount: 0
     }
   }
   
@@ -90,22 +95,41 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     if (this.retryTimeout) {
       clearTimeout(this.retryTimeout)
     }
-    
+
+    // Stop auto-retrying once the cap is reached; render a terminal fallback instead.
+    if (this.state.retryCount >= MAX_AUTO_RETRIES) {
+      logger.warn('Error Boundary reached max auto-retries, stopping', {
+        retryCount: this.state.retryCount
+      })
+      return
+    }
+
     // Schedule retry in 5 seconds
     this.retryTimeout = setTimeout(() => {
-      this.handleRetry()
+      this.handleAutoRetry()
     }, 5000) as any
   }
-  
+
+  private handleAutoRetry = (): void => {
+    this.setState((prev) => ({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      errorId: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      retryCount: prev.retryCount + 1
+    }))
+  }
+
   private handleRetry = (): void => {
     this.setState({
       hasError: false,
       error: null,
       errorInfo: null,
-      errorId: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      errorId: `error-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      retryCount: 0
     })
   }
-  
+
   private handleManualRetry = (): void => {
     if (this.retryTimeout) {
       clearTimeout(this.retryTimeout)
@@ -183,9 +207,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </button>
             </div>
             
-            <p style={styles.autoRetryNote}>
-              Auto-retry in 5 seconds...
-            </p>
+            {this.state.retryCount < MAX_AUTO_RETRIES ? (
+              <p style={styles.autoRetryNote}>
+                Auto-retry in 5 seconds...
+              </p>
+            ) : (
+              <p style={styles.autoRetryNote}>
+                Automatic retries exhausted. Use Try Again or Reload Page.
+              </p>
+            )}
           </div>
         </div>
       )

@@ -43,6 +43,13 @@ vi.mock('./styles', () => ({
   SEARCH_MODAL_STYLES: ''
 }))
 
+vi.mock('~lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
+
+import { getUnsupportedTypes } from '~lib/salesforce-api'
+import { logger } from '~lib/logger'
+
 interface RenderOptions {
   onClose?: () => void
   onSearch?: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
@@ -78,6 +85,19 @@ describe('SearchModal', () => {
       isLoading: false,
       searchError: null,
       recordContext: null
+    })
+  })
+
+  describe('error logging', () => {
+    it('logs a warning when getUnsupportedTypes rejects', async () => {
+      vi.mocked(getUnsupportedTypes).mockRejectedValueOnce(new Error('boom'))
+      renderModal()
+      await waitFor(() => {
+        expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+          'getUnsupportedTypes failed',
+          expect.objectContaining({ error: expect.any(Error) })
+        )
+      })
     })
   })
 

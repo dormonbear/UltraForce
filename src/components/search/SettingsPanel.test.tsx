@@ -12,7 +12,13 @@ vi.mock('~lib/salesforce-api', () => ({
   clearMetadataCache: vi.fn().mockResolvedValue(undefined),
   warmupMetadataCache: vi.fn().mockResolvedValue(undefined)
 }))
+vi.mock('~lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
 
+import { waitFor } from '@testing-library/react'
+import { getApiStats } from '~lib/api-stats'
+import { logger } from '~lib/logger'
 import SettingsPanel from './SettingsPanel'
 
 function renderPanel(overrides: Partial<React.ComponentProps<typeof SettingsPanel>> = {}) {
@@ -49,6 +55,24 @@ async function openAddForm() {
   fireEvent.click(addBtn)
   await screen.findByPlaceholderText('e.g. log')
 }
+
+describe('SettingsPanel error logging', () => {
+  beforeEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
+
+  it('logs a warning when getApiStats rejects', async () => {
+    vi.mocked(getApiStats).mockRejectedValueOnce(new Error('boom'))
+    renderPanel()
+    await waitFor(() => {
+      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+        'getApiStats failed',
+        expect.objectContaining({ error: expect.any(Error) })
+      )
+    })
+  })
+})
 
 describe('SettingsPanel custom commands', () => {
   beforeEach(() => cleanup())
