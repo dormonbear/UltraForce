@@ -123,3 +123,133 @@ describe('SettingsPanel custom commands', () => {
     expect(onCustomCommandsChange).toHaveBeenCalled()
   })
 })
+
+describe('SettingsPanel toggles and export', () => {
+  beforeEach(() => cleanup())
+
+  it('calls onClose when the back button is clicked', async () => {
+    const onClose = vi.fn()
+    renderPanel({ onClose })
+    await screen.findByText('Settings')
+    const backButton = document.querySelector('.back-button') as HTMLButtonElement
+    fireEvent.click(backButton)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('toggles a metadata type via onToggleType', async () => {
+    const onToggleType = vi.fn()
+    renderPanel({ onToggleType })
+    // selectedTypes=['ApexClass']; the Apex option covers ApexClass,ApexTrigger.
+    // Not all selected => isChecked false => toggles the missing one (ApexTrigger).
+    const apexLabel = await screen.findByText('Apex Classes & Triggers')
+    const checkbox = apexLabel.closest('label')!.querySelector('input') as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(onToggleType).toHaveBeenCalledWith('ApexTrigger')
+  })
+
+  it('changes the shortcut key via the select', async () => {
+    const onShortcutChange = vi.fn()
+    renderPanel({ onShortcutChange })
+    const select = (await screen.findByDisplayValue('B')).closest('select') as HTMLSelectElement
+    fireEvent.change(select, { target: { value: 'i' } })
+    expect(onShortcutChange).toHaveBeenCalledWith('i')
+  })
+
+  it('fires onCloseOnNavigateChange when toggling close-on-navigate', async () => {
+    const onCloseOnNavigateChange = vi.fn()
+    renderPanel({ closeOnNavigate: true, onCloseOnNavigateChange })
+    const label = await screen.findByText('Close modal after opening result')
+    const checkbox = label.closest('label')!.querySelector('input') as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(onCloseOnNavigateChange).toHaveBeenCalledWith(false)
+  })
+
+  it('fires onAutoLoadFieldsChange when toggling auto-load fields', async () => {
+    const onAutoLoadFieldsChange = vi.fn()
+    renderPanel({ autoLoadFields: false, onAutoLoadFieldsChange })
+    const label = await screen.findByText('Auto-load all fields on Setup pages')
+    const checkbox = label.closest('label')!.querySelector('input') as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(onAutoLoadFieldsChange).toHaveBeenCalledWith(true)
+  })
+
+  it('fires onFuzzySearchChange when toggling fuzzy search', async () => {
+    const onFuzzySearchChange = vi.fn()
+    renderPanel({ fuzzySearch: true, onFuzzySearchChange })
+    const label = await screen.findByText('Fuzzy search (typo-tolerant matching)')
+    const checkbox = label.closest('label')!.querySelector('input') as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(onFuzzySearchChange).toHaveBeenCalledWith(false)
+  })
+
+  it('fires onHideManagedPackageChange when toggling hide managed package', async () => {
+    const onHideManagedPackageChange = vi.fn()
+    renderPanel({ hideManagedPackage: true, onHideManagedPackageChange })
+    const label = await screen.findByText('Hide managed package items')
+    const checkbox = label.closest('label')!.querySelector('input') as HTMLInputElement
+    fireEvent.click(checkbox)
+    expect(onHideManagedPackageChange).toHaveBeenCalledWith(false)
+  })
+
+  it('fires onMaxResultsPerTypeChange with a numeric value', async () => {
+    const onMaxResultsPerTypeChange = vi.fn()
+    renderPanel({ maxResultsPerType: 10, onMaxResultsPerTypeChange })
+    const label = await screen.findByText('Max results per type')
+    const select = label.closest('.toggle-option')!.querySelector('select') as HTMLSelectElement
+    fireEvent.change(select, { target: { value: '50' } })
+    expect(onMaxResultsPerTypeChange).toHaveBeenCalledWith(50)
+  })
+
+  it('changes navigation mode via the radio inputs', async () => {
+    const onNavigationModeChange = vi.fn()
+    renderPanel({ navigationMode: 'auto', onNavigationModeChange })
+    const label = await screen.findByText('Salesforce Classic')
+    const radio = label.closest('label')!.querySelector('input') as HTMLInputElement
+    fireEvent.click(radio)
+    expect(onNavigationModeChange).toHaveBeenCalledWith('classic')
+  })
+
+  it('disables the export button when there are no custom commands', async () => {
+    renderPanel({ customCommands: {} })
+    const exportBtn = (await screen.findByText('Export')) as HTMLButtonElement
+    expect(exportBtn.disabled).toBe(true)
+  })
+
+  it('exports custom commands to a JSON blob when export is clicked', async () => {
+    const createObjectURL = vi.fn(() => 'blob:x')
+    const revokeObjectURL = vi.fn()
+    const originalCreate = URL.createObjectURL
+    const originalRevoke = URL.revokeObjectURL
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    const existing: Record<string, CustomCommand> = {
+      log: { key: 'log', description: 'My Logs', soql: "SELECT Id FROM ApexLog WHERE Name LIKE '%{query}%'", useToolingApi: true, isBuiltin: false, nameField: 'Id', descriptionFields: ['Operation'] }
+    }
+    renderPanel({ customCommands: existing })
+    const exportBtn = (await screen.findByText('Export')) as HTMLButtonElement
+    expect(exportBtn.disabled).toBe(false)
+    fireEvent.click(exportBtn)
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    const blobArg = createObjectURL.mock.calls[0][0] as Blob
+    expect(blobArg.type).toBe('application/json')
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:x')
+
+    clickSpy.mockRestore()
+    URL.createObjectURL = originalCreate
+    URL.revokeObjectURL = originalRevoke
+  })
+
+  it('rebuilds the metadata cache when the rebuild button is clicked', async () => {
+    const { clearMetadataCache, warmupMetadataCache } = await import('~lib/salesforce-api')
+    renderPanel({ sfHost: 'myorg.my.salesforce.com' })
+    const rebuildBtn = await screen.findByText('Rebuild Cache')
+    fireEvent.click(rebuildBtn)
+    await screen.findByText('Rebuild Cache')
+    expect(clearMetadataCache).toHaveBeenCalled()
+    expect(warmupMetadataCache).toHaveBeenCalledWith('myorg.my.salesforce.com')
+  })
+})
