@@ -957,6 +957,25 @@ describe('UltraForceWindowManager', () => {
       expect(state.isLoading).toBe(false)
     })
 
+    it('should surface the 401 session-expired message and emit searchError', async () => {
+      const instance = await UltraForceWindowManager.getInstance()
+      const handler = (instance as any).handleSearch.bind(instance)
+
+      // sfRest throws this exact string on a 401 during a search
+      const sessionExpired = new Error('Session expired. Please refresh the page and try again.')
+      mockSearchMetadata.mockRejectedValue(sessionExpired)
+
+      const errorHandler = vi.fn()
+      instance.on('searchError', errorHandler)
+
+      await handler('test', ['ApexClass'], true, true)
+
+      const state = instance.getState()
+      expect(state.searchError).toBe('Session expired. Please refresh the page and try again.')
+      expect(state.isLoading).toBe(false)
+      expect(errorHandler).toHaveBeenCalledWith(sessionExpired)
+    })
+
     it('should not search when sfHost is null', async () => {
       mockGetSfHost.mockResolvedValue(null)
       const instance = await UltraForceWindowManager.getInstance()
