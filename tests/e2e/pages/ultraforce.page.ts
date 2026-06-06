@@ -197,6 +197,26 @@ export class UltraForcePage {
     await this.wait(400)
   }
 
+  /**
+   * Hover the result row containing `text`, click the inline action button with
+   * `actionTitle`, and capture the new tab the action opens. Closes the new tab.
+   */
+  async clickActionOnRow(text: string, actionTitle: string): Promise<{ opened: boolean; url: string }> {
+    const row = this.rowByText(text)
+    await row.hover()
+    const newPagePromise = this.context.waitForEvent('page', { timeout: 8000 }).catch(() => null)
+    await row.getByTitle(actionTitle, { exact: true }).click()
+
+    const newPage = await newPagePromise
+    if (newPage) {
+      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+      const url = newPage.url()
+      await newPage.close()
+      return { opened: true, url }
+    }
+    return { opened: false, url: '' }
+  }
+
   /** The current favorite-button title for the result row ("Pin to favorites" | "Remove from favorites"). */
   async pinTitleOnRow(text: string): Promise<string | null> {
     const row = this.rowByText(text)
