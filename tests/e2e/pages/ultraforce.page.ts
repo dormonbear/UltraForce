@@ -169,4 +169,56 @@ export class UltraForcePage {
       return Array.from(root.querySelectorAll('[data-ultraforce-result-item] .result-name')).map((n) => n.textContent || '')
     })
   }
+
+  // --- Open-shadow helpers (require PLASMO_PUBLIC_E2E build with mode: 'open') ---
+  // Playwright locators automatically pierce open shadow roots, so these reach
+  // elements inside the modal directly.
+
+  /** Locator for result rows inside the (now open) shadow modal. */
+  resultRows() {
+    return this.page.locator('[data-ultraforce-result-item]')
+  }
+
+  /** Text of all result row names. */
+  async resultNames(): Promise<string[]> {
+    return this.resultRows().locator('.result-name').allTextContents()
+  }
+
+  /** The result row whose name/content contains the given text. */
+  rowByText(text: string) {
+    return this.resultRows().filter({ hasText: text }).first()
+  }
+
+  /** Click the pin/favorite button on the result row containing the given text. */
+  async togglePinOnRow(text: string): Promise<void> {
+    const row = this.rowByText(text)
+    await row.hover()
+    await row.getByTitle(/favorites/i).click()
+    await this.wait(400)
+  }
+
+  /** The current favorite-button title for the result row ("Pin to favorites" | "Remove from favorites"). */
+  async pinTitleOnRow(text: string): Promise<string | null> {
+    const row = this.rowByText(text)
+    await row.hover()
+    return row.locator('.favorite-action button').first().getAttribute('title')
+  }
+
+  /** Locator for the home-screen Favorites section items (after clearing query / reopening). */
+  homeFavoriteItems() {
+    return this.page.locator('.home-item')
+  }
+
+  /** Names of items in the home-screen Favorites section. */
+  async homeFavoriteNames(): Promise<string[]> {
+    return this.page.locator('.home-section .home-item-name').allTextContents()
+  }
+
+  /** Click the Unpin button on the home-screen favorite row containing the given text. */
+  async unpinFromHome(text: string): Promise<void> {
+    const item = this.homeFavoriteItems().filter({ hasText: text }).first()
+    await item.hover()
+    await item.getByTitle('Unpin').click()
+    await this.wait(400)
+  }
 }
