@@ -1,5 +1,27 @@
 # Release Notes
 
+## v0.3.0
+
+Release Date: 2026-06-10
+
+### New Features
+
+- **Accessibility Overhaul**: The search modal is now fully screen-reader and keyboard friendly -- ARIA roles and labels on the dialog, result list, and all action buttons; live-region announcements for loading and error states; focus is restored to the host page element when the modal closes.
+
+### Improvements
+
+- **Keyboard Focus Rings**: All interactive elements inside the modal show a visible focus indicator when navigating with Tab, and hover-only row actions (pin, remove, edit) now also appear on keyboard focus.
+- **Text Contrast**: Secondary text (descriptions, timestamps, namespaces, hints) is brighter to meet WCAG AA contrast on the dark panel.
+- **Reduced Motion**: With `prefers-reduced-motion` enabled, the modal entrance animation and the production org-badge pulse are disabled.
+- **Cleaner Icons**: Empty-state emoji icons replaced with crisp SVG icons matching the rest of the UI.
+- **Faster Result Rendering**: Result rows are memoized, so long result lists no longer re-render on every keystroke.
+
+### Bug Fixes
+
+- **Recent List Ordering**: The Recent list on the home screen now sorts strictly by last opened time -- the item you just opened always appears at the top, regardless of how often other items were visited.
+- **SOQL Wildcard Escaping**: Search text containing `%` or `_` is now escaped correctly in LIKE queries instead of acting as a wildcard.
+- **Hardened Messaging**: Background message handlers now validate the sender origin, ignoring requests from non-Salesforce pages.
+
 ## v0.2.5
 
 Release Date: 2026-05-22
