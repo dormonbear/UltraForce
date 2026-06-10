@@ -27,7 +27,8 @@ vi.mock('~stores/history-store', () => {
   return {
     useHistoryStore: (selector: (s: { items: typeof items }) => unknown) =>
       selector({ items }),
-    sortByFrecency: (arr: typeof items) => [...arr]
+    sortByLastVisited: (arr: typeof items) =>
+      [...arr].sort((a, b) => b.lastVisitedAt - a.lastVisitedAt)
   }
 })
 
@@ -74,6 +75,15 @@ describe('HomeScreen', () => {
     expect(screen.getByText('CreateCase')).toBeTruthy()
   })
 
+  it('should order recent items by last visit time, most recent first', () => {
+    render(<HomeScreen {...defaultProps} />)
+    const names = screen
+      .getAllByText(/AccountService|CreateCase/)
+      .map((el) => el.textContent)
+    // AccountService visited 1m ago, CreateCase 1h ago
+    expect(names).toEqual(['AccountService', 'CreateCase'])
+  })
+
   it('should call onNavigate when clicking a favorite', () => {
     render(<HomeScreen {...defaultProps} />)
     fireEvent.click(screen.getByText('Account'))
@@ -118,7 +128,7 @@ describe('HomeScreen empty state', () => {
     vi.doMock('~stores/history-store', () => ({
       useHistoryStore: (selector: (s: { items: never[] }) => unknown) =>
         selector({ items: [] }),
-      sortByFrecency: (arr: never[]) => arr
+      sortByLastVisited: (arr: never[]) => arr
     }))
 
     vi.doMock('~stores/favorites-store', () => ({
