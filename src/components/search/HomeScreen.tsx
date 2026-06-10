@@ -1,8 +1,8 @@
 // HomeScreen - Replaces the empty state when query is empty.
-// Shows pinned favorites and frecency-ranked recent history.
+// Shows pinned favorites and recent history ordered by last visit time.
 
 import React, { useMemo, useCallback } from 'react'
-import { useHistoryStore, sortByFrecency } from '~stores/history-store'
+import { useHistoryStore, sortByLastVisited } from '~stores/history-store'
 import { useFavoritesStore, type FavoriteItem } from '~stores/favorites-store'
 import type { HistoryItem } from '~stores/history-store'
 
@@ -61,7 +61,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const isFavorite = useFavoritesStore((s) => s.isFavorite)
 
   const recentItems = useMemo(() => {
-    const sorted = sortByFrecency(historyItems)
+    const sorted = sortByLastVisited(historyItems)
     return sorted.slice(0, MAX_RECENT_ITEMS)
   }, [historyItems])
 

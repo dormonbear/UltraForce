@@ -58,6 +58,11 @@ export function sortByFrecency(items: HistoryItem[], now: number = Date.now()): 
   return [...items].sort((a, b) => calculateFrecency(b, now) - calculateFrecency(a, now))
 }
 
+/** Sort items by last visit time (most recent first). */
+export function sortByLastVisited(items: HistoryItem[]): HistoryItem[] {
+  return [...items].sort((a, b) => b.lastVisitedAt - a.lastVisitedAt)
+}
+
 // Writes/reads no-op while persist name is still the pending placeholder (sfHost unknown).
 // Once setHistoryOrgScope() is called the placeholder is swapped for a host-scoped key.
 const chromeHistoryStorage: PersistStorage<Partial<HistoryState>> = {

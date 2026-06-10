@@ -5,6 +5,7 @@ import {
   _resetHistoryOrgScope,
   calculateFrecency,
   sortByFrecency,
+  sortByLastVisited,
   type HistoryItem
 } from './history-store'
 
@@ -303,6 +304,29 @@ describe('frecency', () => {
       expect(sorted[0].id).toBe('frequent')
       expect(sorted[1].id).toBe('recent')
       expect(sorted[2].id).toBe('old')
+    })
+  })
+
+  describe('sortByLastVisited', () => {
+    it('should sort items by lastVisitedAt descending regardless of visit count', () => {
+      const now = Date.now()
+      const items = [
+        makeItem({ id: 'frequent-old', visitCount: 50, lastVisitedAt: now - 3600000 }),
+        makeItem({ id: 'just-opened', visitCount: 1, lastVisitedAt: now }),
+        makeItem({ id: 'middle', visitCount: 5, lastVisitedAt: now - 60000 })
+      ]
+
+      const sorted = sortByLastVisited(items)
+      expect(sorted.map((i) => i.id)).toEqual(['just-opened', 'middle', 'frequent-old'])
+    })
+
+    it('should not mutate the input array', () => {
+      const items = [
+        makeItem({ id: 'a', lastVisitedAt: 1 }),
+        makeItem({ id: 'b', lastVisitedAt: 2 })
+      ]
+      sortByLastVisited(items)
+      expect(items[0].id).toBe('a')
     })
   })
 })
