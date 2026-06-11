@@ -1,5 +1,17 @@
 # Release Notes
 
+## v0.3.1
+
+Release Date: 2026-06-11
+
+### Bug Fixes
+
+- **CRITICAL -- Extension Broken in v0.3.0**: v0.3.0 shipped with a broken build -- the content script crashed on load (`Cannot find module 'react/jsx-runtime'`), so the keyboard shortcut could not open the search modal at all. Root cause: a newly added `engines` field in package.json made the bundler target Node and stop bundling dependencies. The field is removed and the build is verified working. Please update immediately if you are on v0.3.0.
+
+### Technical
+
+- Added a release smoke test that loads the packed extension in a real browser and verifies the shortcut opens the modal; the release pipeline now hard-fails if the built extension does not actually work.
+
 ## v0.3.0
 
 Release Date: 2026-06-10
