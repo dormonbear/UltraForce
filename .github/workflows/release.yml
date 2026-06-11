@@ -46,6 +46,16 @@ jobs:
       - name: Build Extension
         run: pnpm build
 
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium --with-deps
+
+      # Gate the release on the packed extension actually working in a real
+      # browser: content script executes without module errors and the
+      # keyboard shortcut opens the modal. Catches broken bundles that unit
+      # tests cannot see (e.g. externalized dependencies).
+      - name: Smoke Test Extension
+        run: xvfb-run --auto-servernum node scripts/smoke-test.mjs
+
       - name: Package Extension
         run: pnpm package
 
