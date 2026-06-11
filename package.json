@@ -1,6 +1,6 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
