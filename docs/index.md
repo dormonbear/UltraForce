@@ -12,9 +12,11 @@ UltraForce is a Chrome extension designed to enhance Salesforce developers and a
 
 UltraForce provides a command-palette style interface that allows you to:
 
-- **Search metadata** - Quickly find Apex classes, triggers, objects, fields, flows, and more
+- **Search metadata** - Quickly find Apex classes, triggers, objects, fields, flows, reports, and more
 - **Navigate to Setup** - Jump directly to Setup pages without manual navigation
 - **Search fields** - Use dot notation to search object fields (e.g., `Account.Name`)
+- **Recent & Favorites** - Reopen recently used items or pin favorites, isolated per org
+- **Direct record navigation** - Paste record IDs or URLs to preview and open records
 - **Custom commands** - Create your own shortcuts for frequently used searches
 
 ## Key Features
