@@ -104,7 +104,7 @@ pageSessionId = getCookie("sid");
 ## 认证方式
 
 ### 1. OAuth 2.0 认证
-- **CLIENT_ID**: `3MVG9ZL0ppGP5UrA9aY95Z6kCqxCfYY.2HlZ.A0HSGLju2QOI9QHHn_fqJK7cseKdOk3R9UsmGpk2_t9Cmvi7`
+- **CLIENT_ID**: `<YOUR_CONNECTED_APP_CLIENT_ID>`
 - **生产环境**: `https://login.salesforce.com`
 - **沙盒环境**: `https://test.salesforce.com`
 

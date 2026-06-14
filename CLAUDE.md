@@ -122,8 +122,7 @@ Type `ObjectName.FieldName` (e.g., `Account.Name` or `account.`) to search field
 ## E2E Testing
 
 ### Test Environment
-- **Target Org**: `ultraforce` (sf CLI alias)
-- **Instance**: orgfarm-d300fcfc0f-dev-ed.develop.my.salesforce.com
+- **Target Org**: `ultraforce` (sf CLI alias, configure via `sf org display`)
 - **Test Data**: [trailheadapps/agent-script-recipes](https://github.com/trailheadapps/agent-script-recipes)
 - **Guide**: See `tests/E2E_TEST_GUIDE.md` for detailed test data and patterns
 

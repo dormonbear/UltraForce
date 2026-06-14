@@ -20,6 +20,14 @@ Navigate to record detail pages and detect objects from record IDs.
 
 Jump directly to Setup pages using the `:g` command.
 
+### Recent & Favorites
+
+Open UltraForce with an empty query to see a home screen with your **Recent** items (ordered by most recently opened) and pinned **Favorites**. Both are isolated per Salesforce org.
+
+### Accessibility
+
+The search modal is an ARIA dialog with labelled controls and live-region announcements, visible keyboard focus rings, WCAG AA text contrast, and `prefers-reduced-motion` support.
+
 ## Search Capabilities
 
 - **Fuzzy matching** - Find results even with typos
@@ -42,6 +50,7 @@ Jump directly to Setup pages using the `:g` command.
 | Code | ApexClass, ApexTrigger, ApexPage, ApexComponent |
 | Lightning | AuraDefinitionBundle, LightningComponentBundle |
 | Automation | Flow, ValidationRule, WorkflowRule |
-| Security | Profile, PermissionSet, PermissionSetGroup |
+| Security | Profile, PermissionSet, PermissionSetGroup, CustomPermission |
 | Configuration | CustomLabel, CustomMetadata, CustomSetting |
 | Users | User, Queue, Group |
+| Analytics | Report, Dashboard |

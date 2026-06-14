@@ -1,7 +1,35 @@
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useCallback } from "react"
 import type { SearchResult } from "~types"
 import type { FavoriteItem } from "~stores/favorites-store"
 import ResultItem, { type ObjectAction } from "./ResultItem"
+
+interface ResultRowProps {
+  result: SearchResult
+  isSelected: boolean
+  isFavorite?: boolean
+  onResultClick: (result: SearchResult) => void
+  onActionClick?: (result: SearchResult, action: ObjectAction) => void
+  onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
+}
+
+// Memoized row that derives a stable per-row onClick from the stable parent
+// callback, so ResultItem's `onClick: () => void` interface stays intact while
+// avoiding a fresh closure each render.
+const ResultRow: React.FC<ResultRowProps> = React.memo(
+  ({ result, isSelected, isFavorite, onResultClick, onActionClick, onToggleFavorite }) => {
+    const handleClick = useCallback(() => onResultClick(result), [onResultClick, result])
+    return (
+      <ResultItem
+        result={result}
+        isSelected={isSelected}
+        onClick={handleClick}
+        onActionClick={onActionClick}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
+      />
+    )
+  }
+)
 
 interface SearchResultsProps {
   results: Record<string, SearchResult[]>
@@ -71,7 +99,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   let currentIndex = 0
 
   return (
-    <div className="search-results" data-ultraforce-results>
+    <div className="search-results" data-ultraforce-results role="listbox" aria-label="Search results">
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 
@@ -81,13 +109,13 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         const groupItems = isCollapsed ? null : typeResults.map((result) => {
           const globalIndex = currentIndex++
           return (
-            <ResultItem
+            <ResultRow
               key={result.id}
               result={result}
               isSelected={globalIndex === selectedIndex}
-              onClick={() => onResultClick(result)}
-              onActionClick={onActionClick}
               isFavorite={isFavorite?.(result.id)}
+              onResultClick={onResultClick}
+              onActionClick={onActionClick}
               onToggleFavorite={onToggleFavorite}
             />
           )

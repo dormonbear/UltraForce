@@ -8,11 +8,11 @@ import { logger } from '~lib/logger'
 import { useSettingsStore } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
-import { useHistoryStore } from '~stores/history-store'
+import { useHistoryStore, setHistoryOrgScope } from '~stores/history-store'
+import { setFavoritesOrgScope } from '~stores/favorites-store'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
 import {
-  getSetupHost,
   buildSetupUrl,
   resolveSetupShortcutPath,
   getCurrentRecordFromUrl,
@@ -27,9 +27,7 @@ import {
   fetchRecordTypeId as fetchRecordTypeIdFn,
   resolveObjectApiNameFromRecord as resolveObjectApiNameFromRecordFn,
   getCurrentRecordLayoutInfo as getCurrentRecordLayoutInfoFn,
-  getCurrentUserProfileId as getCurrentUserProfileIdFn,
   getUserLightningPreference as getUserLightningPreferenceFn,
-  getLayoutAssignment as getLayoutAssignmentFn,
   handleFieldsNavigation as handleFieldsNavigationFn,
   handleRecordTypeNavigation as handleRecordTypeNavigationFn
 } from '~lib/record-context'
@@ -200,7 +198,11 @@ class UltraForceWindowManager {
 
     if (this.options.useShadowDOM) {
       try {
-        this.shadowRoot = this.containerElement.attachShadow({ mode: 'closed' })
+        // Production uses 'closed' to fully isolate the extension UI from the host page.
+        // E2E builds (PLASMO_PUBLIC_E2E=true) use 'open' so Playwright can read/click
+        // inside the modal; style isolation is identical for both modes.
+        const shadowMode = process.env.PLASMO_PUBLIC_E2E === 'true' ? 'open' : 'closed'
+        this.shadowRoot = this.containerElement.attachShadow({ mode: shadowMode })
         this.log('Shadow DOM created for style isolation')
       } catch {
         logger.warn('Shadow DOM not supported, falling back to regular DOM')
@@ -241,13 +243,19 @@ class UltraForceWindowManager {
       if (sfHost) {
         this.log('SF Host detected:', sfHost)
 
+        // Scope per-org persisted stores BEFORE issuing any session-dependent reads
+        // so recent/favorites cannot leak across orgs when multiple tabs are open.
+        await Promise.all([setHistoryOrgScope(sfHost), setFavoritesOrgScope(sfHost)])
+
         const session = await getSession(sfHost)
         const hasSession = session !== null
         useSessionStore.getState().setSession(sfHost, hasSession)
         this.log('Session status:', hasSession ? 'Active' : 'None')
 
         if (hasSession) {
-          this.fetchLightningPreference().catch(() => {})
+          this.fetchLightningPreference().catch((error) =>
+            logger.warn('fetchLightningPreference failed', { error })
+          )
         }
       }
     } catch (error) {
@@ -298,15 +306,22 @@ class UltraForceWindowManager {
     document.documentElement.setAttribute('data-ultraforce-modal-open', '')
     logger.debug('keyboard:shield activated')
 
-    this.keyboardInterceptor = createKeyboardInterceptor(
-      () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
-      () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null
-    )
+    // A failing interceptor must never break the host page; degrade gracefully.
+    try {
+      this.keyboardInterceptor = createKeyboardInterceptor({
+        getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
+        getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
+        getShadowRoot: () => this.shadowRoot ?? null
+      })
 
-    window.addEventListener('keydown', this.keyboardInterceptor, true)
-    window.addEventListener('keyup', this.keyboardInterceptor, true)
-    window.addEventListener('keypress', this.keyboardInterceptor, true)
-    logger.debug('keyboard:interceptor added')
+      window.addEventListener('keydown', this.keyboardInterceptor, true)
+      window.addEventListener('keyup', this.keyboardInterceptor, true)
+      window.addEventListener('keypress', this.keyboardInterceptor, true)
+      logger.debug('keyboard:interceptor added')
+    } catch (error) {
+      this.keyboardInterceptor = null
+      logger.error('Failed to attach keyboard interceptor', { error })
+    }
 
     await this.renderComponent()
     this.emit('show', this.getState())
@@ -368,7 +383,7 @@ class UltraForceWindowManager {
           onIdNavigate: this.handleIdNavigate.bind(this),
           onActionClick: this.handleActionClick.bind(this),
           onNavigate: (url: string) => {
-            window.open(url, '_blank')
+            this.handleDirectNavigate(url)
           },
           onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
           onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
@@ -671,7 +686,7 @@ class UltraForceWindowManager {
     this.emit('resultClick', result)
 
     const navContext = this.getNavigationContext()
-    const targetUrl = buildNavigationUrl(result, navContext)
+    const targetUrl = result.url || buildNavigationUrl(result, navContext)
     if (targetUrl) {
       this.trackNavigation(result, targetUrl)
       window.open(targetUrl, '_blank')
@@ -707,7 +722,7 @@ class UltraForceWindowManager {
               })
             }
           })
-          .catch(() => {})
+          .catch((error) => logger.warn('record preview enrichment failed', { error }))
       }
     }
     if (useSettingsStore.getState().closeOnNavigate) {
@@ -733,8 +748,17 @@ class UltraForceWindowManager {
     }
   }
 
+  /** Open a known URL and refresh its existing recent entry when present. */
+  private handleDirectNavigate(url: string): void {
+    const historyItem = useHistoryStore.getState().items.find((item) => item.url === url)
+    if (historyItem) {
+      this.trackNavigation(historyItem, url)
+    }
+    window.open(url, '_blank')
+  }
+
   /** Record a navigation event for history tracking. */
-  private trackNavigation(result: SearchResult, url: string): void {
+  private trackNavigation(result: Pick<SearchResult, 'id' | 'name' | 'type' | 'description'>, url: string): void {
     useHistoryStore.getState().recordVisit({
       id: result.id,
       name: result.name,

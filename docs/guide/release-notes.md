@@ -1,5 +1,100 @@
 # Release Notes
 
+## v0.3.1
+
+Release Date: 2026-06-11
+
+### Bug Fixes
+
+- **CRITICAL -- Extension Broken in v0.3.0**: v0.3.0 shipped with a broken build -- the content script crashed on load (`Cannot find module 'react/jsx-runtime'`), so the keyboard shortcut could not open the search modal at all. Root cause: a newly added `engines` field in package.json made the bundler target Node and stop bundling dependencies. The field is removed and the build is verified working. Please update immediately if you are on v0.3.0.
+
+### Technical
+
+- Added a release smoke test that loads the packed extension in a real browser and verifies the shortcut opens the modal; the release pipeline now hard-fails if the built extension does not actually work.
+
+## v0.3.0
+
+Release Date: 2026-06-10
+
+### New Features
+
+- **Accessibility Overhaul**: The search modal is now fully screen-reader and keyboard friendly -- ARIA roles and labels on the dialog, result list, and all action buttons; live-region announcements for loading and error states; focus is restored to the host page element when the modal closes.
+
+### Improvements
+
+- **Keyboard Focus Rings**: All interactive elements inside the modal show a visible focus indicator when navigating with Tab, and hover-only row actions (pin, remove, edit) now also appear on keyboard focus.
+- **Text Contrast**: Secondary text (descriptions, timestamps, namespaces, hints) is brighter to meet WCAG AA contrast on the dark panel.
+- **Reduced Motion**: With `prefers-reduced-motion` enabled, the modal entrance animation and the production org-badge pulse are disabled.
+- **Cleaner Icons**: Empty-state emoji icons replaced with crisp SVG icons matching the rest of the UI.
+- **Faster Result Rendering**: Result rows are memoized, so long result lists no longer re-render on every keystroke.
+
+### Bug Fixes
+
+- **Recent List Ordering**: The Recent list on the home screen now sorts strictly by last opened time -- the item you just opened always appears at the top, regardless of how often other items were visited.
+- **SOQL Wildcard Escaping**: Search text containing `%` or `_` is now escaped correctly in LIKE queries instead of acting as a wildcard.
+- **Hardened Messaging**: Background message handlers now validate the sender origin, ignoring requests from non-Salesforce pages.
+
+## v0.2.5
+
+Release Date: 2026-05-22
+
+### Improvements
+
+- **Recent History Navigation**: Opening an existing Recent or Favorite item now refreshes its visit count and recency score.
+
+### Bug Fixes
+
+- **Command Result Recents**: Fixed `:u`, `:p`, and other command search results not always appearing in the Recent list after opening them.
+
+## v0.2.4
+
+Release Date: 2026-05-22
+
+### Bug Fixes
+
+- **Custom Setting Search Grouping**: Fixed custom settings appearing twice in search results by excluding `IsCustomSetting` entities from the Custom Objects index. Existing stale Custom Object metadata cache is refreshed automatically.
+
+## v0.2.3
+
+Release Date: 2026-05-14
+
+### Bug Fixes
+
+- **Cross-Org Recent / Favorites Leak**: Fixed a bug where opening two Salesforce org tabs (e.g. Sandbox + Production) caused the Recent list and Favorites to leak across orgs -- clicking an item from one org could navigate to the other. History and favorites are now isolated per host. Existing single-org data is automatically migrated on first launch.
+
+## v0.2.2
+
+Release Date: 2026-04-07
+
+### Bug Fixes
+
+- **Settings Panel Input**: Fixed custom command form inputs being unresponsive -- the keyboard interceptor was hijacking all keystrokes and routing them to the search input
+
+## v0.2.1
+
+Release Date: 2026-04-07
+
+### Bug Fixes
+
+- **Classic Object Navigation**: Fixed Custom Object search results opening the setup/definition page instead of the record list view in Classic mode
+
+## v0.2.0
+
+Release Date: 2026-04-06
+
+### New Features
+
+- **Recent History + Frecency**: Modal home screen shows recently visited records and setup pages, ranked by frequency and recency. Remove items or pin them to favorites.
+- **Setup Page Favorites**: Pin frequently-used items to the top of the modal home screen. Star icon toggle available on search results and home screen. Persisted across sessions.
+- **Smart ID Navigator**: Paste Salesforce record IDs (15/18-char) or URLs into the search input to see record previews with object type and name. Supports pasting multiple IDs at once.
+- **Contextual Suggestions**: On record pages, quick actions for Clone and Object Setup. On setup pages, related setup pages in the same category are suggested.
+
+### Improvements
+
+- Modal empty state replaced with rich home screen showing favorites and recent history
+- Record action buttons no longer highlight by default
+- Favorite star icon consistent across all views (14x14, gold fill when pinned)
+
 ## v0.1.3
 
 Release Date: 2026-04-05

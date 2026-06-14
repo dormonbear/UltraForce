@@ -103,13 +103,14 @@ vi.mock('~components/ErrorBoundary', () => ({
 }))
 
 import UltraForceWindowManager from './window-manager'
-import type { WindowManagerState } from './window-manager'
 import { getSfHost, getSession, sfRest } from './auth'
 import { createKeyboardInterceptor } from './keyboard-interceptor'
+import { logger } from './logger'
 import { searchSalesforceMetadata, executeCustomCommand } from './salesforce-api'
 import { useSearchStore } from '~stores/search-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
+import { useHistoryStore } from '~stores/history-store'
 
 const mockGetSfHost = vi.mocked(getSfHost)
 const mockGetSession = vi.mocked(getSession)
@@ -123,6 +124,7 @@ function resetStores(): void {
   useSearchStore.getState().reset()
   useSessionStore.getState().reset()
   useSettingsStore.setState(SETTINGS_DEFAULTS)
+  useHistoryStore.setState({ items: [] })
 }
 
 // Helper to destroy singleton and reset static fields
@@ -274,6 +276,18 @@ describe('UltraForceWindowManager', () => {
       await instance.show()
 
       expect(mockCreateKeyboardInterceptor).toHaveBeenCalled()
+    })
+
+    it('should not throw when keyboard interceptor creation fails', async () => {
+      const instance = await UltraForceWindowManager.getInstance()
+      mockCreateKeyboardInterceptor.mockImplementationOnce(() => {
+        throw new Error('interceptor boom')
+      })
+
+      // Modal must still show; a failing interceptor must not break the host page.
+      await expect(instance.show()).resolves.not.toThrow()
+      expect(instance.isVisible()).toBe(true)
+      expect(vi.mocked(logger.error)).toHaveBeenCalled()
     })
   })
 
@@ -678,6 +692,28 @@ describe('UltraForceWindowManager', () => {
       )
     })
 
+    it('should record User command results in recent history', async () => {
+      const handler = (instance as any).handleResultClick.bind(instance)
+
+      handler({
+        id: '005Dn000001abcdef',
+        name: 'Test Admin',
+        type: 'User',
+        description: 'test@example.com | System Administrator'
+      })
+
+      expect(useHistoryStore.getState().items).toEqual([
+        expect.objectContaining({
+          id: '005Dn000001abcdef',
+          name: 'Test Admin',
+          type: 'User',
+          description: 'test@example.com | System Administrator',
+          url: expect.stringContaining('ManageUsers'),
+          visitCount: 1
+        })
+      ])
+    })
+
     it('should navigate to custom object list page', async () => {
       const handler = (instance as any).handleResultClick.bind(instance)
 
@@ -724,6 +760,26 @@ describe('UltraForceWindowManager', () => {
       )
     })
 
+    it('should record Profile command results in recent history', async () => {
+      const handler = (instance as any).handleResultClick.bind(instance)
+
+      handler({
+        id: '00eDn000001abc',
+        name: 'System Administrator',
+        type: 'Profile'
+      })
+
+      expect(useHistoryStore.getState().items).toEqual([
+        expect.objectContaining({
+          id: '00eDn000001abc',
+          name: 'System Administrator',
+          type: 'Profile',
+          url: expect.stringContaining('EnhancedProfiles'),
+          visitCount: 1
+        })
+      ])
+    })
+
     it('should open setup shortcut URL directly', async () => {
       const handler = (instance as any).handleResultClick.bind(instance)
 
@@ -737,6 +793,52 @@ describe('UltraForceWindowManager', () => {
       expect(openSpy).toHaveBeenCalledWith(
         'https://myorg.my.salesforce-setup.com/lightning/setup/ApexDebugLogs/home',
         '_blank'
+      )
+    })
+
+    it('should prefer a result URL and record it in recent history', async () => {
+      const handler = (instance as any).handleResultClick.bind(instance)
+      const url = 'https://myorg.my.salesforce.com/lightning/r/User/005Dn000001abcdef/view'
+
+      handler({
+        id: '005Dn000001abcdef',
+        name: 'Test Admin',
+        type: 'User',
+        url
+      })
+
+      expect(openSpy).toHaveBeenCalledWith(url, '_blank')
+      expect(useHistoryStore.getState().items[0]).toEqual(
+        expect.objectContaining({
+          id: '005Dn000001abcdef',
+          name: 'Test Admin',
+          type: 'User',
+          url
+        })
+      )
+    })
+
+    it('should refresh recent history when opening an existing recent item by URL', async () => {
+      const handler = (instance as any).handleDirectNavigate.bind(instance)
+      const url = 'https://myorg.my.salesforce.com/lightning/setup/EnhancedProfiles/page?address=%2F00eDn000001abc'
+
+      useHistoryStore.getState().recordVisit({
+        id: '00eDn000001abc',
+        name: 'System Administrator',
+        type: 'Profile',
+        url
+      })
+      const firstVisit = useHistoryStore.getState().items[0]
+
+      handler(url)
+
+      expect(openSpy).toHaveBeenCalledWith(url, '_blank')
+      expect(useHistoryStore.getState().items[0]).toEqual(
+        expect.objectContaining({
+          id: firstVisit.id,
+          type: firstVisit.type,
+          visitCount: 2
+        })
       )
     })
 
@@ -866,6 +968,25 @@ describe('UltraForceWindowManager', () => {
       const state = instance.getState()
       expect(state.searchError).toBe('Search failed')
       expect(state.isLoading).toBe(false)
+    })
+
+    it('should surface the 401 session-expired message and emit searchError', async () => {
+      const instance = await UltraForceWindowManager.getInstance()
+      const handler = (instance as any).handleSearch.bind(instance)
+
+      // sfRest throws this exact string on a 401 during a search
+      const sessionExpired = new Error('Session expired. Please refresh the page and try again.')
+      mockSearchMetadata.mockRejectedValue(sessionExpired)
+
+      const errorHandler = vi.fn()
+      instance.on('searchError', errorHandler)
+
+      await handler('test', ['ApexClass'], true, true)
+
+      const state = instance.getState()
+      expect(state.searchError).toBe('Session expired. Please refresh the page and try again.')
+      expect(state.isLoading).toBe(false)
+      expect(errorHandler).toHaveBeenCalledWith(sessionExpired)
     })
 
     it('should not search when sfHost is null', async () => {

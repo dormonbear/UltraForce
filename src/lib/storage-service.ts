@@ -16,9 +16,23 @@ export const STORAGE_KEYS = {
   LEGACY_SETTINGS: 'settings'
 } as const
 
+// Placeholder names used by stores before sfHost is known; storage layer no-ops on these.
+export const PENDING_HISTORY_KEY = 'ultraforce_history__pending'
+export const PENDING_FAVORITES_KEY = 'ultraforce_favorites__pending'
+
 /** Builds the dynamic cache key for a metadata type in an org. */
 export function metadataCacheKey(orgId: string, metadataType: string): string {
   return `metadata_${orgId}_${metadataType}`
+}
+
+/** Builds the per-org history persistence key. Host (sfHost) is preferred over orgId since it is known earlier. */
+export function historyKey(host: string): string {
+  return `ultraforce_history__${host}`
+}
+
+/** Builds the per-org favorites persistence key. */
+export function favoritesKey(host: string): string {
+  return `ultraforce_favorites__${host}`
 }
 
 // --- Value interfaces ---

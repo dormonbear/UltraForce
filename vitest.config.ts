@@ -48,7 +48,13 @@ export default defineConfig({
         'src/contents/**',
         'src/background/**',
         'src/components/search/styles.ts'
-      ]
+      ],
+      thresholds: {
+        lines: 78,
+        functions: 78,
+        branches: 63,
+        statements: 78
+      }
     }
   },
   resolve: {

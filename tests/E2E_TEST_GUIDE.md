@@ -3,8 +3,8 @@
 ## Test Environment
 
 ### Target Org: ultraforce
-- **Username**: dormon104@agentforce.com
-- **Instance**: orgfarm-d300fcfc0f-dev-ed.develop.my.salesforce.com
+- **Username**: `<YOUR_TEST_USERNAME>` (configure via `sf org display --target-org ultraforce`)
+- **Instance**: `<YOUR_INSTANCE>.develop.my.salesforce.com`
 - **Data Source**: [trailheadapps/agent-script-recipes](https://github.com/trailheadapps/agent-script-recipes)
 
 ### SF CLI Commands for Verification
@@ -24,16 +24,16 @@ sf data query --query "SELECT ..." --target-org ultraforce --use-tooling-api --j
 ## Available Test Data
 
 ### Apex Classes (24 total)
-| Name | ID | Description |
-|------|-----|-------------|
-| WeatherService | 01pfj000006m4B5AAI | Weather API service |
-| WeatherAlertService | 01pfj000006m4B3AAI | Weather alert handling |
-| PaymentGatewayController | 01pfj000006m4AwAAI | Payment processing |
-| ExperienceController | 01pfj000006m4AqAAI | Experience management |
-| PersonalizedGuestExperiences | 01pfj000006m4AyAAI | Guest personalization |
-| ActionCallbacksFlowTest | 01pfj000006m4AjAAI | Flow test class |
-| ActionDefinitionsFlowTest | 01pfj000006m4AkAAI | Flow test class |
-| ErrorHandlingFlowTest | 01pfj000006m4ApAAI | Error handling tests |
+| Name | Description |
+|------|-------------|
+| WeatherService | Weather API service |
+| WeatherAlertService | Weather alert handling |
+| PaymentGatewayController | Payment processing |
+| ExperienceController | Experience management |
+| PersonalizedGuestExperiences | Guest personalization |
+| ActionCallbacksFlowTest | Flow test class |
+| ActionDefinitionsFlowTest | Flow test class |
+| ErrorHandlingFlowTest | Error handling tests |
 
 **Verification Query:**
 ```bash
@@ -95,13 +95,12 @@ sf data query --query "SELECT Id, DeveloperName FROM FlowDefinition WHERE Develo
 ### Users
 | Name | Username | ID |
 |------|----------|-----|
-| Dormon Zhou | dormon104@agentforce.com | 005fj000009dCTxAAM |
-| Integration User | integration@00dfj00000f31rleab.com | 005fj000009EV6oAAG |
-| OrgFarm EPIC | epic.9e91d2bb6c35@orgfarm.salesforce.com | 005fj000009ESFOAA4 |
+| Test Admin | `<admin-username>` | `<admin-user-id>` |
+| Integration User | `<integration-username>` | `<integration-user-id>` |
 
 **Verification Query:**
 ```bash
-sf data query --query "SELECT Id, Name, Username FROM User WHERE Name = 'Dormon Zhou'" --target-org ultraforce --json
+sf data query --query "SELECT Id, Name, Username FROM User WHERE IsActive = true" --target-org ultraforce --json
 ```
 
 ### Profiles
@@ -109,8 +108,8 @@ sf data query --query "SELECT Id, Name, Username FROM User WHERE Name = 'Dormon 
 |------|-----|
 | System Administrator | (query for Id) |
 | Standard User | (query for Id) |
-| Chatter Free User | 00efj000005oIqBAAU |
-| Contract Manager | 00efj000005oIqmAAE |
+| Chatter Free User | (query for Id) |
+| Contract Manager | (query for Id) |
 
 **Verification Query:**
 ```bash
@@ -207,7 +206,7 @@ test('Navigate to WeatherService class', async () => {
 
   // Verify ID exists
   // sf data query --query "SELECT Id FROM ApexClass WHERE Name = 'WeatherService'" --target-org ultraforce --json
-  // Expected ID: 01pfj000006m4B5AAI
+  // Expected: ID starts with 01p prefix
 })
 ```
 
@@ -221,11 +220,11 @@ test('Navigate to ASR_Hotel__c object', async () => {
 #### Flow Navigation
 ```typescript
 test('Navigate to CreateCase flow', async () => {
-  await testNewTabNavigation(':f CreateCase', /flowBuilder|300fj/, 'CreateCase Flow')
+  await testNewTabNavigation(':f CreateCase', /flowBuilder|300/, 'CreateCase Flow')
 
   // Verify Flow ID
   // sf data query --query "SELECT Id FROM FlowDefinition WHERE DeveloperName = 'CreateCase'" --target-org ultraforce --use-tooling-api --json
-  // Expected ID: 300fj00000npLPhAAM
+  // Expected: ID starts with 300 prefix
 })
 ```
 
@@ -321,12 +320,12 @@ The extension supports two navigation modes: **Lightning** (default) and **Class
 
 | Type | URL Pattern | Example |
 |------|-------------|---------|
-| ApexClass | `/lightning/setup/ApexClasses/page?address=%2F{id}` | `/lightning/setup/ApexClasses/page?address=%2F01pfj000006m4B5AAI` |
+| ApexClass | `/lightning/setup/ApexClasses/page?address=%2F{id}` | `/lightning/setup/ApexClasses/page?address=%2F01pXXXXXXXXXXXXXXX` |
 | ApexTrigger | `/lightning/setup/ApexTriggers/page?address=%2F{id}` | `/lightning/setup/ApexTriggers/page?address=%2F01qxxxxx` |
-| User | `/lightning/setup/ManageUsers/page?address=%2F{id}` | `/lightning/setup/ManageUsers/page?address=%2F005fj000009dCTxAAM` |
+| User | `/lightning/setup/ManageUsers/page?address=%2F{id}` | `/lightning/setup/ManageUsers/page?address=%2F005XXXXXXXXXXXXXXXXX` |
 | CustomObject | `/lightning/o/{apiName}/list` | `/lightning/o/ASR_Hotel__c/list` |
 | CustomField | `/lightning/setup/ObjectManager/{obj}/FieldsAndRelationships/{fieldId}/view` | |
-| Flow | `/builder_platform_interaction/flowBuilder.app?flowId={id}` | `/flowBuilder.app?flowId=300fj00000npLPhAAM` |
+| Flow | `/builder_platform_interaction/flowBuilder.app?flowId={id}` | `/flowBuilder.app?flowId=300XXXXXXXXXXXXXXXXX` |
 | PermissionSet | `/lightning/setup/PermSets/page?address=%2F{id}` | |
 | Profile | `/lightning/setup/EnhancedProfiles/page?address=%2F{id}` | |
 | Queue | `/lightning/setup/Queues/page?address=%2Fp%2Fown%2FQueue%2Fd%3Fid%3D{id}` | |
@@ -335,9 +334,9 @@ The extension supports two navigation modes: **Lightning** (default) and **Class
 
 | Type | URL Pattern | Example |
 |------|-------------|---------|
-| ApexClass | `/{id}` | `/01pfj000006m4B5AAI` |
+| ApexClass | `/{id}` | `/01pXXXXXXXXXXXXXXX` |
 | ApexTrigger | `/{id}` | `/01qxxxxx` |
-| User | `/{id}` | `/005fj000009dCTxAAM` |
+| User | `/{id}` | `/005XXXXXXXXXXXXXXXXX` |
 | CustomObject | `/{keyPrefix}` or `/p/setup/layout/LayoutFieldList?type={apiName}` | `/a0B` |
 | CustomField | `/{fieldId}` | `/00Nxxxxx` |
 | Flow | `/builder_platform_interaction/flowBuilder.app?flowId={id}` | Same as Lightning |

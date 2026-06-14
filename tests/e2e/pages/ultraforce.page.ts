@@ -155,4 +155,140 @@ export class UltraForcePage {
     }
     return { opened: false, url: '' }
   }
+
+  async openHome(): Promise<void> {
+    await this.openModal()
+    await this.clearInput()
+    await this.wait(800)
+  }
+
+  async resultTexts(): Promise<string[]> {
+    return this.page.evaluate(() => {
+      const host = document.querySelector('[id^="ultraforce-modal"]')
+      const root = (host as HTMLElement | null)?.shadowRoot ?? document
+      return Array.from(root.querySelectorAll('[data-ultraforce-result-item] .result-name')).map((n) => n.textContent || '')
+    })
+  }
+
+  // --- Open-shadow helpers (require PLASMO_PUBLIC_E2E build with mode: 'open') ---
+  // Playwright locators automatically pierce open shadow roots, so these reach
+  // elements inside the modal directly.
+
+  /** Locator for result rows inside the (now open) shadow modal. */
+  resultRows() {
+    return this.page.locator('[data-ultraforce-result-item]')
+  }
+
+  /** Text of all result row names. */
+  async resultNames(): Promise<string[]> {
+    return this.resultRows().locator('.result-name').allTextContents()
+  }
+
+  /** The result row whose name/content contains the given text. */
+  rowByText(text: string) {
+    return this.resultRows().filter({ hasText: text }).first()
+  }
+
+  /** Click the pin/favorite button on the result row containing the given text. */
+  async togglePinOnRow(text: string): Promise<void> {
+    const row = this.rowByText(text)
+    await row.hover()
+    await row.getByTitle(/favorites/i).click()
+    await this.wait(400)
+  }
+
+  /**
+   * Hover the result row containing `text`, click the inline action button with
+   * `actionTitle`, and capture the new tab the action opens. Closes the new tab.
+   */
+  async clickActionOnRow(text: string, actionTitle: string): Promise<{ opened: boolean; url: string }> {
+    const row = this.rowByText(text)
+    await row.hover()
+    const newPagePromise = this.context.waitForEvent('page', { timeout: 8000 }).catch(() => null)
+    await row.getByTitle(actionTitle, { exact: true }).click()
+
+    const newPage = await newPagePromise
+    if (newPage) {
+      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+      const url = newPage.url()
+      await newPage.close()
+      return { opened: true, url }
+    }
+    return { opened: false, url: '' }
+  }
+
+  /** The current favorite-button title for the result row ("Pin to favorites" | "Remove from favorites"). */
+  async pinTitleOnRow(text: string): Promise<string | null> {
+    const row = this.rowByText(text)
+    await row.hover()
+    return row.locator('.favorite-action button').first().getAttribute('title')
+  }
+
+  /** Locator for the home-screen Favorites section items (after clearing query / reopening). */
+  homeFavoriteItems() {
+    return this.page.locator('.home-item')
+  }
+
+  /** Names of items in the home-screen Favorites section. */
+  async homeFavoriteNames(): Promise<string[]> {
+    return this.page.locator('.home-section .home-item-name').allTextContents()
+  }
+
+  /** Click the Unpin button on the home-screen favorite row containing the given text. */
+  async unpinFromHome(text: string): Promise<void> {
+    const item = this.homeFavoriteItems().filter({ hasText: text }).first()
+    await item.hover()
+    await item.getByTitle('Unpin').click()
+    await this.wait(400)
+  }
+
+  // --- Settings panel helpers (open-shadow build) ---
+
+  /** Open the Settings panel by clicking the gear button in the modal footer. */
+  async openSettings(): Promise<void> {
+    await this.page.locator('[data-ultraforce-settings-button]').click()
+    await this.page.locator('[data-ultraforce-settings]').waitFor({ state: 'visible', timeout: 5000 })
+    await this.wait(400)
+  }
+
+  /** The Settings panel root locator. */
+  settingsPanel() {
+    return this.page.locator('[data-ultraforce-settings]')
+  }
+
+  /** Custom-command rows in the Custom Commands section (rows with an Edit button). */
+  customCommandRows() {
+    return this.settingsPanel().locator('.command-row').filter({ has: this.page.getByTitle('Edit', { exact: true }) })
+  }
+
+  /** Descriptions of all custom commands currently listed. */
+  async customCommandDescriptions(): Promise<string[]> {
+    return this.customCommandRows().locator('.command-desc').allTextContents()
+  }
+
+  /**
+   * Fill and submit the custom-command form. Assumes the form is already shown
+   * (after clicking "+ Add Command" or "Edit"). Clicks Save at the end.
+   */
+  async fillCommandForm(key: string, description: string, soql: string): Promise<void> {
+    const form = this.settingsPanel().locator('.command-edit-form')
+    await form.getByPlaceholder('e.g. log').fill(key)
+    await form.getByPlaceholder('e.g. My Logs').fill(description)
+    await form.locator('.command-textarea').fill(soql)
+    await form.getByRole('button', { name: 'Save' }).click()
+    await this.wait(400)
+  }
+
+  /** Click "+ Add Command" to reveal the new-command form. */
+  async clickAddCommand(): Promise<void> {
+    await this.settingsPanel().getByRole('button', { name: '+ Add Command' }).click()
+    await this.wait(300)
+  }
+
+  /** Delete the custom command whose description contains the given text (accepts confirm dialog). */
+  async deleteCommandByDescription(description: string): Promise<void> {
+    const row = this.customCommandRows().filter({ hasText: description }).first()
+    await row.getByTitle('Delete', { exact: true }).click()
+    await this.wait(400)
+  }
 }

@@ -65,7 +65,7 @@ export default function IdPreview({ recordId, sfHost, onNavigate }: IdPreviewPro
   return (
     <div className="id-preview" role="region" aria-label="Record preview">
       {state.status === 'loading' && (
-        <div className="id-preview-loading">
+        <div className="id-preview-loading" role="status" aria-live="polite">
           <div className="id-preview-id">{recordId}</div>
           <div className="id-preview-hint">Resolving record...</div>
         </div>
@@ -86,7 +86,7 @@ export default function IdPreview({ recordId, sfHost, onNavigate }: IdPreviewPro
       )}
 
       {state.status === 'error' && (
-        <div className="id-preview-error">
+        <div className="id-preview-error" role="alert">
           <div className="id-preview-id">{recordId}</div>
           <div className="id-preview-hint">{state.message}</div>
         </div>

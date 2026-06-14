@@ -43,6 +43,13 @@ vi.mock('./styles', () => ({
   SEARCH_MODAL_STYLES: ''
 }))
 
+vi.mock('~lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
+
+import { getUnsupportedTypes } from '~lib/salesforce-api'
+import { logger } from '~lib/logger'
+
 interface RenderOptions {
   onClose?: () => void
   onSearch?: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
@@ -78,6 +85,54 @@ describe('SearchModal', () => {
       isLoading: false,
       searchError: null,
       recordContext: null
+    })
+  })
+
+  describe('error logging', () => {
+    it('logs a warning when getUnsupportedTypes rejects', async () => {
+      vi.mocked(getUnsupportedTypes).mockRejectedValueOnce(new Error('boom'))
+      renderModal()
+      await waitFor(() => {
+        expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+          'getUnsupportedTypes failed',
+          expect.objectContaining({ error: expect.any(Error) })
+        )
+      })
+    })
+  })
+
+  describe('accessibility', () => {
+    it('exposes the modal as a dialog with an accessible name', () => {
+      renderModal()
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toBeInTheDocument()
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      expect(dialog).toHaveAccessibleName('UltraForce search')
+    })
+
+    it('labels the search input', () => {
+      renderModal()
+      expect(screen.getByRole('textbox', { name: /search/i })).toBeInTheDocument()
+    })
+
+    it('labels the settings button', () => {
+      renderModal()
+      expect(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument()
+    })
+
+    it('restores focus to the previously focused element on close', () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+      expect(document.activeElement).toBe(trigger)
+
+      const { unmount } = renderModal()
+      // Modal grabs focus on open
+      expect(document.activeElement).not.toBe(trigger)
+
+      unmount()
+      expect(document.activeElement).toBe(trigger)
+      document.body.removeChild(trigger)
     })
   })
 

@@ -21,6 +21,7 @@ const ActionButton: React.FC<{
   <button
     className="object-action-btn"
     title={title}
+    aria-label={title}
     onClick={onClick}
   >
     {icon}
@@ -83,6 +84,8 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
       className={`result-item ${isSelected ? 'selected' : ''}`}
       data-ultraforce-result-item
       data-selected={isSelected}
+      role="option"
+      aria-selected={isSelected}
       onClick={onClick}
     >
       <div className="result-info">
@@ -225,4 +228,15 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
   )
 }
 
-export default ResultItem
+// Re-render only when displayed data or selection/favorite state changes.
+// Callback props are intentionally excluded: SearchResults passes stable
+// per-row callbacks (see ResultRow), so ignoring their identity here is safe
+// and avoids re-rendering every row on each keystroke.
+const arePropsEqual = (prev: ResultItemProps, next: ResultItemProps): boolean =>
+  prev.result.id === next.result.id &&
+  prev.isSelected === next.isSelected &&
+  prev.isFavorite === next.isFavorite &&
+  prev.result.name === next.result.name &&
+  prev.result.description === next.result.description
+
+export default React.memo(ResultItem, arePropsEqual)

@@ -77,7 +77,7 @@ CWS publishing is **disabled by default**. To enable it:
 
 1. Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 2. Navigate to **Settings** > **Group publishers** (or invite the service account email as a group member)
-3. Add the service account email (e.g., `chrone-extension-auto-publish@ultraforce.iam.gserviceaccount.com`) with publish permissions
+3. Add the service account email (e.g., `<your-service-account>@<your-project>.iam.gserviceaccount.com`) with publish permissions
 
 ### Step 3: Configure GitHub Repository
 

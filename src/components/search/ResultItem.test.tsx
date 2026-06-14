@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import React from 'react'
 import ResultItem from './ResultItem'
 import type { SearchResult } from '~types'
@@ -49,6 +49,19 @@ describe('ResultItem', () => {
     )
     const item = container.querySelector('.result-item')
     expect(item?.classList.contains('selected')).toBe(true)
+  })
+
+  it('exposes the row as an option reflecting selection', () => {
+    const { rerender } = render(<ResultItem {...defaultProps} isSelected={false} />)
+    const option = screen.getByRole('option')
+    expect(option.getAttribute('aria-selected')).toBe('false')
+    rerender(<ResultItem {...defaultProps} isSelected={true} />)
+    expect(screen.getByRole('option').getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('labels the pin button by its title for screen readers', () => {
+    render(<ResultItem {...defaultProps} onToggleFavorite={vi.fn()} isFavorite={false} />)
+    expect(screen.getByRole('button', { name: 'Pin to favorites' })).toBeTruthy()
   })
 
   it('should call onClick when clicked', () => {
@@ -143,5 +156,64 @@ describe('ResultItem', () => {
     fireEvent.click(screen.getByTitle('Pin to favorites'))
     expect(onToggleFavorite).toHaveBeenCalledTimes(1)
     expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('renders the 5 object action buttons for a CustomObject and fires onActionClick', () => {
+    const onActionClick = vi.fn()
+    render(
+      <ResultItem
+        {...defaultProps}
+        result={makeResult({ id: '001x', name: 'Acme', type: 'CustomObject' })}
+        onActionClick={onActionClick}
+      />
+    )
+    fireEvent.click(screen.getByTitle('Fields'))
+    expect(onActionClick).toHaveBeenCalledWith(expect.objectContaining({ id: '001x' }), 'fields')
+    expect(screen.getByTitle('Page Layouts')).toBeTruthy()
+    expect(screen.getByTitle('Record Types')).toBeTruthy()
+    expect(screen.getByTitle('Validation Rules')).toBeTruthy()
+    expect(screen.getByTitle('Object Settings')).toBeTruthy()
+  })
+
+  it('renders a Preview action for ApexPage', () => {
+    const onActionClick = vi.fn()
+    render(
+      <ResultItem
+        {...defaultProps}
+        result={makeResult({ type: 'ApexPage' })}
+        onActionClick={onActionClick}
+      />
+    )
+    fireEvent.click(screen.getByTitle('Preview'))
+    expect(onActionClick).toHaveBeenCalledWith(expect.objectContaining({ type: 'ApexPage' }), 'preview')
+  })
+
+  it('copies the QualifiedApiName for a CustomField', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    render(
+      <ResultItem
+        {...defaultProps}
+        result={makeResult({ type: 'CustomField', name: 'Industry', metadata: { QualifiedApiName: 'Account.Industry' } })}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('Copy API Name'))
+    })
+    expect(writeText).toHaveBeenCalledWith('Account.Industry')
+  })
+
+  it('shows last-modified meta for Apex with a relative date', () => {
+    render(
+      <ResultItem
+        {...defaultProps}
+        result={makeResult({
+          type: 'ApexClass',
+          metadata: { LastModifiedDate: new Date().toISOString(), LastModifiedBy: { Name: 'Dormon' } }
+        })}
+      />
+    )
+    expect(screen.getByText('Dormon')).toBeTruthy()
+    expect(screen.getByText('today')).toBeTruthy()
   })
 })

@@ -45,6 +45,20 @@
   to { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 
+/* Keyboard focus indicator (a11y) -- the large input opts out via its own
+   outline:none, every other interactive element gets a visible ring. */
+.ultraforce-search-modal :focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.result-item:focus-visible,
+.home-item:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
 .search-container {
   flex: 1;
   display: flex;
@@ -257,7 +271,7 @@
 
 .result-description {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -276,7 +290,7 @@
 
 .result-namespace {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.05);
   padding: 2px 6px;
   border-radius: 4px;
@@ -299,7 +313,7 @@
 }
 
 .meta-date {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .object-actions,
@@ -312,7 +326,9 @@
 }
 
 .result-item:hover .object-actions,
-.result-item:hover .favorite-action {
+.result-item:hover .favorite-action,
+.result-item:focus-within .object-actions,
+.result-item:focus-within .favorite-action {
   opacity: 1;
 }
 
@@ -385,7 +401,7 @@
 
 .empty-desc {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.55);
   max-width: 280px;
   line-height: 1.4;
 }
@@ -832,7 +848,8 @@ kbd {
   transition: opacity 0.15s ease;
 }
 
-.command-row:hover .command-actions {
+.command-row:hover .command-actions,
+.command-row:focus-within .command-actions {
   opacity: 1;
 }
 
@@ -1052,7 +1069,7 @@ kbd {
 
 .command-form-hint {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .command-form-error {
@@ -1392,6 +1409,23 @@ kbd {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .firework-particle,
+  .update-celebration-icon {
+    animation: none;
+  }
+  .firework-particle {
+    opacity: 0;
+  }
+  .ultraforce-search-modal {
+    animation: none;
+    opacity: 1;
+  }
+  .org-badge-production {
+    animation: none;
+  }
+}
+
 /* ================================================================
    HomeScreen - Favorites + Recent History
    ================================================================ */
@@ -1542,7 +1576,7 @@ kbd {
 
 .home-item-desc {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1551,7 +1585,7 @@ kbd {
 
 .home-item-time {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1573,7 +1607,8 @@ kbd {
   transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.home-item:hover .home-item-action {
+.home-item:hover .home-item-action,
+.home-item:focus-within .home-item-action {
   opacity: 1;
 }
 
@@ -1752,5 +1787,5 @@ kbd {
 
 .setup-suggestion-category {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.5);
 }

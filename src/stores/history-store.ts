@@ -4,7 +4,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { PersistStorage } from 'zustand/middleware'
-import { STORAGE_KEYS, storageGet, storageSet, storageRemove } from '~lib/storage-service'
+import {
+  STORAGE_KEYS,
+  PENDING_HISTORY_KEY,
+  historyKey,
+  storageGet,
+  storageSet,
+  storageRemove
+} from '~lib/storage-service'
+import { logger } from '~lib/logger'
 
 export interface HistoryItem {
   id: string
@@ -50,16 +58,26 @@ export function sortByFrecency(items: HistoryItem[], now: number = Date.now()): 
   return [...items].sort((a, b) => calculateFrecency(b, now) - calculateFrecency(a, now))
 }
 
+/** Sort items by last visit time (most recent first). */
+export function sortByLastVisited(items: HistoryItem[]): HistoryItem[] {
+  return [...items].sort((a, b) => b.lastVisitedAt - a.lastVisitedAt)
+}
+
+// Writes/reads no-op while persist name is still the pending placeholder (sfHost unknown).
+// Once setHistoryOrgScope() is called the placeholder is swapped for a host-scoped key.
 const chromeHistoryStorage: PersistStorage<Partial<HistoryState>> = {
   getItem: async (name) => {
+    if (name === PENDING_HISTORY_KEY) return null
     const value = await storageGet<Partial<HistoryState>>(name)
     if (!value) return null
     return { state: value }
   },
   setItem: async (name, value) => {
+    if (name === PENDING_HISTORY_KEY) return
     await storageSet(name, value.state)
   },
   removeItem: async (name) => {
+    if (name === PENDING_HISTORY_KEY) return
     await storageRemove(name)
   }
 }
@@ -114,9 +132,60 @@ export const useHistoryStore = create<HistoryStore>()(
       clearHistory: () => set({ items: [] })
     }),
     {
-      name: STORAGE_KEYS.HISTORY,
+      name: PENDING_HISTORY_KEY,
       storage: chromeHistoryStorage,
-      partialize: ({ items }) => ({ items })
+      partialize: ({ items }) => ({ items }),
+      // Force items to come entirely from the new scope. Without this, switching
+      // to an unpersisted org would leave the previous org's items in memory
+      // (default merge keeps currentState fields when persistedState is empty).
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        items: (persistedState as { items?: HistoryItem[] } | undefined)?.items ?? []
+      })
     }
   )
 )
+
+let currentHistoryHost: string | null = null
+
+/**
+ * Bind the history store to a specific Salesforce host. Must be called once the
+ * sfHost is known (typically from WindowManager.loadSession). Subsequent reads
+ * and writes use a host-scoped storage key, isolating recents across orgs.
+ *
+ * Performs a one-time migration: if the legacy global key exists and the
+ * host-scoped key does not, the legacy data is moved into the current host's
+ * key. This preserves single-org users' existing history.
+ */
+export async function setHistoryOrgScope(host: string): Promise<void> {
+  if (!host) return
+  if (currentHistoryHost === host) return
+  currentHistoryHost = host
+
+  const scopedKey = historyKey(host)
+
+  // One-time migration from legacy global key.
+  try {
+    const scopedExisting = await storageGet<Partial<HistoryState>>(scopedKey)
+    if (!scopedExisting) {
+      const legacy = await storageGet<Partial<HistoryState>>(STORAGE_KEYS.HISTORY)
+      if (legacy && Array.isArray(legacy.items) && legacy.items.length > 0) {
+        await storageSet(scopedKey, legacy)
+        await storageRemove(STORAGE_KEYS.HISTORY)
+        logger.info('history:migrated legacy global key', { host, count: legacy.items.length })
+      }
+    }
+  } catch (error) {
+    logger.error('history:migration failed', { host, error })
+  }
+
+  // setOptions must come before rehydrate; the custom merge handles clearing
+  // items when the new scope has no persisted data.
+  useHistoryStore.persist.setOptions({ name: scopedKey })
+  await useHistoryStore.persist.rehydrate()
+}
+
+/** Test-only helper: forget the bound host so setHistoryOrgScope can be re-applied. */
+export function _resetHistoryOrgScope(): void {
+  currentHistoryHost = null
+}

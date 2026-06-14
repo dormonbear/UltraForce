@@ -60,3 +60,15 @@ temp/
 
 # Backup directories
 backup/
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# GSD planning artifacts
+.planning/
+
+# Playwright MCP screenshots
+.playwright-mcp/
+
+# CodeGraph local index (regenerated from source)
+.codegraph/

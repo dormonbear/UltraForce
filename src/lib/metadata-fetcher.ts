@@ -4,7 +4,6 @@
 import { sfRest, API_VERSION } from './auth'
 import { MetadataCache } from './metadata-cache'
 import { METADATA_TYPES } from './metadata-types'
-import type { SfEntityDefinition, SfFieldDefinition } from './metadata-types'
 import { logger } from './logger'
 import { markTypeUnsupported } from './unsupported-types'
 import { normalizeHost, escapeSoql } from './domain-utils'
@@ -28,6 +27,10 @@ const REST_API_TYPES = ['CustomObject', 'CustomSetting', 'User', 'Report', 'Dash
 
 // Types that should always fetch fresh data (no cache)
 const REALTIME_TYPES: string[] = ['CustomLabel']
+
+function isStaleCustomObjectCache(metadataType: string, data: Record<string, unknown>[]): boolean {
+  return metadataType === 'CustomObject' && data.some((record) => !Object.prototype.hasOwnProperty.call(record, 'IsCustomSetting'))
+}
 
 export async function fetchAllPages<T extends Record<string, unknown> = Record<string, unknown>>(
   sfHost: string,
@@ -342,7 +345,11 @@ export async function getMetadataWithCache(
   if (!skipCache) {
     const cachedData = await cache.get(cacheKey, metadataType)
     if (cachedData) {
-      return { data: cachedData, fromCache: true }
+      if (isStaleCustomObjectCache(metadataType, cachedData)) {
+        await cache.delete(cacheKey, metadataType)
+      } else {
+        return { data: cachedData, fromCache: true }
+      }
     }
   }
 

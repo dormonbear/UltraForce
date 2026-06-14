@@ -1,11 +1,35 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useHistoryStore, calculateFrecency, sortByFrecency, type HistoryItem } from './history-store'
+import {
+  useHistoryStore,
+  setHistoryOrgScope,
+  _resetHistoryOrgScope,
+  calculateFrecency,
+  sortByFrecency,
+  sortByLastVisited,
+  type HistoryItem
+} from './history-store'
+
+const fakeStore = new Map<string, unknown>()
+const storageGetMock = vi.fn(async (key: string) => fakeStore.get(key))
+const storageSetMock = vi.fn(async (key: string, value: unknown) => {
+  fakeStore.set(key, value)
+})
+const storageRemoveMock = vi.fn(async (keys: string | string[]) => {
+  const list = Array.isArray(keys) ? keys : [keys]
+  list.forEach((k) => fakeStore.delete(k))
+})
+
+vi.mock('~lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+}))
 
 vi.mock('~lib/storage-service', () => ({
   STORAGE_KEYS: { HISTORY: 'ultraforce_history' },
-  storageGet: vi.fn().mockResolvedValue(undefined),
-  storageSet: vi.fn().mockResolvedValue(undefined),
-  storageRemove: vi.fn().mockResolvedValue(undefined)
+  PENDING_HISTORY_KEY: 'ultraforce_history__pending',
+  historyKey: (host: string) => `ultraforce_history__${host}`,
+  storageGet: (k: string) => storageGetMock(k),
+  storageSet: (k: string, v: unknown) => storageSetMock(k, v),
+  storageRemove: (k: string | string[]) => storageRemoveMock(k)
 }))
 
 function makeItem(overrides: Partial<HistoryItem> = {}): HistoryItem {
@@ -24,6 +48,11 @@ function makeItem(overrides: Partial<HistoryItem> = {}): HistoryItem {
 describe('history-store', () => {
   beforeEach(() => {
     useHistoryStore.setState({ items: [] })
+    fakeStore.clear()
+    storageGetMock.mockClear()
+    storageSetMock.mockClear()
+    storageRemoveMock.mockClear()
+    _resetHistoryOrgScope()
   })
 
   describe('recordVisit', () => {
@@ -115,6 +144,119 @@ describe('history-store', () => {
       expect(useHistoryStore.getState().items).toHaveLength(0)
     })
   })
+
+  describe('setHistoryOrgScope', () => {
+    const HOST_A = 'a--stg.sandbox.my.salesforce.com'
+    const HOST_B = 'b.my.salesforce.com'
+
+    it('isolates items across hosts', async () => {
+      await setHistoryOrgScope(HOST_A)
+      useHistoryStore.getState().recordVisit({
+        id: 'stg-1',
+        name: 'Stg item',
+        type: 'Account',
+        url: `https://${HOST_A}/stg-1`
+      })
+      // Allow the persist middleware to flush asynchronously.
+      await new Promise((r) => setTimeout(r, 0))
+
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST_B)
+      expect(useHistoryStore.getState().items).toHaveLength(0)
+
+      useHistoryStore.getState().recordVisit({
+        id: 'live-1',
+        name: 'Live item',
+        type: 'Account',
+        url: `https://${HOST_B}/live-1`
+      })
+      await new Promise((r) => setTimeout(r, 0))
+
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST_A)
+      const items = useHistoryStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(items[0].id).toBe('stg-1')
+    })
+
+    it('migrates legacy global key on first scope', async () => {
+      fakeStore.set('ultraforce_history', { items: [makeItem({ id: 'legacy' })] })
+
+      await setHistoryOrgScope(HOST_A)
+
+      expect(fakeStore.get(`ultraforce_history__${HOST_A}`)).toBeDefined()
+      expect(fakeStore.get('ultraforce_history')).toBeUndefined()
+      expect(useHistoryStore.getState().items[0]?.id).toBe('legacy')
+    })
+
+    it('does not migrate when scoped key already exists', async () => {
+      fakeStore.set('ultraforce_history', { items: [makeItem({ id: 'legacy' })] })
+      fakeStore.set(`ultraforce_history__${HOST_A}`, { items: [makeItem({ id: 'scoped' })] })
+
+      await setHistoryOrgScope(HOST_A)
+
+      expect(fakeStore.get('ultraforce_history')).toBeDefined()
+      expect(useHistoryStore.getState().items[0]?.id).toBe('scoped')
+    })
+
+    it('no-ops on empty host', async () => {
+      await setHistoryOrgScope('')
+      expect(storageGetMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('frecency refresh on re-open', () => {
+    it('moves a re-visited low-frecency item ahead of a stale high-count item', () => {
+      const store = useHistoryStore.getState()
+      const now = Date.now()
+      useHistoryStore.setState({
+        items: [
+          { id: 'stale', name: 'Stale', type: 'ApexClass', url: 'u1', visitCount: 10, lastVisitedAt: now - 30 * 864e5, firstVisitedAt: now - 60 * 864e5 },
+          { id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2', visitCount: 1, lastVisitedAt: now - 20 * 864e5, firstVisitedAt: now - 20 * 864e5 }
+        ]
+      })
+      store.recordVisit({ id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2' })
+      const items = useHistoryStore.getState().items
+      const sorted = sortByFrecency(items)
+      expect(sorted[0].id).toBe('fresh')
+    })
+
+    it('keeps description when recordVisit omits it', () => {
+      const store = useHistoryStore.getState()
+      store.recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u', description: 'first@x.com | Admin' })
+      store.recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      const item = useHistoryStore.getState().items.find((i) => i.id === 'a')
+      expect(item?.description).toBe('first@x.com | Admin')
+      expect(item?.visitCount).toBe(2)
+    })
+
+    it('treats same id with different type as distinct entries', () => {
+      const store = useHistoryStore.getState()
+      store.recordVisit({ id: 'x', name: 'X', type: 'ApexClass', url: 'u1' })
+      store.recordVisit({ id: 'x', name: 'X', type: 'Flow', url: 'u2' })
+      expect(useHistoryStore.getState().items).toHaveLength(2)
+    })
+  })
+
+  describe('org scope isolation', () => {
+    it('writes to a host-scoped key after setHistoryOrgScope', async () => {
+      await setHistoryOrgScope('orgA.my.salesforce.com')
+      useHistoryStore.getState().recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      await Promise.resolve()
+      expect(storageSetMock).toHaveBeenCalledWith(
+        'ultraforce_history__orgA.my.salesforce.com',
+        expect.objectContaining({ items: expect.any(Array) })
+      )
+    })
+
+    it('clears in-memory items when switching to an org with no persisted data', async () => {
+      await setHistoryOrgScope('orgA.my.salesforce.com')
+      useHistoryStore.getState().recordVisit({ id: 'a', name: 'A', type: 'User', url: 'u' })
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope('orgB.my.salesforce.com')
+      expect(useHistoryStore.getState().items).toEqual([])
+    })
+  })
 })
 
 describe('frecency', () => {
@@ -162,6 +304,29 @@ describe('frecency', () => {
       expect(sorted[0].id).toBe('frequent')
       expect(sorted[1].id).toBe('recent')
       expect(sorted[2].id).toBe('old')
+    })
+  })
+
+  describe('sortByLastVisited', () => {
+    it('should sort items by lastVisitedAt descending regardless of visit count', () => {
+      const now = Date.now()
+      const items = [
+        makeItem({ id: 'frequent-old', visitCount: 50, lastVisitedAt: now - 3600000 }),
+        makeItem({ id: 'just-opened', visitCount: 1, lastVisitedAt: now }),
+        makeItem({ id: 'middle', visitCount: 5, lastVisitedAt: now - 60000 })
+      ]
+
+      const sorted = sortByLastVisited(items)
+      expect(sorted.map((i) => i.id)).toEqual(['just-opened', 'middle', 'frequent-old'])
+    })
+
+    it('should not mutate the input array', () => {
+      const items = [
+        makeItem({ id: 'a', lastVisitedAt: 1 }),
+        makeItem({ id: 'b', lastVisitedAt: 2 })
+      ]
+      sortByLastVisited(items)
+      expect(items[0].id).toBe('a')
     })
   })
 })

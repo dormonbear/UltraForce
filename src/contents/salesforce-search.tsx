@@ -198,7 +198,9 @@ class UltraForceContentScript {
           )
         }, 2000)
       } else {
-        checkMetadataPermissions(sfHost).catch(() => {})
+        checkMetadataPermissions(sfHost).catch((error: any) =>
+          logger.warn('metadata permission check failed', { error })
+        )
       }
     } catch (error) {
       logger.error('Failed to initialize session:', error)
@@ -268,6 +270,15 @@ function initializeContentScript(): void {
 
   globalContentScript = new UltraForceContentScript()
 }
+
+// Content scripts run in an isolated world: this listener only catches rejections
+// originating from the extension's own JS context, not the host page's. Logging and
+// preventing default ensures a stray rejection from our code can never surface as a
+// host-page error and break the user's Salesforce session.
+window.addEventListener('unhandledrejection', (event) => {
+  logger.error('unhandled promise rejection', { reason: event.reason })
+  event.preventDefault()
+})
 
 window.addEventListener('beforeunload', async () => {
   if (globalContentScript) {

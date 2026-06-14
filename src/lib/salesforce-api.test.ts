@@ -467,6 +467,33 @@ describe('salesforce-api', () => {
       const result = isApiAvailable(TEST_HOST, 'new-session-key')
       expect(result).toBe(true)
     })
+
+    it('should reflect markApiAvailability(false) after a failed session validation', async () => {
+      const host = 'unavailable-org.my.salesforce.com'
+      const session = { key: 'session-key-abc123', hostname: host }
+      mockGetSession.mockResolvedValue(session)
+      // validateSalesforceSession marks availability false on a non-ok response
+      mockFetch.mockResolvedValue({ ok: false })
+
+      const valid = await validateSalesforceSession(host)
+      expect(valid).toBe(false)
+
+      // Same session key -> reflects cached unavailable state
+      expect(isApiAvailable(host, session.key)).toBe(false)
+    })
+
+    it('should reset to available when the session key changes', async () => {
+      const host = 'reset-org.my.salesforce.com'
+      const session = { key: 'old-session-key-1', hostname: host }
+      mockGetSession.mockResolvedValue(session)
+      mockFetch.mockResolvedValue({ ok: false })
+
+      await validateSalesforceSession(host)
+      expect(isApiAvailable(host, session.key)).toBe(false)
+
+      // A different session key (different 8-char hash) forces a recheck -> true
+      expect(isApiAvailable(host, 'new-session-key-2')).toBe(true)
+    })
   })
 
   describe('warmupMetadataCache', () => {
