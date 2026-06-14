@@ -16,17 +16,22 @@ A Chrome extension for lightning-fast Salesforce metadata search.
 
 ## Search Types
 
-- **Apex Classes** - Search by class name
-- **Apex Triggers** - Search by trigger name
+- **Apex Classes / Triggers** - Search by name
+- **Visualforce / LWC / Aura** - Search by component name
 - **Custom Objects** - Search by object API name or label
 - **Fields** - Use dot-notation: `Account.Name` or `Account.`
 - **Flows** - Search by flow name
 - **Users** - Search by name, username, email, or federation ID
-- **Permission Sets** - Search by permission set name
-- **Profiles** - Search by profile name
+- **Profiles & Permission Sets** - Profiles, permission sets, permission set groups, custom permissions
 - **Custom Labels** - Search by label name or value content
 - **Custom Metadata Types** - Search types, use dot-notation for records: `My_Setting__mdt.`
 - **Custom Settings** - Search settings, use dot-notation for records: `My_Setting__c.`
+- **Queues & Public Groups** - Search by name
+- **Reports & Dashboards** - Search by name and folder
+
+## Accessibility
+
+UltraForce is built to be keyboard- and screen-reader friendly: the modal is an ARIA dialog with labelled controls and live-region announcements, every interactive element shows a visible focus ring during keyboard navigation, secondary text meets WCAG AA contrast, and animations are disabled when `prefers-reduced-motion` is set.
 
 ## Commands
 
@@ -35,18 +40,26 @@ Type `:` to see available commands for quick filtering:
 | Command | Description | Example |
 |---------|-------------|---------|
 | `:o` | Objects & Fields | `:o account` |
-| `:c` | Apex (Classes + Triggers) | `:c mycontroller` |
-| `:w` | Flows | `:w approval` |
+| `:c` | Custom Code (Apex, Triggers, VF, LWC, Aura) | `:c mycontroller` |
+| `:f` | Flows | `:f approval` |
 | `:u` | Users | `:u john` |
-| `:p` | Permission Sets | `:p admin` |
-| `:r` | Profiles | `:r system` |
+| `:p` | Profiles & Permissions (Profile, Perm Set, Perm Set Group, Custom Permission) | `:p admin` |
 | `:l` | Custom Labels | `:l error_message` |
-| `:s` | Custom Settings | `:s my_setting` |
+| `:m` | Custom Metadata & Settings | `:m my_setting` |
+| `:q` | Queues & Public Groups | `:q support` |
+| `:r` | Reports & Dashboards | `:r pipeline` |
 | `:g` | Setup Shortcuts | `:g deploy` |
+
+## Home Screen: Recent & Favorites
+
+Open UltraForce with an empty query to see your home screen:
+
+- **Recent** - Items you have opened, ordered by most recently used (the item you just opened is always on top). Isolated per org.
+- **Favorites** - Pin frequently-used items with the star icon to keep them at the top. Persisted across sessions.
 
 ## Direct Record Navigation
 
-Enter a Salesforce record ID (15 or 18 characters) directly and press Enter to navigate to that record.
+Paste one or more Salesforce record IDs (15 or 18 characters) or record URLs into the search box. UltraForce previews the resolved record (object type and name); press Enter to open it. Multiple IDs can be pasted at once.
 
 ## Keyboard Shortcuts
 
@@ -77,7 +90,7 @@ UltraForce communicates directly between your web browser and Salesforce servers
 
 ### Data Storage
 
-We store minimal data in browser localStorage to save your preferences (search settings, keyboard shortcuts, custom commands). None of the stored data contains Salesforce record data (Accounts, Contacts, etc.).
+We store minimal data in the browser's extension storage (`chrome.storage.local`) to save your preferences (search settings, keyboard shortcut, custom commands) along with a locally cached metadata index, recent history, and favorites. Recent history and favorites are isolated per Salesforce org. None of the stored data is sent anywhere.
 
 ### API Access
 

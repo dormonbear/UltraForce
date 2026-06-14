@@ -96,6 +96,17 @@ Search queues and public groups.
 
 **Types:** Queue, Group
 
+## :r - Reports & Dashboards
+
+Search reports and dashboards by name and folder.
+
+```
+:r pipeline       # Pipeline report
+:r sales          # Sales dashboard
+```
+
+**Types:** Report, Dashboard
+
 ## :g - Setup Navigation
 
 Navigate to Setup pages.

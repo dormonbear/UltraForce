@@ -18,10 +18,11 @@ Commands start with `:` followed by a key and optional query:
 | `:c` | Code | ApexClass, ApexTrigger, ApexPage, ApexComponent, Aura, LWC |
 | `:f` | Flows | Flow |
 | `:u` | Users | User |
-| `:p` | Permissions | Profile, PermissionSet, PermissionSetGroup |
+| `:p` | Permissions | Profile, PermissionSet, PermissionSetGroup, CustomPermission |
 | `:l` | Labels | CustomLabel |
 | `:m` | Metadata | CustomMetadata, CustomSetting |
 | `:q` | Queues | Queue, Group |
+| `:r` | Reports & Dashboards | Report, Dashboard |
 | `:g` | Setup | Navigate to Setup pages |
 
 ## Usage Examples
