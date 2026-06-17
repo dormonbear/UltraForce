@@ -1,5 +1,13 @@
 # Release Notes
 
+## v0.3.2
+
+Release Date: 2026-06-17
+
+### Bug Fixes
+
+- **Field search broken for underscore-named objects**: Typing `ObjectName.` (e.g. `IC_Royalty_Center__c.` or `ASR_Hotel__c.`) returned no fields for any custom object whose API name contains underscores. The field lookup over-escaped underscores in an exact-match query, so it matched zero rows. Fields now load correctly for all objects.
+
 ## v0.3.1
 
 Release Date: 2026-06-11
