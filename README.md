@@ -7,6 +7,9 @@ A Chrome extension for lightning-fast Salesforce metadata search.
 [![Chrome Web Store users](https://img.shields.io/chrome-web-store/users/maemkmihjmlfilhpfeeindecjnagelkh)](https://chromewebstore.google.com/detail/ultraforce-for-salesforce/maemkmihjmlfilhpfeeindecjnagelkh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
+[![Docs](https://img.shields.io/badge/docs-ultraforce.dormon.net-brightgreen.svg)](https://ultraforce.dormon.net)
+
+Documentation: [ultraforce.dormon.net](https://ultraforce.dormon.net)
 
 ## Install
 
