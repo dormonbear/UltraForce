@@ -160,15 +160,28 @@ sf data query --query "SELECT Id, DeveloperName FROM FlowDefinition WHERE Develo
 Releases are automated via GitHub Actions. Pushing a `v*` tag triggers the release workflow which builds, packages, creates a GitHub Release, and optionally publishes to the Chrome Web Store.
 
 ```bash
-# Bump version, update release notes, commit, and tag (pick one)
+# Releases are cut from and tagged on `main`.
+
+# 1. Bring main up to date with develop
+git checkout main
+git merge --ff-only develop
+
+# 2. Bump version + release-notes placeholder, commit, and tag on main (pick one)
 pnpm release:patch   # 0.1.1 -> 0.1.2
 pnpm release:minor   # 0.1.1 -> 0.2.0
 pnpm release:major   # 0.1.1 -> 1.0.0
 
-# Edit the generated release notes placeholder in docs/guide/release-notes.md
-# Then amend the commit and push with tags
-git commit --amend
-git push origin develop --tags
+# 3. Edit the generated placeholder in docs/guide/release-notes.md, then re-point the tag
+git commit --amend --no-edit
+git tag -f vX.Y.Z
+
+# 4. Push main + tag to trigger the release workflow
+git push origin main
+git push origin vX.Y.Z --force
+
+# 5. Fast-forward develop so it keeps the release commit
+git checkout develop
+git merge --ff-only main
 ```
 
 The release workflow (`.github/workflows/release.yml`) will:
