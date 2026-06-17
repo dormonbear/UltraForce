@@ -63,3 +63,11 @@ export function isSalesforceDomain(hostname: string): boolean {
 export function escapeSoql(input: string): string {
   return input.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/%/g, '\\%').replace(/_/g, '\\_')
 }
+
+/**
+ * Escape a string for use as a SOQL string literal in an exact-match (=) query.
+ * Only backslash and single quote need escaping; % and _ are literal outside LIKE.
+ */
+export function escapeSoqlLiteral(input: string): string {
+  return input.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+}

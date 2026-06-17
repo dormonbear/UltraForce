@@ -28,9 +28,12 @@ test.describe('Features', () => {
     await uf.openModal()
     await uf.clearAndType('ASR_Hotel__c.')
     await uf.wait(2000)
-    await uf.pressKey('ArrowDown')
-    await uf.wait(200)
+    const names = await uf.resultNames()
     await uf.closeModal()
+    // Regression: escapeSoql over-escaped '_' in the '=' field query, so fields
+    // for underscore-named objects (ASR_*, IC_*) never loaded. Assert real fields show.
+    expect(names).toContain('City')
+    expect(names).toContain('Location')
   })
 
   test('autocomplete with Tab key', async () => {

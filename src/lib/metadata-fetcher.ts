@@ -6,7 +6,7 @@ import { MetadataCache } from './metadata-cache'
 import { METADATA_TYPES } from './metadata-types'
 import { logger } from './logger'
 import { markTypeUnsupported } from './unsupported-types'
-import { normalizeHost, escapeSoql } from './domain-utils'
+import { normalizeHost, escapeSoqlLiteral } from './domain-utils'
 import { buildSearchIndex, hasSearchIndex } from './fuzzy-search'
 
 export interface FetchOptions {
@@ -207,7 +207,7 @@ export async function fetchFieldsForObject(
 ): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
-  const escapedName = escapeSoql(objectApiName)
+  const escapedName = escapeSoqlLiteral(objectApiName)
   const query = `SELECT Id, DurableId, QualifiedApiName, Label, DataType, EntityDefinition.QualifiedApiName FROM FieldDefinition WHERE EntityDefinition.QualifiedApiName = '${escapedName}' ORDER BY QualifiedApiName ASC`
   const queryPath = `/services/data/v${API_VERSION}/tooling/query?q=${encodeURIComponent(query)}`
 

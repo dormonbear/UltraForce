@@ -41,7 +41,8 @@ vi.mock('./unsupported-types', () => ({
 
 vi.mock('./domain-utils', () => ({
   normalizeHost: vi.fn((h: string) => h),
-  escapeSoql: vi.fn((s: string) => s)
+  escapeSoql: vi.fn((s: string) => s),
+  escapeSoqlLiteral: vi.fn((s: string) => s)
 }))
 
 import { fetchAllPages, fetchMetadataFromAPI, fetchFieldsForObject, getMetadataWithCache } from './metadata-fetcher'

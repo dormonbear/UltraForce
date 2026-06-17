@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeHost, isSalesforceDomain, escapeSoql } from './domain-utils'
+import { normalizeHost, isSalesforceDomain, escapeSoql, escapeSoqlLiteral } from './domain-utils'
 
 describe('normalizeHost', () => {
   it('should return empty string for empty input', () => {
@@ -111,5 +111,23 @@ describe('escapeSoql', () => {
 
   it('should handle empty string', () => {
     expect(escapeSoql('')).toBe('')
+  })
+})
+
+describe('escapeSoqlLiteral', () => {
+  it('should NOT escape underscores (exact-match query)', () => {
+    expect(escapeSoqlLiteral('IC_Royalty_Center__c')).toBe('IC_Royalty_Center__c')
+  })
+
+  it('should NOT escape percent', () => {
+    expect(escapeSoqlLiteral('50%')).toBe('50%')
+  })
+
+  it('should escape single quotes', () => {
+    expect(escapeSoqlLiteral("O'Brien")).toBe("O\\'Brien")
+  })
+
+  it('should escape backslashes before single quotes', () => {
+    expect(escapeSoqlLiteral("test\\'value")).toBe("test\\\\\\'value")
   })
 })
