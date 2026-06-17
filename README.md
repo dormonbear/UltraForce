@@ -2,11 +2,21 @@
 
 A Chrome extension for lightning-fast Salesforce metadata search.
 
+[![CI](https://github.com/dormonbear/UltraForce/actions/workflows/ci.yml/badge.svg)](https://github.com/dormonbear/UltraForce/actions/workflows/ci.yml)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/maemkmihjmlfilhpfeeindecjnagelkh)](https://chromewebstore.google.com/detail/ultraforce-for-salesforce/maemkmihjmlfilhpfeeindecjnagelkh)
+[![Chrome Web Store users](https://img.shields.io/chrome-web-store/users/maemkmihjmlfilhpfeeindecjnagelkh)](https://chromewebstore.google.com/detail/ultraforce-for-salesforce/maemkmihjmlfilhpfeeindecjnagelkh)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Security Policy](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
 
 ## Install
 
 [Get it on Chrome Web Store](https://chromewebstore.google.com/detail/ultraforce-for-salesforce/maemkmihjmlfilhpfeeindecjnagelkh?authuser=0&hl=en)
+
+## Demo
+
+Press `Cmd+B` or `Ctrl+B` on a Salesforce page, type a metadata name, and open the result directly.
+
+Demo media should be added at `docs/assets/ultraforce-demo.gif` before a public launch.
 
 ## Usage
 
@@ -105,6 +115,15 @@ All Salesforce API calls reuse the access token/session from your browser's exis
 - [EasyMeta](https://chromewebstore.google.com/detail/easymeta/jmlnbdjigfmgodkdaaikakhfabfjohcd) - Chrome extension for Salesforce metadata
 - [Salesforce Inspector Reloaded](https://github.com/tprouvot/Salesforce-Inspector-reloaded) - Chrome extension for Salesforce admins and developers
 - [Raycast](https://www.raycast.com/) - Productivity tool with beautiful UI/UX
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, development workflow, and testing expectations. See
+[SECURITY.md](SECURITY.md) to report vulnerabilities privately.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
