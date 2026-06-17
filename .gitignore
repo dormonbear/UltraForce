@@ -72,3 +72,5 @@ backup/
 
 # CodeGraph local index (regenerated from source)
 .codegraph/
+# Local-only working notes (internal planning, drafts) - never publish
+notes/
