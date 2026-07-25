@@ -49,11 +49,13 @@ export default defineConfig({
         'src/background/**',
         'src/components/search/styles.ts'
       ],
+      // Floors, not targets: set just under the measured values so coverage
+      // cannot regress. Raise them whenever the measured numbers move up.
       thresholds: {
-        lines: 78,
-        functions: 78,
-        branches: 63,
-        statements: 78
+        lines: 81,
+        functions: 83,
+        branches: 67,
+        statements: 80
       }
     }
   },
