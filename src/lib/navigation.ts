@@ -51,20 +51,68 @@ export function buildNavigationUrl(result: SearchResult, context: NavigationCont
   return buildClassicUrl(result, baseUrl)
 }
 
+// Types addressed as /lightning/setup/<area>/page?address=%2F<id>
+const LIGHTNING_SETUP_AREAS: Record<string, string> = {
+  ApexClass: 'ApexClasses',
+  ApexTrigger: 'ApexTriggers',
+  ApexPage: 'ApexPages',
+  ApexComponent: 'ApexComponents',
+  LightningComponentBundle: 'LightningComponentBundles',
+  AuraDefinitionBundle: 'AuraBundles',
+  PermissionSet: 'PermSets',
+  Profile: 'EnhancedProfiles',
+  CustomLabel: 'ExternalStrings'
+}
+
+// Profile detail sections. Both themes address these as <profileId>?s=<section>,
+// so the query is shared and only the surrounding URL shape differs.
+const PROFILE_SECTIONS: Record<string, string> = {
+  ObjectPermission: 'ObjectsAndTabs',
+  FieldPermission: 'FieldPermissions',
+  CustomPermissionAccess: 'CustomPermissions',
+  ApexClassAccess: 'ApexClassAccess',
+  VFPageAccess: 'ApexPageAccess',
+  ConnectedAppAccess: 'ConnectedAppSettings',
+  AssignedAppAccess: 'ObjectsAndTabs'
+}
+
+// ProfileSetupLink carries its section in metadata rather than the table
+function isProfileSectionType(type: string): boolean {
+  return type === 'ProfileSetupLink' || type in PROFILE_SECTIONS
+}
+
+function profileSectionQuery(result: SearchResult): string {
+  const section = result.type === 'ProfileSetupLink' ? result.metadata?.section : PROFILE_SECTIONS[result.type]
+  const query = `/${result.metadata?.profileId}?s=${section}`
+  if (result.type === 'ObjectPermission') {
+    return `${query}&o=${result.metadata?.objectRef || result.name}`
+  }
+  if (result.type === 'FieldPermission') {
+    return `${query}&o=${result.metadata?.SobjectType}`
+  }
+  return query
+}
+
+// Resolves the field id out of a CustomField DurableId ("Account.00Nxxx" -> "00Nxxx")
+function customFieldId(result: SearchResult): string {
+  const durableId = result.metadata?.DurableId || ''
+  return durableId.includes('.') ? durableId.split('.')[1] : durableId
+}
+
 function buildLightningUrl(result: SearchResult, baseUrl: string, setupHost: string | null): string | null {
+  const setupArea = LIGHTNING_SETUP_AREAS[result.type]
+  if (setupArea) {
+    return `${baseUrl}/lightning/setup/${setupArea}/page?address=%2F${result.id}`
+  }
+
+  if (isProfileSectionType(result.type)) {
+    const address = encodeURIComponent(profileSectionQuery(result))
+    return `https://${setupHost}/lightning/setup/Profiles/page?address=${address}`
+  }
+
   switch (result.type) {
-    case 'ApexClass':
-      return `${baseUrl}/lightning/setup/ApexClasses/page?address=%2F${result.id}`
-    case 'ApexTrigger':
-      return `${baseUrl}/lightning/setup/ApexTriggers/page?address=%2F${result.id}`
-    case 'ApexPage':
-      return `${baseUrl}/lightning/setup/ApexPages/page?address=%2F${result.id}`
-    case 'ApexComponent':
-      return `${baseUrl}/lightning/setup/ApexComponents/page?address=%2F${result.id}`
-    case 'LightningComponentBundle':
-      return `${baseUrl}/lightning/setup/LightningComponentBundles/page?address=%2F${result.id}`
-    case 'AuraDefinitionBundle':
-      return `${baseUrl}/lightning/setup/AuraBundles/page?address=%2F${result.id}`
+    case 'ProfileSubMenu':
+      return null // Tab-only navigation, no click action
     case 'Flow':
       return `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
     case 'User':
@@ -73,74 +121,19 @@ function buildLightningUrl(result: SearchResult, baseUrl: string, setupHost: str
       return `${baseUrl}/lightning/o/${result.metadata?.QualifiedApiName}/list`
     case 'CustomField': {
       const objectName = result.metadata?.ObjectApiName || result.metadata?.EntityDefinition?.QualifiedApiName
-      const durableId = result.metadata?.DurableId || ''
-      const fieldId = durableId.includes('.') ? durableId.split('.')[1] : durableId
+      const fieldId = customFieldId(result)
       if (objectName && fieldId) {
         return `https://${setupHost}/lightning/setup/ObjectManager/${objectName}/FieldsAndRelationships/${fieldId}/view`
       }
       return `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
     }
-    case 'PermissionSet':
-      return `${baseUrl}/lightning/setup/PermSets/page?address=%2F${result.id}`
-    case 'Profile':
-      return `${baseUrl}/lightning/setup/EnhancedProfiles/page?address=%2F${result.id}`
-    case 'ProfileSubMenu':
-      return null // Tab-only navigation, no click action
-    case 'ObjectPermission': {
-      const objProfileId = result.metadata?.profileId
-      const objectRef = result.metadata?.objectRef || result.name
-      const objAddr = encodeURIComponent(`/${objProfileId}?s=ObjectsAndTabs&o=${objectRef}`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${objAddr}`
-    }
-    case 'FieldPermission': {
-      const fieldProfileId = result.metadata?.profileId
-      const fieldSobjectType = result.metadata?.SobjectType
-      const fieldAddr = encodeURIComponent(`/${fieldProfileId}?s=FieldPermissions&o=${fieldSobjectType}`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${fieldAddr}`
-    }
-    case 'CustomPermissionAccess': {
-      const cpProfileId = result.metadata?.profileId
-      const cpAddr = encodeURIComponent(`/${cpProfileId}?s=CustomPermissions`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${cpAddr}`
-    }
-    case 'ApexClassAccess': {
-      const acProfileId = result.metadata?.profileId
-      const acAddr = encodeURIComponent(`/${acProfileId}?s=ApexClassAccess`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${acAddr}`
-    }
-    case 'VFPageAccess': {
-      const vfProfileId = result.metadata?.profileId
-      const vfAddr = encodeURIComponent(`/${vfProfileId}?s=ApexPageAccess`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${vfAddr}`
-    }
-    case 'ConnectedAppAccess': {
-      const caProfileId = result.metadata?.profileId
-      const caAddr = encodeURIComponent(`/${caProfileId}?s=ConnectedAppSettings`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${caAddr}`
-    }
-    case 'AssignedAppAccess': {
-      const aaProfileId = result.metadata?.profileId
-      const aaAddr = encodeURIComponent(`/${aaProfileId}?s=ObjectsAndTabs`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${aaAddr}`
-    }
-    case 'ProfileSetupLink': {
-      const pslProfileId = result.metadata?.profileId
-      const pslSection = result.metadata?.section
-      const pslAddr = encodeURIComponent(`/${pslProfileId}?s=${pslSection}`)
-      return `https://${setupHost}/lightning/setup/Profiles/page?address=${pslAddr}`
-    }
-    case 'CustomLabel':
-      return `${baseUrl}/lightning/setup/ExternalStrings/page?address=%2F${result.id}`
     case 'CustomMetadataType': {
       const recordId = result.metadata?.Id || result.metadata?.DurableId || result.id
-      if (result.metadata?._isTypeDefinition) {
-        return `https://${setupHost}/lightning/setup/CustomMetadata/page?address=%2F${recordId}`
-      }
       return `https://${setupHost}/lightning/setup/CustomMetadata/page?address=%2F${recordId}`
     }
     case 'CustomSetting': {
-      const settingId = result.metadata?.DurableId || result.id
       if (result.metadata?._isSettingDefinition) {
+        const settingId = result.metadata?.DurableId || result.id
         return `https://${setupHost}/lightning/setup/CustomSettings/page?address=%2Fsetup%2Fui%2FviewCustomSettings.apexp%3Fid%3D${settingId}`
       }
       return `https://${setupHost}/lightning/setup/CustomSettings/page?address=%2F${result.id}`
@@ -151,47 +144,20 @@ function buildLightningUrl(result: SearchResult, baseUrl: string, setupHost: str
       return `https://${setupHost}/lightning/setup/Queues/page?address=%2Fp%2Fown%2FQueue%2Fd%3Fid%3D${result.id}`
     case 'Group':
       return `https://${setupHost}/lightning/setup/PublicGroups/page?address=%2Fsetup%2Fown%2Fgroupdetail.jsp%3Fid%3D${result.id}`
-    case 'Report':
-      return `${baseUrl}/lightning/r/Report/${result.id}/view`
-    case 'Dashboard':
-      return `${baseUrl}/lightning/r/Dashboard/${result.id}/view`
     default:
+      // Report, Dashboard and every unlisted type resolve to their record page
       return `${baseUrl}/lightning/r/${result.type}/${result.id}/view`
   }
 }
 
 function buildClassicUrl(result: SearchResult, baseUrl: string): string | null {
+  if (isProfileSectionType(result.type)) {
+    return `${baseUrl}${profileSectionQuery(result)}`
+  }
+
   switch (result.type) {
-    case 'ApexClass':
-    case 'ApexTrigger':
-    case 'ApexPage':
-    case 'ApexComponent':
-    case 'LightningComponentBundle':
-    case 'AuraDefinitionBundle':
-    case 'User':
-    case 'PermissionSet':
-    case 'Profile':
-      return `${baseUrl}/${result.id}`
     case 'ProfileSubMenu':
       return null // Tab-only navigation, no click action
-    case 'ObjectPermission': {
-      const classicObjRef = result.metadata?.objectRef || result.name
-      return `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs&o=${classicObjRef}`
-    }
-    case 'FieldPermission':
-      return `${baseUrl}/${result.metadata?.profileId}?s=FieldPermissions&o=${result.metadata?.SobjectType}`
-    case 'CustomPermissionAccess':
-      return `${baseUrl}/${result.metadata?.profileId}?s=CustomPermissions`
-    case 'ApexClassAccess':
-      return `${baseUrl}/${result.metadata?.profileId}?s=ApexClassAccess`
-    case 'VFPageAccess':
-      return `${baseUrl}/${result.metadata?.profileId}?s=ApexPageAccess`
-    case 'ConnectedAppAccess':
-      return `${baseUrl}/${result.metadata?.profileId}?s=ConnectedAppSettings`
-    case 'AssignedAppAccess':
-      return `${baseUrl}/${result.metadata?.profileId}?s=ObjectsAndTabs`
-    case 'ProfileSetupLink':
-      return `${baseUrl}/${result.metadata?.profileId}?s=${result.metadata?.section}`
     case 'Flow':
       return `${baseUrl}/builder_platform_interaction/flowBuilder.app?flowId=${result.id}`
     case 'CustomObject': {
@@ -206,37 +172,25 @@ function buildClassicUrl(result: SearchResult, baseUrl: string): string | null {
       const apiName = result.metadata?.QualifiedApiName
       return `${baseUrl}/p/setup/layout/LayoutFieldList?type=${apiName}&setupid=${apiName}Fields`
     }
-    case 'CustomField': {
-      const durableId = result.metadata?.DurableId || ''
-      const fieldId = durableId.includes('.') ? durableId.split('.')[1] : durableId
-      if (fieldId) {
-        return `${baseUrl}/${fieldId}`
-      }
-      return `${baseUrl}/${result.id}`
-    }
-    case 'CustomLabel':
-      return `${baseUrl}/${result.id}`
+    case 'CustomField':
+      return `${baseUrl}/${customFieldId(result) || result.id}`
     case 'CustomMetadataType': {
       const classicRecordId = result.metadata?.Id || result.metadata?.DurableId || result.id
       return `${baseUrl}/${classicRecordId}`
     }
     case 'CustomSetting': {
-      const settingId = result.metadata?.DurableId || result.id
       if (result.metadata?._isSettingDefinition) {
+        const settingId = result.metadata?.DurableId || result.id
         return `${baseUrl}/setup/ui/viewCustomSettings.apexp?id=${settingId}`
       }
       return `${baseUrl}/${result.id}`
     }
-    case 'CustomQuery':
-      return `${baseUrl}/${result.id}`
     case 'Queue':
       return `${baseUrl}/p/own/Queue/d?id=${result.id}&setupid=Queues`
     case 'Group':
       return `${baseUrl}/setup/own/groupdetail.jsp?id=${result.id}&setupid=PublicGroups`
-    case 'Report':
-    case 'Dashboard':
-      return `${baseUrl}/${result.id}`
     default:
+      // Classic addresses every other type by record id
       return `${baseUrl}/${result.id}`
   }
 }
