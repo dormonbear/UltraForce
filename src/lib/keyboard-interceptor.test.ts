@@ -9,11 +9,7 @@ function createMockInput(value = '', selectionStart = 0, selectionEnd = 0): HTML
   return input
 }
 
-function createKeyEvent(
-  type: string,
-  key: string,
-  opts: Partial<KeyboardEventInit> = {}
-): KeyboardEvent {
+function createKeyEvent(type: string, key: string, opts: Partial<KeyboardEventInit> = {}): KeyboardEvent {
   const event = new KeyboardEvent(type, {
     key,
     bubbles: true,
@@ -254,16 +250,13 @@ describe('createKeyboardInterceptor', () => {
   })
 
   describe('modifier-only keys', () => {
-    it.each(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])(
-      'should NOT intercept modifier key %s',
-      (key) => {
-        const handler = createKeyboardInterceptor(getInput)
-        const event = createKeyEvent('keydown', key)
-        handler(event)
+    it.each(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])('should NOT intercept modifier key %s', (key) => {
+      const handler = createKeyboardInterceptor(getInput)
+      const event = createKeyEvent('keydown', key)
+      handler(event)
 
-        expect(event.stopPropagation).not.toHaveBeenCalled()
-      }
-    )
+      expect(event.stopPropagation).not.toHaveBeenCalled()
+    })
   })
 
   describe('Alt+key combinations', () => {

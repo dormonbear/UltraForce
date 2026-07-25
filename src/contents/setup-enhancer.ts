@@ -132,7 +132,7 @@ class SetupEnhancer {
 
     const collectIds = () => {
       const rows = scrollContainer.querySelectorAll('tr[data-row-key-value], [data-row-key-value]')
-      rows.forEach(row => {
+      rows.forEach((row) => {
         const id = row.getAttribute('data-row-key-value')
         if (id) seenIds.add(id)
       })
@@ -143,14 +143,14 @@ class SetupEnhancer {
 
     const duplicateObserver = new MutationObserver((mutations) => {
       let removedCount = 0
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
           if (node instanceof HTMLElement) {
-            const rows = node.querySelectorAll ?
-              [node, ...Array.from(node.querySelectorAll('[data-row-key-value]'))] :
-              [node]
+            const rows = node.querySelectorAll
+              ? [node, ...Array.from(node.querySelectorAll('[data-row-key-value]'))]
+              : [node]
 
-            rows.forEach(row => {
+            rows.forEach((row) => {
               if (row instanceof HTMLElement) {
                 const id = row.getAttribute('data-row-key-value')
                 if (id) {
@@ -214,7 +214,7 @@ class SetupEnhancer {
   }
 
   private wait(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
   private stopAutoScroll(): void {

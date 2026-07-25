@@ -164,7 +164,7 @@ describe('unsupported-types', () => {
   describe('clearUnsupportedTypesCache', () => {
     it('clears cache and storage', async () => {
       vi.mocked(storageGet).mockResolvedValue({
-        'h1': { types: ['A'], checkedAt: 1 }
+        h1: { types: ['A'], checkedAt: 1 }
       })
       await getUnsupportedTypes('h1')
       vi.mocked(storageGet).mockClear()

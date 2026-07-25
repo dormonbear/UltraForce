@@ -17,13 +17,18 @@
 
 import { logger } from './logger'
 
-const MODIFIER_KEYS = new Set([
-  'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'
-])
+const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])
 
 const NAVIGATION_KEYS = new Set([
-  'Escape', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight',
-  'Enter', 'Tab', 'Home', 'End'
+  'Escape',
+  'ArrowDown',
+  'ArrowUp',
+  'ArrowLeft',
+  'ArrowRight',
+  'Enter',
+  'Tab',
+  'Home',
+  'End'
 ])
 
 const EDITING_SHORTCUTS = new Set(['a', 'c', 'v', 'x', 'z'])
@@ -45,10 +50,7 @@ function insertChar(input: HTMLInputElement, char: string): string {
   return newValue
 }
 
-function deleteChar(
-  input: HTMLInputElement,
-  direction: 'backward' | 'forward'
-): string {
+function deleteChar(input: HTMLInputElement, direction: 'backward' | 'forward'): string {
   const start = input.selectionStart ?? 0
   const end = input.selectionEnd ?? 0
 
@@ -103,9 +105,8 @@ export function createKeyboardInterceptor(
   getInputOrOpts: (() => HTMLInputElement | null) | KeyboardInterceptorOptions,
   getModal?: () => HTMLElement | null
 ): (e: KeyboardEvent) => void {
-  const opts: KeyboardInterceptorOptions = typeof getInputOrOpts === 'function'
-    ? { getInput: getInputOrOpts, getModal }
-    : getInputOrOpts
+  const opts: KeyboardInterceptorOptions =
+    typeof getInputOrOpts === 'function' ? { getInput: getInputOrOpts, getModal } : getInputOrOpts
 
   return (e: KeyboardEvent) => {
     // Never intercept IME composition
@@ -120,7 +121,11 @@ export function createKeyboardInterceptor(
       const shadowRoot = opts.getShadowRoot()
       const activeEl = shadowRoot?.activeElement
       const searchInput = opts.getInput()
-      if (activeEl && activeEl !== searchInput && (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)) {
+      if (
+        activeEl &&
+        activeEl !== searchInput &&
+        (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
+      ) {
         // Still block Salesforce page shortcuts from firing
         e.stopPropagation()
         e.stopImmediatePropagation()

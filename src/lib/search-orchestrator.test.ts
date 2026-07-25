@@ -39,18 +39,9 @@ vi.mock('./logger', () => ({
 
 import { searchSalesforceMetadata } from './search-orchestrator'
 import { getSession } from './auth'
-import {
-  fetchAllPages,
-  ensureCMDTRecordIndex,
-  ensureFieldIndex,
-  ensureMetadataIndex
-} from './metadata-fetcher'
+import { fetchAllPages, ensureCMDTRecordIndex, ensureFieldIndex, ensureMetadataIndex } from './metadata-fetcher'
 import { searchIndex, hasSearchIndex } from './fuzzy-search'
-import {
-  parseProfileDotNotation,
-  buildProfileSubMenu,
-  queryProfileUsers
-} from './profile-search'
+import { parseProfileDotNotation, buildProfileSubMenu, queryProfileUsers } from './profile-search'
 
 const mockGetSession = vi.mocked(getSession)
 const mockParseProfileDotNotation = vi.mocked(parseProfileDotNotation)
@@ -113,7 +104,16 @@ describe('search-orchestrator / searchSalesforceMetadata', () => {
 
   it('appends "Inactive" to description for inactive users', async () => {
     mockFetchAllPages.mockResolvedValue([
-      { Id: '005x', Name: 'Old User', Username: 'old@test.com', Email: '', FederationIdentifier: null, IsActive: false, Profile: null, UserRole: null }
+      {
+        Id: '005x',
+        Name: 'Old User',
+        Username: 'old@test.com',
+        Email: '',
+        FederationIdentifier: null,
+        IsActive: false,
+        Profile: null,
+        UserRole: null
+      }
     ])
     const result = await searchSalesforceMetadata('Old', ['User'], TEST_HOST)
     expect(result.User[0].description).toContain('Inactive')
@@ -129,9 +129,7 @@ describe('search-orchestrator / searchSalesforceMetadata', () => {
   })
 
   it('runs a realtime Group search with type "Group"', async () => {
-    mockFetchAllPages.mockResolvedValue([
-      { Id: '00G000000000002', Name: 'All Reps', DeveloperName: 'All_Reps' }
-    ])
+    mockFetchAllPages.mockResolvedValue([{ Id: '00G000000000002', Name: 'All Reps', DeveloperName: 'All_Reps' }])
     const result = await searchSalesforceMetadata('Reps', ['Group'], TEST_HOST)
     expect(result.Group[0]).toMatchObject({ name: 'All Reps', type: 'Group' })
   })
@@ -196,7 +194,8 @@ describe('search-orchestrator / dot-notation field search', () => {
     mockHasSearchIndex.mockReturnValue(true)
     mockSearchIndex.mockImplementation((_q, indexKey) => {
       if (indexKey === 'Field:Account') return [fieldResult]
-      if (indexKey === 'ApexClass') return [{ id: '01p', name: 'AccountController', type: 'ApexClass', description: '' }]
+      if (indexKey === 'ApexClass')
+        return [{ id: '01p', name: 'AccountController', type: 'ApexClass', description: '' }]
       return []
     })
 
@@ -262,7 +261,15 @@ describe('search-orchestrator / dot-notation custom setting search', () => {
     // checkIsCustomSetting reads the CustomSetting index for QualifiedApiName
     mockSearchIndex.mockImplementation((_q, indexKey) => {
       if (indexKey === 'CustomSetting') {
-        return [{ id: 'cs1', name: 'MySetting__c', type: 'CustomSetting', description: '', metadata: { QualifiedApiName: 'MySetting__c' } }]
+        return [
+          {
+            id: 'cs1',
+            name: 'MySetting__c',
+            type: 'CustomSetting',
+            description: '',
+            metadata: { QualifiedApiName: 'MySetting__c' }
+          }
+        ]
       }
       if (indexKey === 'CustomSettingRecord:MySetting__c') {
         return [{ id: 'rec1', name: 'Default', type: 'CustomSetting', description: '' }]
@@ -301,7 +308,12 @@ describe('search-orchestrator / dot-notation profile search', () => {
 
   it('returns a profile submenu when no sub-category is given', async () => {
     const submenu: SearchResult[] = [{ id: 'p1', name: 'Users', type: 'Profile', description: '' }]
-    mockParseProfileDotNotation.mockReturnValue({ profileId: 'p1', profileName: 'System Administrator', subCategory: null, filter: null })
+    mockParseProfileDotNotation.mockReturnValue({
+      profileId: 'p1',
+      profileName: 'System Administrator',
+      subCategory: null,
+      filter: null
+    })
     mockBuildProfileSubMenu.mockReturnValue(submenu)
     mockSearchIndex.mockReturnValue([])
 
@@ -312,7 +324,12 @@ describe('search-orchestrator / dot-notation profile search', () => {
   })
 
   it('dispatches a profile sub-data query for the Users sub-category', async () => {
-    mockParseProfileDotNotation.mockReturnValue({ profileId: 'p1', profileName: 'System Administrator', subCategory: 'Users', filter: null })
+    mockParseProfileDotNotation.mockReturnValue({
+      profileId: 'p1',
+      profileName: 'System Administrator',
+      subCategory: 'Users',
+      filter: null
+    })
     mockQueryProfileUsers.mockResolvedValue([{ id: 'u1', name: 'Dormon', type: 'User', description: '' }])
     mockSearchIndex.mockReturnValue([])
 
@@ -331,7 +348,12 @@ describe('search-orchestrator / cached metadata-type search', () => {
   })
 
   it('returns mapped results from the cached ApexClass index', async () => {
-    const apexResult: SearchResult = { id: '01p000000000001', name: 'WeatherService', type: 'ApexClass', description: '' }
+    const apexResult: SearchResult = {
+      id: '01p000000000001',
+      name: 'WeatherService',
+      type: 'ApexClass',
+      description: ''
+    }
     mockEnsureMetadataIndex.mockResolvedValue(undefined)
     mockSearchIndex.mockReturnValue([apexResult])
 

@@ -30,33 +30,99 @@ const MODAL_INLINE_STYLE: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(24px) saturate(180%)'
 }
 
-const ACTION_ICON_PROPS = { width: '16', height: '16', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2' }
+const ACTION_ICON_PROPS = {
+  width: '16',
+  height: '16',
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: '2'
+}
 
 function renderActionIcon(icon: string): React.ReactNode {
   switch (icon) {
     case 'layout':
-      return <svg {...ACTION_ICON_PROPS}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="9" y1="21" x2="9" y2="9" />
+        </svg>
+      )
     case 'type':
-      return <svg {...ACTION_ICON_PROPS}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      )
     case 'sharing':
-      return <svg {...ACTION_ICON_PROPS}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      )
     case 'history':
-      return <svg {...ACTION_ICON_PROPS}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      )
     case 'related':
-      return <svg {...ACTION_ICON_PROPS}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      )
     case 'clone':
-      return <svg {...ACTION_ICON_PROPS}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )
     case 'setup':
-      return <svg {...ACTION_ICON_PROPS}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      )
     default:
-      return <svg {...ACTION_ICON_PROPS}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      )
   }
 }
 
 interface SearchModalProps {
   onClose: () => void
   onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
-  onCustomSearch?: (soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]) => void
+  onCustomSearch?: (
+    soqlTemplate: string,
+    query: string,
+    useToolingApi: boolean,
+    nameField: string,
+    descriptionFields?: string[]
+  ) => void
   onSetupSearch?: (query: string) => void
   onResultClick: (result: SearchResult) => void
   onIdNavigate?: (id: string) => void
@@ -110,10 +176,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const favoriteItems = useFavoritesStore((s) => s.items)
   const removeHistoryItem = useHistoryStore((s) => s.removeItem)
 
-  const isFavoriteCheck = useCallback(
-    (id: string) => favoriteItems.some((i) => i.id === id),
-    [favoriteItems]
-  )
+  const isFavoriteCheck = useCallback((id: string) => favoriteItems.some((i) => i.id === id), [favoriteItems])
 
   const handleToggleFavorite = useCallback(
     (item: Omit<import('~stores/favorites-store').FavoriteItem, 'pinnedAt'>) => {
@@ -210,15 +273,15 @@ const SearchModal: React.FC<SearchModalProps> = ({
   useEffect(() => {
     if (isVisible && !hasCheckedUpdate.current) {
       hasCheckedUpdate.current = true
-      checkForUpdate().then(({ hasUpdate, currentVersion }) => {
-        if (hasUpdate) {
-          setShowUpdateNotification(true)
-          setUpdateVersion(currentVersion)
-          markNotificationAsShown().catch((error) =>
-            logger.warn('markNotificationAsShown failed', { error })
-          )
-        }
-      }).catch((error) => logger.warn('checkForUpdate failed', { error }))
+      checkForUpdate()
+        .then(({ hasUpdate, currentVersion }) => {
+          if (hasUpdate) {
+            setShowUpdateNotification(true)
+            setUpdateVersion(currentVersion)
+            markNotificationAsShown().catch((error) => logger.warn('markNotificationAsShown failed', { error }))
+          }
+        })
+        .catch((error) => logger.warn('checkForUpdate failed', { error }))
     }
   }, [isVisible])
 
@@ -227,13 +290,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   // Parse command from query
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
-  const matchingCommands = useMemo(() => getMatchingCommands(query, allCommands, unsupportedTypes), [query, allCommands, unsupportedTypes])
+  const matchingCommands = useMemo(
+    () => getMatchingCommands(query, allCommands, unsupportedTypes),
+    [query, allCommands, unsupportedTypes]
+  )
   const extractedId = useMemo(() => extractSalesforceId(query.trim()), [query])
   const extractedIds = useMemo(() => extractAllSalesforceIds(query.trim()), [query])
   const setupSuggestions = useMemo(
-    () => isSetupPage(window.location.pathname)
-      ? getSetupSuggestions(window.location.pathname, SETUP_SHORTCUTS)
-      : [],
+    () => (isSetupPage(window.location.pathname) ? getSetupSuggestions(window.location.pathname, SETUP_SHORTCUTS) : []),
     []
   )
 
@@ -284,7 +348,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
     if (parsedCommand.isCommand && parsedCommand.command && isCustomCommand(parsedCommand.command)) {
       const customCmd = parsedCommand.command
       const debounceTimer = setTimeout(() => {
-        onCustomSearchRef.current?.(customCmd.soql, searchQuery, customCmd.useToolingApi, customCmd.nameField, customCmd.descriptionFields)
+        onCustomSearchRef.current?.(
+          customCmd.soql,
+          searchQuery,
+          customCmd.useToolingApi,
+          customCmd.nameField,
+          customCmd.descriptionFields
+        )
       }, 300)
       return () => clearTimeout(debounceTimer)
     }
@@ -334,7 +404,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }, [limitedSearchResults, collapsedGroups])
 
   const handleToggleCollapse = useCallback((type: string) => {
-    setCollapsedGroups(prev => {
+    setCollapsedGroups((prev) => {
       const newState = { ...prev, [type]: !prev[type] }
       return newState
     })
@@ -440,7 +510,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
             const objectApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
             setQuery(`${prefix}${objectApiName}.`)
           } else if (selectedResult.type === 'CustomField') {
-            const objectApiName = selectedResult.metadata?.ObjectApiName || selectedResult.metadata?.EntityDefinition?.QualifiedApiName
+            const objectApiName =
+              selectedResult.metadata?.ObjectApiName || selectedResult.metadata?.EntityDefinition?.QualifiedApiName
             const fieldApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
             if (objectApiName) {
               setQuery(`${prefix}${objectApiName}.${fieldApiName}`)
@@ -495,10 +566,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         break
 
       default:
-        if (
-          (event.ctrlKey || event.metaKey) &&
-          event.key.toLowerCase() === shortcutKey.toLowerCase()
-        ) {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
           event.preventDefault()
           event.stopPropagation()
           onClose()
@@ -508,9 +576,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }
 
   const handleTypeToggle = (type: string) => {
-    const newTypes = selectedTypes.includes(type)
-      ? selectedTypes.filter((t) => t !== type)
-      : [...selectedTypes, type]
+    const newTypes = selectedTypes.includes(type) ? selectedTypes.filter((t) => t !== type) : [...selectedTypes, type]
     if (newTypes.length > 0) {
       setSelectedTypes(newTypes)
     }
@@ -525,11 +591,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   if (!isVisible) return null
 
-  const hasResults = visibleResults.length > 0 || Object.values(limitedSearchResults).some(arr => arr.length > 0)
+  const hasResults = visibleResults.length > 0 || Object.values(limitedSearchResults).some((arr) => arr.length > 0)
 
   return (
     <>
-      <style>{getInterFontFaces()}{SEARCH_MODAL_STYLES}</style>
+      <style>
+        {getInterFontFaces()}
+        {SEARCH_MODAL_STYLES}
+      </style>
       <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
         <div
           className="ultraforce-search-modal"
@@ -543,203 +612,184 @@ const SearchModal: React.FC<SearchModalProps> = ({
           onClick={(e) => e.stopPropagation()}
           style={MODAL_INLINE_STYLE}
         >
-        {showSettings ? (
-          <SettingsPanel
-            onClose={() => setShowSettings(false)}
-            selectedTypes={selectedTypes}
-            onToggleType={handleTypeToggle}
-            shortcutKey={shortcutKey}
-            onShortcutChange={(key) => updateSettings({ shortcutKey: key })}
-            closeOnNavigate={closeOnNavigate}
-            onCloseOnNavigateChange={(val) => updateSettings({ closeOnNavigate: val })}
-            autoLoadFields={autoLoadFields}
-            onAutoLoadFieldsChange={(val) => updateSettings({ autoLoadFields: val })}
-            fuzzySearch={fuzzySearch}
-            onFuzzySearchChange={(val) => storeSetFuzzy(val)}
-            hideManagedPackage={hideManagedPackage}
-            onHideManagedPackageChange={(val) => updateSettings({ hideManagedPackage: val })}
-            maxResultsPerType={maxResultsPerType}
-            onMaxResultsPerTypeChange={(val) => updateSettings({ maxResultsPerType: val })}
-            navigationMode={navigationMode}
-            onNavigationModeChange={(mode) => storeSetNavMode(mode)}
-            sfHost={sfHost}
-            customCommands={customCommands}
-            onCustomCommandsChange={setCustomCommands}
-          />
-        ) : (
-          <>
-            <div className="search-container">
-              <SearchInput
-                ref={inputRef}
-                query={query}
-                onQueryChange={setQuery}
-                onKeyDown={(e) => {
-                  if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
-                    handleKeyDown(e)
-                  }
-                }}
-                sfHost={sfHost}
-              />
-
-              {showCommandHints && (
-                <CommandHints commands={matchingCommands} />
-              )}
-
-              {!hasSession ? (
-                <EmptyState type="no-session" />
-              ) : isLoading ? (
-                <EmptyState type="loading" />
-              ) : searchError ? (
-                <EmptyState
-                  type="error"
-                  errorMessage={searchError}
+          {showSettings ? (
+            <SettingsPanel
+              onClose={() => setShowSettings(false)}
+              selectedTypes={selectedTypes}
+              onToggleType={handleTypeToggle}
+              shortcutKey={shortcutKey}
+              onShortcutChange={(key) => updateSettings({ shortcutKey: key })}
+              closeOnNavigate={closeOnNavigate}
+              onCloseOnNavigateChange={(val) => updateSettings({ closeOnNavigate: val })}
+              autoLoadFields={autoLoadFields}
+              onAutoLoadFieldsChange={(val) => updateSettings({ autoLoadFields: val })}
+              fuzzySearch={fuzzySearch}
+              onFuzzySearchChange={(val) => storeSetFuzzy(val)}
+              hideManagedPackage={hideManagedPackage}
+              onHideManagedPackageChange={(val) => updateSettings({ hideManagedPackage: val })}
+              maxResultsPerType={maxResultsPerType}
+              onMaxResultsPerTypeChange={(val) => updateSettings({ maxResultsPerType: val })}
+              navigationMode={navigationMode}
+              onNavigationModeChange={(mode) => storeSetNavMode(mode)}
+              sfHost={sfHost}
+              customCommands={customCommands}
+              onCustomCommandsChange={setCustomCommands}
+            />
+          ) : (
+            <>
+              <div className="search-container">
+                <SearchInput
+                  ref={inputRef}
+                  query={query}
+                  onQueryChange={setQuery}
+                  onKeyDown={(e) => {
+                    if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
+                      handleKeyDown(e)
+                    }
+                  }}
+                  sfHost={sfHost}
                 />
-              ) : !query.trim() ? (
-                <>
-                  {recordContext && recordActions.length > 0 && (
-                    <div className="record-actions">
-                      <div className="record-actions-header">
-                        Record Actions
-                        {recordContext.objectApiName && (
-                          <span className="record-object-name">{recordContext.objectApiName}</span>
-                        )}
-                      </div>
-                      <div className="record-actions-list">
-                      {recordActions.map((action, index) => (
-                        <div
-                          key={action.id}
-                          className={`record-action-item${selectedRecordActionIndex === index ? ' selected' : ''}`}
-                          onClick={action.handler}
-                          role="button"
-                          tabIndex={0}
-                          title={action.name}
-                          onKeyDown={(e) => e.key === 'Enter' && action.handler()}
-                        >
-                          <span className="record-action-icon">
-                            {renderActionIcon(action.icon)}
-                          </span>
-                          <span className="record-action-text">{action.name}</span>
-                          <span className="record-action-desc">
-                            {action.description ?? action.name}
-                          </span>
+
+                {showCommandHints && <CommandHints commands={matchingCommands} />}
+
+                {!hasSession ? (
+                  <EmptyState type="no-session" />
+                ) : isLoading ? (
+                  <EmptyState type="loading" />
+                ) : searchError ? (
+                  <EmptyState type="error" errorMessage={searchError} />
+                ) : !query.trim() ? (
+                  <>
+                    {recordContext && recordActions.length > 0 && (
+                      <div className="record-actions">
+                        <div className="record-actions-header">
+                          Record Actions
+                          {recordContext.objectApiName && (
+                            <span className="record-object-name">{recordContext.objectApiName}</span>
+                          )}
                         </div>
-                      ))}
+                        <div className="record-actions-list">
+                          {recordActions.map((action, index) => (
+                            <div
+                              key={action.id}
+                              className={`record-action-item${selectedRecordActionIndex === index ? ' selected' : ''}`}
+                              onClick={action.handler}
+                              role="button"
+                              tabIndex={0}
+                              title={action.name}
+                              onKeyDown={(e) => e.key === 'Enter' && action.handler()}
+                            >
+                              <span className="record-action-icon">{renderActionIcon(action.icon)}</span>
+                              <span className="record-action-text">{action.name}</span>
+                              <span className="record-action-desc">{action.description ?? action.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  <HomeScreen
-                    onNavigate={handleHomeNavigate}
-                    onToggleFavorite={handleToggleFavorite}
-                    onRemoveHistoryItem={handleRemoveHistoryItem}
-                    selectedTypes={selectedTypes}
-                  />
-                  {setupSuggestions.length > 0 && (
-                    <div className="setup-suggestions">
-                      <div className="setup-suggestions-header">Related Setup Pages</div>
-                      <div className="setup-suggestions-list">
-                        {setupSuggestions.map((s) => (
-                          <div
-                            key={s.id}
-                            className="setup-suggestion-item"
-                            onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
-                          >
-                            <span className="setup-suggestion-name">{s.name}</span>
-                            <span className="setup-suggestion-category">{s.description}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
-                <EmptyState
-                  type="command"
-                  commandTypes={parsedCommand.types || []}
-                  commandDescription={parsedCommand.command.description}
-                />
-              ) : !hasResults && extractedIds.length > 0 && sfHost ? (
-                <div className="id-preview-list">
-                  {extractedIds.map((id) => (
-                    <IdPreview
-                      key={id}
-                      recordId={id}
-                      sfHost={sfHost}
-                      onNavigate={() => onIdNavigate?.(id)}
+                    )}
+                    <HomeScreen
+                      onNavigate={handleHomeNavigate}
+                      onToggleFavorite={handleToggleFavorite}
+                      onRemoveHistoryItem={handleRemoveHistoryItem}
+                      selectedTypes={selectedTypes}
                     />
-                  ))}
-                </div>
-              ) : !hasResults && extractedId ? (
-                <EmptyState type="id-navigation" query={extractedId} />
-              ) : !hasResults ? (
-                <EmptyState type="empty" query={query} />
-              ) : (
-                <SearchResults
-                  results={limitedSearchResults}
-                  selectedIndex={selectedIndex}
-                  onResultClick={onResultClick}
-                  onActionClick={onActionClick}
-                  onVisibleCountChange={handleVisibleCountChange}
-                  collapsedGroups={collapsedGroups}
-                  onToggleCollapse={handleToggleCollapse}
-                  onToggleFavorite={handleToggleFavorite}
-                  isFavorite={isFavoriteCheck}
-                />
-              )}
-            </div>
-
-            <div className="search-footer">
-              <div className="shortcuts">
-                <div className="shortcut-item">
-                  <kbd>Up/Down</kbd> Navigate
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Tab</kbd> Autocomplete
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Enter</kbd> Open
-                </div>
-                <div className="shortcut-item">
-                  <kbd>Esc</kbd> Close
-                </div>
+                    {setupSuggestions.length > 0 && (
+                      <div className="setup-suggestions">
+                        <div className="setup-suggestions-header">Related Setup Pages</div>
+                        <div className="setup-suggestions-list">
+                          {setupSuggestions.map((s) => (
+                            <div
+                              key={s.id}
+                              className="setup-suggestion-item"
+                              onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) =>
+                                e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
+                              }
+                            >
+                              <span className="setup-suggestion-name">{s.name}</span>
+                              <span className="setup-suggestion-category">{s.description}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
+                  <EmptyState
+                    type="command"
+                    commandTypes={parsedCommand.types || []}
+                    commandDescription={parsedCommand.command.description}
+                  />
+                ) : !hasResults && extractedIds.length > 0 && sfHost ? (
+                  <div className="id-preview-list">
+                    {extractedIds.map((id) => (
+                      <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
+                    ))}
+                  </div>
+                ) : !hasResults && extractedId ? (
+                  <EmptyState type="id-navigation" query={extractedId} />
+                ) : !hasResults ? (
+                  <EmptyState type="empty" query={query} />
+                ) : (
+                  <SearchResults
+                    results={limitedSearchResults}
+                    selectedIndex={selectedIndex}
+                    onResultClick={onResultClick}
+                    onActionClick={onActionClick}
+                    onVisibleCountChange={handleVisibleCountChange}
+                    collapsedGroups={collapsedGroups}
+                    onToggleCollapse={handleToggleCollapse}
+                    onToggleFavorite={handleToggleFavorite}
+                    isFavorite={isFavoriteCheck}
+                  />
+                )}
               </div>
 
-              <button
-                className="settings-button"
-                data-ultraforce-settings-button
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setShowSettings(true)
-                }}
-                title="Settings"
-                aria-label="Settings"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </button>
-            </div>
+              <div className="search-footer">
+                <div className="shortcuts">
+                  <div className="shortcut-item">
+                    <kbd>Up/Down</kbd> Navigate
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Tab</kbd> Autocomplete
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Enter</kbd> Open
+                  </div>
+                  <div className="shortcut-item">
+                    <kbd>Esc</kbd> Close
+                  </div>
+                </div>
 
-            {showUpdateNotification && (
-              <UpdateNotification
-                version={updateVersion}
-                releaseNotesUrl={RELEASE_NOTES_URL}
-                onDismiss={handleDismissUpdate}
-              />
-            )}
-          </>
-        )}
+                <button
+                  className="settings-button"
+                  data-ultraforce-settings-button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setShowSettings(true)
+                  }}
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
+              </div>
+
+              {showUpdateNotification && (
+                <UpdateNotification
+                  version={updateVersion}
+                  releaseNotesUrl={RELEASE_NOTES_URL}
+                  onDismiss={handleDismissUpdate}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
     </>

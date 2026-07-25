@@ -15,10 +15,7 @@ import {
  * Builds a command map with a synthetic `types` field on a custom entry (runtime shape only)
  * so getMatchingCommands filtering for all-unsupported types can be exercised.
  */
-function commandMapWithTypedCustom(
-  custom: CustomCommand,
-  types: string[]
-): Record<string, SearchCommand> {
+function commandMapWithTypedCustom(custom: CustomCommand, types: string[]): Record<string, SearchCommand> {
   return {
     ...mergeCommands({ [custom.key]: custom }),
     [custom.key]: { ...custom, types } as unknown as SearchCommand
@@ -36,9 +33,7 @@ describe('BUILTIN_COMMANDS and DEFAULT_COMMANDS', () => {
   })
 
   it('should list all documented builtin keys', () => {
-    expect(Object.keys(BUILTIN_COMMANDS).sort()).toEqual(
-      ['c', 'f', 'g', 'l', 'm', 'o', 'p', 'q', 'r', 'u'].sort()
-    )
+    expect(Object.keys(BUILTIN_COMMANDS).sort()).toEqual(['c', 'f', 'g', 'l', 'm', 'o', 'p', 'q', 'r', 'u'].sort())
   })
 
   it('should include expected core shortcuts and :g setup navigation', () => {
@@ -179,11 +174,9 @@ describe('getMatchingCommands', () => {
   it('should match by command key prefix', () => {
     const matches = getMatchingCommands(':o')
     expect(matches.some((c) => c.key === 'o')).toBe(true)
-    expect(
-      matches.every(
-        (c) => c.key.toLowerCase().startsWith('o') || c.description.toLowerCase().includes('o')
-      )
-    ).toBe(true)
+    expect(matches.every((c) => c.key.toLowerCase().startsWith('o') || c.description.toLowerCase().includes('o'))).toBe(
+      true
+    )
   })
 
   it('should normalize partial token case-insensitively', () => {

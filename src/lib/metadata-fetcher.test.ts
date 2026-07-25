@@ -122,9 +122,9 @@ describe('fetchAllPages', () => {
   it('handles API errors gracefully by throwing', async () => {
     mockSfRest.mockRejectedValueOnce(new Error('Session expired'))
 
-    await expect(
-      fetchAllPages('test.salesforce.com', '/services/data/v62.0/query?q=test')
-    ).rejects.toThrow('Session expired')
+    await expect(fetchAllPages('test.salesforce.com', '/services/data/v62.0/query?q=test')).rejects.toThrow(
+      'Session expired'
+    )
   })
 
   it('respects maxRecords option', async () => {
@@ -149,7 +149,15 @@ describe('fetchMetadataFromAPI', () => {
 
   it('calls sfRest with correct SOQL query path for known type', async () => {
     mockSfRest.mockResolvedValueOnce({
-      records: [{ Id: '001', Name: 'TestClass', NamespacePrefix: null, LastModifiedDate: '2024-01-01', LastModifiedBy: { Name: 'Admin' } }],
+      records: [
+        {
+          Id: '001',
+          Name: 'TestClass',
+          NamespacePrefix: null,
+          LastModifiedDate: '2024-01-01',
+          LastModifiedBy: { Name: 'Admin' }
+        }
+      ],
       done: true,
       totalSize: 1
     })
@@ -163,9 +171,9 @@ describe('fetchMetadataFromAPI', () => {
   })
 
   it('throws for unknown metadata type', async () => {
-    await expect(
-      fetchMetadataFromAPI('UnknownType', 'test.salesforce.com')
-    ).rejects.toThrow('Unknown metadata type: UnknownType')
+    await expect(fetchMetadataFromAPI('UnknownType', 'test.salesforce.com')).rejects.toThrow(
+      'Unknown metadata type: UnknownType'
+    )
   })
 
   it('uses REST API for CustomObject type', async () => {
@@ -288,7 +296,9 @@ describe('getMetadataWithCache', () => {
 
   it('refreshes stale CustomObject cache that predates IsCustomSetting filtering', async () => {
     const mockCache = {
-      get: vi.fn().mockResolvedValue([{ DurableId: '01I001', QualifiedApiName: 'Old_Setting__c', Label: 'Old Setting' }]),
+      get: vi
+        .fn()
+        .mockResolvedValue([{ DurableId: '01I001', QualifiedApiName: 'Old_Setting__c', Label: 'Old Setting' }]),
       set: vi.fn(),
       delete: vi.fn()
     }

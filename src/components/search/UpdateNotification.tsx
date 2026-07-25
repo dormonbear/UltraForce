@@ -18,11 +18,7 @@ function generateParticles() {
   }))
 }
 
-const UpdateNotification: React.FC<UpdateNotificationProps> = ({
-  version,
-  releaseNotesUrl,
-  onDismiss
-}) => {
+const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, releaseNotesUrl, onDismiss }) => {
   const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
@@ -52,19 +48,10 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
       <div className="update-celebration-content">
         <span className="update-celebration-icon">🎉</span>
         <div className="update-celebration-text">
-          <div className="update-celebration-title">
-            Updated to v{version}
-          </div>
-          <div className="update-celebration-desc">
-            See what is new in this version
-          </div>
+          <div className="update-celebration-title">Updated to v{version}</div>
+          <div className="update-celebration-desc">See what is new in this version</div>
         </div>
-        <a
-          href={releaseNotesUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="update-celebration-link"
-        >
+        <a href={releaseNotesUrl} target="_blank" rel="noopener noreferrer" className="update-celebration-link">
           Release Notes
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />

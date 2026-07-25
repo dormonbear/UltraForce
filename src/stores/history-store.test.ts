@@ -211,8 +211,24 @@ describe('history-store', () => {
       const now = Date.now()
       useHistoryStore.setState({
         items: [
-          { id: 'stale', name: 'Stale', type: 'ApexClass', url: 'u1', visitCount: 10, lastVisitedAt: now - 30 * 864e5, firstVisitedAt: now - 60 * 864e5 },
-          { id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2', visitCount: 1, lastVisitedAt: now - 20 * 864e5, firstVisitedAt: now - 20 * 864e5 }
+          {
+            id: 'stale',
+            name: 'Stale',
+            type: 'ApexClass',
+            url: 'u1',
+            visitCount: 10,
+            lastVisitedAt: now - 30 * 864e5,
+            firstVisitedAt: now - 60 * 864e5
+          },
+          {
+            id: 'fresh',
+            name: 'Fresh',
+            type: 'ApexClass',
+            url: 'u2',
+            visitCount: 1,
+            lastVisitedAt: now - 20 * 864e5,
+            firstVisitedAt: now - 20 * 864e5
+          }
         ]
       })
       store.recordVisit({ id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2' })
@@ -321,10 +337,7 @@ describe('frecency', () => {
     })
 
     it('should not mutate the input array', () => {
-      const items = [
-        makeItem({ id: 'a', lastVisitedAt: 1 }),
-        makeItem({ id: 'b', lastVisitedAt: 2 })
-      ]
+      const items = [makeItem({ id: 'a', lastVisitedAt: 1 }), makeItem({ id: 'b', lastVisitedAt: 2 })]
       sortByLastVisited(items)
       expect(items[0].id).toBe('a')
     })

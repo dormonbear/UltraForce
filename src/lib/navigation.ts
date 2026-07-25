@@ -202,11 +202,7 @@ export function buildIdNavigationUrl(id: string, context: NavigationContext): st
   return `https://${context.sfHost}/${id}`
 }
 
-export function buildActionUrl(
-  result: SearchResult,
-  action: ObjectAction,
-  context: NavigationContext
-): string | null {
+export function buildActionUrl(result: SearchResult, action: ObjectAction, context: NavigationContext): string | null {
   if (!context.sfHost) {
     return null
   }
@@ -226,7 +222,8 @@ export function buildActionUrl(
   const objectId = result.metadata.DurableId
   const objectApiName = result.metadata.QualifiedApiName
   // China (Alibaba) domains don't support Classic setup pages for layouts
-  const useLightning = shouldUseLightning(context.navigationMode, context.userLightningPreference) || isChinaDomain(context.sfHost)
+  const useLightning =
+    shouldUseLightning(context.navigationMode, context.userLightningPreference) || isChinaDomain(context.sfHost)
 
   if (useLightning) {
     return buildLightningActionUrl(action, baseUrl, objectId, objectApiName)
@@ -268,9 +265,7 @@ function buildClassicActionUrl(
   const isCustomObject = objectId && objectId.startsWith('01I')
   if (action === 'list') {
     const keyPrefix = metadata?.KeyPrefix
-    return keyPrefix
-      ? `${baseUrl}/${keyPrefix}`
-      : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
+    return keyPrefix ? `${baseUrl}/${keyPrefix}` : `${baseUrl}/p/setup/layout/LayoutFieldList?type=${objectApiName}`
   }
   // Custom objects (DurableId starts with '01I') - use DurableId-based URL
   if (isCustomObject) {

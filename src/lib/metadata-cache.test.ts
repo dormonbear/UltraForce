@@ -159,9 +159,7 @@ describe('MetadataCache', () => {
     })
 
     it('should strip Value field for CustomLabel type', async () => {
-      const data = [
-        { Id: '001', Name: 'MyLabel', Value: 'Some long value text', MasterLabel: 'My Label' }
-      ]
+      const data = [{ Id: '001', Name: 'MyLabel', Value: 'Some long value text', MasterLabel: 'My Label' }]
 
       await cache.set('org123', 'CustomLabel', data)
 

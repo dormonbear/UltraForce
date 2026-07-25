@@ -23,10 +23,7 @@ import './index'
 // registered onMessage listener; the module registers its handler at import.
 const SF_SENDER = { url: 'https://myorg.my.salesforce.com/lightning/page' }
 
-function invoke(
-  request: any,
-  sender: Partial<chrome.runtime.MessageSender> = SF_SENDER
-): Promise<any> {
+function invoke(request: any, sender: Partial<chrome.runtime.MessageSender> = SF_SENDER): Promise<any> {
   return new Promise((resolve) => {
     const sendResponse = (response: any) => resolve(response)
     ;(chrome.runtime.onMessage as any).callListeners(request, sender, sendResponse)

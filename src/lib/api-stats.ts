@@ -28,7 +28,7 @@ export async function trackApiRequest(): Promise<void> {
 
   // Keep only last 30 days of logs to prevent storage bloat
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
-  stats.requestLog = stats.requestLog.filter(t => t > thirtyDaysAgo)
+  stats.requestLog = stats.requestLog.filter((t) => t > thirtyDaysAgo)
 
   await saveStats(stats)
 }
@@ -45,8 +45,8 @@ export async function getApiStats(): Promise<ApiStatsDisplay> {
   const oneDayAgo = now - 24 * 60 * 60 * 1000
   const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000
 
-  const last24h = stats.requestLog.filter(t => t > oneDayAgo).length
-  const lastMonth = stats.requestLog.filter(t => t > oneMonthAgo).length
+  const last24h = stats.requestLog.filter((t) => t > oneDayAgo).length
+  const lastMonth = stats.requestLog.filter((t) => t > oneMonthAgo).length
 
   return {
     total: stats.totalRequests,

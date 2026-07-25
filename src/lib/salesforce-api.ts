@@ -11,11 +11,7 @@ import {
   needsPermissionCheck,
   clearUnsupportedTypesCache
 } from './unsupported-types'
-import {
-  buildSearchIndex,
-  clearSearchIndex,
-  clearAllSearchIndexes
-} from './fuzzy-search'
+import { buildSearchIndex, clearSearchIndex, clearAllSearchIndexes } from './fuzzy-search'
 import { getMetadataWithCache, fetchMetadataFromAPI } from './metadata-fetcher'
 import { METADATA_TYPES } from './metadata-types'
 
@@ -96,9 +92,18 @@ const PERMISSION_CHECK_MAP: Record<string, { object: string; useRestApi: boolean
 }
 
 const TOOLING_API_TYPES = [
-  'ApexClass', 'ApexTrigger', 'ApexPage', 'ApexComponent',
-  'LightningComponentBundle', 'AuraDefinitionBundle', 'Flow',
-  'PermissionSet', 'PermissionSetGroup', 'CustomPermission', 'Profile', 'CustomLabel'
+  'ApexClass',
+  'ApexTrigger',
+  'ApexPage',
+  'ApexComponent',
+  'LightningComponentBundle',
+  'AuraDefinitionBundle',
+  'Flow',
+  'PermissionSet',
+  'PermissionSetGroup',
+  'CustomPermission',
+  'Profile',
+  'CustomLabel'
 ]
 
 async function checkViewSetupPermission(apiHost: string, sessionKey: string): Promise<boolean> {

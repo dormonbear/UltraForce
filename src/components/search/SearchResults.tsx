@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react"
-import type { SearchResult } from "~types"
-import type { FavoriteItem } from "~stores/favorites-store"
-import ResultItem, { type ObjectAction } from "./ResultItem"
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import type { SearchResult } from '~types'
+import type { FavoriteItem } from '~stores/favorites-store'
+import ResultItem, { type ObjectAction } from './ResultItem'
 
 interface ResultRowProps {
   result: SearchResult
@@ -44,13 +44,13 @@ interface SearchResultsProps {
 }
 
 const METADATA_LABELS: Record<string, string> = {
-  "ApexClass": "Apex Classes",
-  "ApexTrigger": "Apex Triggers",
-  "CustomObject": "Custom Objects",
-  "CustomField": "Custom Fields",
-  "Flow": "Flows",
-  "PermissionSet": "Permission Sets",
-  "Profile": "Profiles"
+  ApexClass: 'Apex Classes',
+  ApexTrigger: 'Apex Triggers',
+  CustomObject: 'Custom Objects',
+  CustomField: 'Custom Fields',
+  Flow: 'Flows',
+  PermissionSet: 'Permission Sets',
+  Profile: 'Profiles'
 }
 
 const SearchResults: React.FC<SearchResultsProps> = ({
@@ -72,7 +72,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     if (onToggleCollapse) {
       onToggleCollapse(type)
     } else {
-      setInternalCollapsedGroups(prev => ({
+      setInternalCollapsedGroups((prev) => ({
         ...prev,
         [type]: !prev[type]
       }))
@@ -84,7 +84,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     Object.entries(results).forEach(([type, typeResults]) => {
       if (typeResults.length === 0) return
       if (!collapsedGroups[type]) {
-        typeResults.forEach(result => {
+        typeResults.forEach((result) => {
           items.push({ result, type })
         })
       }
@@ -106,27 +106,26 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         const isCollapsed = collapsedGroups[type] || false
         const label = METADATA_LABELS[type] || type
 
-        const groupItems = isCollapsed ? null : typeResults.map((result) => {
-          const globalIndex = currentIndex++
-          return (
-            <ResultRow
-              key={result.id}
-              result={result}
-              isSelected={globalIndex === selectedIndex}
-              isFavorite={isFavorite?.(result.id)}
-              onResultClick={onResultClick}
-              onActionClick={onActionClick}
-              onToggleFavorite={onToggleFavorite}
-            />
-          )
-        })
+        const groupItems = isCollapsed
+          ? null
+          : typeResults.map((result) => {
+              const globalIndex = currentIndex++
+              return (
+                <ResultRow
+                  key={result.id}
+                  result={result}
+                  isSelected={globalIndex === selectedIndex}
+                  isFavorite={isFavorite?.(result.id)}
+                  onResultClick={onResultClick}
+                  onActionClick={onActionClick}
+                  onToggleFavorite={onToggleFavorite}
+                />
+              )
+            })
 
         return (
           <div key={type} className="result-group">
-            <div
-              className="result-group-header"
-              onClick={() => toggleGroupCollapse(type)}
-            >
+            <div className="result-group-header" onClick={() => toggleGroupCollapse(type)}>
               <span className={`group-chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
               <span className="group-title">{label}</span>
               <span className="group-count">{typeResults.length}</span>

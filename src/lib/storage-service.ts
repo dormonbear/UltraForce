@@ -103,17 +103,11 @@ export async function storageGetAll(): Promise<Record<string, unknown>> {
 
 // --- Change listeners ---
 
-type StorageChangeCallback = (
-  changes: { [key: string]: chrome.storage.StorageChange },
-  areaName: string
-) => void
+type StorageChangeCallback = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => void
 
 /** Adds a listener for chrome.storage.local changes. Filters to local area only. */
 export function onStorageChanged(callback: StorageChangeCallback): void {
-  const wrappedCallback = (
-    changes: { [key: string]: chrome.storage.StorageChange },
-    areaName: string
-  ) => {
+  const wrappedCallback = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
     if (areaName === 'local') {
       callback(changes, areaName)
     }

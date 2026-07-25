@@ -258,7 +258,10 @@ export function parseSearchQuery(query: string): ParsedQuery {
   // Check for pipe filter: "search | filter"
   const pipeIndex = searchTerm.indexOf('|')
   if (pipeIndex !== -1) {
-    filterTerm = searchTerm.slice(pipeIndex + 1).trim().toLowerCase()
+    filterTerm = searchTerm
+      .slice(pipeIndex + 1)
+      .trim()
+      .toLowerCase()
     searchTerm = searchTerm.slice(0, pipeIndex).trim()
     if (!filterTerm) filterTerm = null
   }
@@ -289,9 +292,8 @@ export function searchIndex(
   sfHost: string,
   useFuzzyOrOptions: boolean | SearchIndexOptions = true
 ): SearchResult[] {
-  const options: SearchIndexOptions = typeof useFuzzyOrOptions === 'boolean'
-    ? { useFuzzy: useFuzzyOrOptions }
-    : useFuzzyOrOptions
+  const options: SearchIndexOptions =
+    typeof useFuzzyOrOptions === 'boolean' ? { useFuzzy: useFuzzyOrOptions } : useFuzzyOrOptions
   const { useFuzzy = true, hideManagedPackage = true } = options
 
   const indexKey = `${sfHost}:${metadataType}`
@@ -387,8 +389,7 @@ function toSearchResult(indexed: IndexedRecord, score?: number): SearchResult {
 
   switch (indexed.type) {
     case 'CustomObject':
-      result.description =
-        record.QualifiedApiName !== record.Label ? record.QualifiedApiName : undefined
+      result.description = record.QualifiedApiName !== record.Label ? record.QualifiedApiName : undefined
       break
     case 'CustomField':
       result.description = indexed.description
@@ -419,7 +420,8 @@ function toSearchResult(indexed: IndexedRecord, score?: number): SearchResult {
     }
     case 'CustomMetadataType':
       if (record._isTypeDefinition) {
-        result.description = record.QualifiedApiName !== record.MasterLabel ? record.QualifiedApiName : 'Custom Metadata Type'
+        result.description =
+          record.QualifiedApiName !== record.MasterLabel ? record.QualifiedApiName : 'Custom Metadata Type'
       } else {
         result.description = indexed.description
       }

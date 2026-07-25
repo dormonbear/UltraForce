@@ -101,9 +101,7 @@ export function parseProfileDotNotation(
   if (candidateName.length === 0) return null
 
   // Case-insensitive match against cached profiles
-  const matchedProfile = cachedProfiles.find(
-    (p) => p.name.toLowerCase() === candidateName.toLowerCase()
-  )
+  const matchedProfile = cachedProfiles.find((p) => p.name.toLowerCase() === candidateName.toLowerCase())
   if (!matchedProfile) return null
 
   const afterFirstDot = query.substring(firstDotIndex + 1)
@@ -129,10 +127,7 @@ export function parseProfileDotNotation(
   }
 }
 
-export function buildProfileSubMenu(
-  profileId: string,
-  profileName: string
-): SearchResult[] {
+export function buildProfileSubMenu(profileId: string, profileName: string): SearchResult[] {
   return [
     {
       id: `${profileId}:Users`,
@@ -214,22 +209,14 @@ export function buildProfileSubMenu(
   ]
 }
 
-async function fetchQuery<T>(
-  soql: string,
-  sfHost: string,
-  _sessionId: string
-): Promise<T[]> {
+async function fetchQuery<T>(soql: string, sfHost: string, _sessionId: string): Promise<T[]> {
   const host = normalizeHost(sfHost)
   const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(soql)}`
   const data = await sfRest<SfQueryResponse<T>>(host, queryPath)
   return data.records || []
 }
 
-async function getPermissionSetId(
-  profileId: string,
-  sfHost: string,
-  sessionId: string
-): Promise<string | null> {
+async function getPermissionSetId(profileId: string, sfHost: string, sessionId: string): Promise<string | null> {
   const cacheKey = `${sfHost}:${profileId}`
   if (permissionSetIdCache.has(cacheKey)) {
     return permissionSetIdCache.get(cacheKey)!
@@ -245,11 +232,7 @@ async function getPermissionSetId(
   return psId
 }
 
-export async function queryProfileUsers(
-  profileId: string,
-  sfHost: string,
-  sessionId: string
-): Promise<SearchResult[]> {
+export async function queryProfileUsers(profileId: string, sfHost: string, sessionId: string): Promise<SearchResult[]> {
   try {
     const soql = `SELECT Id, Name, Username, Email, IsActive FROM User WHERE ProfileId = '${profileId}' ORDER BY Name ASC LIMIT 200`
     const records = await fetchQuery<SfUserRecord>(soql, sfHost, sessionId)
@@ -275,11 +258,7 @@ export async function queryProfileUsers(
   }
 }
 
-async function fetchToolingQuery<T>(
-  soql: string,
-  sfHost: string,
-  _sessionId: string
-): Promise<T[]> {
+async function fetchToolingQuery<T>(soql: string, sfHost: string, _sessionId: string): Promise<T[]> {
   const host = normalizeHost(sfHost)
   const queryPath = `/services/data/v${API_VERSION}/tooling/query?q=${encodeURIComponent(soql)}`
   const data = await sfRest<SfQueryResponse<T>>(host, queryPath)
@@ -320,8 +299,13 @@ export async function queryProfileCustomPermissions(
     }
 
     const records = await querySetupEntityAccess<SfCustomPermissionRecord>(
-      psId, 'CustomPermission', 'CustomPermission',
-      'Id, DeveloperName, Description', false, sfHost, sessionId
+      psId,
+      'CustomPermission',
+      'CustomPermission',
+      'Id, DeveloperName, Description',
+      false,
+      sfHost,
+      sessionId
     )
 
     logger.debug('profile:custom-permissions', { profileId, count: records.length })
@@ -352,16 +336,19 @@ export async function queryProfileApexClassAccess(
     }
 
     const records = await querySetupEntityAccess<SfApexRecord>(
-      psId, 'ApexClass', 'ApexClass',
-      'Id, Name, NamespacePrefix', true, sfHost, sessionId
+      psId,
+      'ApexClass',
+      'ApexClass',
+      'Id, Name, NamespacePrefix',
+      true,
+      sfHost,
+      sessionId
     )
 
     logger.debug('profile:apex-class-access', { profileId, count: records.length })
 
     return records.map((record) => {
-      const displayName = record.NamespacePrefix
-        ? `${record.NamespacePrefix}.${record.Name}`
-        : record.Name
+      const displayName = record.NamespacePrefix ? `${record.NamespacePrefix}.${record.Name}` : record.Name
 
       return {
         id: record.Id,
@@ -390,16 +377,19 @@ export async function queryProfileVFPageAccess(
     }
 
     const records = await querySetupEntityAccess<SfApexRecord>(
-      psId, 'ApexPage', 'ApexPage',
-      'Id, Name, NamespacePrefix', true, sfHost, sessionId
+      psId,
+      'ApexPage',
+      'ApexPage',
+      'Id, Name, NamespacePrefix',
+      true,
+      sfHost,
+      sessionId
     )
 
     logger.debug('profile:vf-page-access', { profileId, count: records.length })
 
     return records.map((record) => {
-      const displayName = record.NamespacePrefix
-        ? `${record.NamespacePrefix}.${record.Name}`
-        : record.Name
+      const displayName = record.NamespacePrefix ? `${record.NamespacePrefix}.${record.Name}` : record.Name
 
       return {
         id: record.Id,
@@ -428,8 +418,13 @@ export async function queryProfileConnectedApps(
     }
 
     const records = await querySetupEntityAccess<SfConnectedAppRecord>(
-      psId, 'ConnectedApplication', 'ConnectedApplication',
-      'Id, Name', false, sfHost, sessionId
+      psId,
+      'ConnectedApplication',
+      'ConnectedApplication',
+      'Id, Name',
+      false,
+      sfHost,
+      sessionId
     )
 
     logger.debug('profile:connected-apps', { profileId, count: records.length })
@@ -460,8 +455,13 @@ export async function queryProfileAssignedApps(
     }
 
     const records = await querySetupEntityAccess<SfAppMenuItemRecord>(
-      psId, 'TabSet', 'AppMenuItem',
-      'Id, Label, Name, Type', false, sfHost, sessionId
+      psId,
+      'TabSet',
+      'AppMenuItem',
+      'Id, Label, Name, Type',
+      false,
+      sfHost,
+      sessionId
     )
 
     logger.debug('profile:assigned-apps', { profileId, count: records.length })
@@ -480,14 +480,16 @@ export async function queryProfileAssignedApps(
 }
 
 function isCustomObject(name: string): boolean {
-  return name.endsWith('__c') || name.endsWith('__mdt') || name.endsWith('__e') || name.endsWith('__b') || name.endsWith('__x')
+  return (
+    name.endsWith('__c') ||
+    name.endsWith('__mdt') ||
+    name.endsWith('__e') ||
+    name.endsWith('__b') ||
+    name.endsWith('__x')
+  )
 }
 
-async function fetchDurableIds(
-  objectNames: string[],
-  sfHost: string,
-  sessionId: string
-): Promise<Map<string, string>> {
+async function fetchDurableIds(objectNames: string[], sfHost: string, sessionId: string): Promise<Map<string, string>> {
   const map = new Map<string, string>()
   if (objectNames.length === 0) return map
 
@@ -522,9 +524,7 @@ export async function queryProfileObjectPermissions(
     logger.debug('profile:object-permissions', { profileId, count: records.length })
 
     // Fetch DurableIds for custom objects (needed for navigation URLs)
-    const customNames = records
-      .map((r) => r.SobjectType)
-      .filter(isCustomObject)
+    const customNames = records.map((r) => r.SobjectType).filter(isCustomObject)
     const durableIdMap = await fetchDurableIds(customNames, sfHost, sessionId)
 
     return records.map((record) => {
@@ -572,10 +572,7 @@ export async function queryProfileFieldPermissions(
     logger.debug('profile:field-permissions', { profileId, count: records.length })
 
     return records.map((record) => {
-      const flags = [
-        record.PermissionsRead ? 'Read' : '-',
-        record.PermissionsEdit ? 'Edit' : '-'
-      ].join(' ')
+      const flags = [record.PermissionsRead ? 'Read' : '-', record.PermissionsEdit ? 'Edit' : '-'].join(' ')
 
       return {
         id: record.Id,
@@ -591,16 +588,11 @@ export async function queryProfileFieldPermissions(
   }
 }
 
-export function filterProfileSubData(
-  results: SearchResult[],
-  filter: string
-): SearchResult[] {
+export function filterProfileSubData(results: SearchResult[], filter: string): SearchResult[] {
   if (!filter) return results
   const lowerFilter = filter.toLowerCase()
   return results.filter(
-    (r) =>
-      r.name.toLowerCase().includes(lowerFilter) ||
-      r.description?.toLowerCase().includes(lowerFilter)
+    (r) => r.name.toLowerCase().includes(lowerFilter) || r.description?.toLowerCase().includes(lowerFilter)
   )
 }
 

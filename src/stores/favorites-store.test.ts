@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import {
-  useFavoritesStore,
-  setFavoritesOrgScope,
-  _resetFavoritesOrgScope,
-  type FavoriteItem
-} from './favorites-store'
+import { useFavoritesStore, setFavoritesOrgScope, _resetFavoritesOrgScope, type FavoriteItem } from './favorites-store'
 
 const fakeStore = new Map<string, unknown>()
 const storageGetMock = vi.fn(async (key: string) => fakeStore.get(key))

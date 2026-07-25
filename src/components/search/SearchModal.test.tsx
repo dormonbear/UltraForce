@@ -156,18 +156,19 @@ describe('SearchModal', () => {
 
       await userEvent.type(input, 'Account')
 
-      await waitFor(() => {
-        expect(props.onSearch).toHaveBeenCalled()
-      }, { timeout: 500 })
+      await waitFor(
+        () => {
+          expect(props.onSearch).toHaveBeenCalled()
+        },
+        { timeout: 500 }
+      )
     })
   })
 
   describe('search results', () => {
     it('should display search results from store', async () => {
       const mockResults: Record<string, SearchResult[]> = {
-        ApexClass: [
-          { id: '001', name: 'WeatherService', type: 'ApexClass', description: 'Weather API' }
-        ]
+        ApexClass: [{ id: '001', name: 'WeatherService', type: 'ApexClass', description: 'Weather API' }]
       }
 
       useSearchStore.setState({ searchResults: mockResults })
@@ -200,9 +201,7 @@ describe('SearchModal', () => {
 
       await userEvent.click(screen.getByText('WeatherService'))
 
-      expect(props.onResultClick).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '001', name: 'WeatherService' })
-      )
+      expect(props.onResultClick).toHaveBeenCalledWith(expect.objectContaining({ id: '001', name: 'WeatherService' }))
     })
   })
 
@@ -270,9 +269,7 @@ describe('SearchModal', () => {
 
       fireEvent.keyDown(input, { key: 'Enter' })
 
-      expect(props.onResultClick).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '001', name: 'ClassA' })
-      )
+      expect(props.onResultClick).toHaveBeenCalledWith(expect.objectContaining({ id: '001', name: 'ClassA' }))
     })
   })
 

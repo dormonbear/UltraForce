@@ -29,7 +29,10 @@ const REST_API_TYPES = ['CustomObject', 'CustomSetting', 'User', 'Report', 'Dash
 const REALTIME_TYPES: string[] = ['CustomLabel']
 
 function isStaleCustomObjectCache(metadataType: string, data: Record<string, unknown>[]): boolean {
-  return metadataType === 'CustomObject' && data.some((record) => !Object.prototype.hasOwnProperty.call(record, 'IsCustomSetting'))
+  return (
+    metadataType === 'CustomObject' &&
+    data.some((record) => !Object.prototype.hasOwnProperty.call(record, 'IsCustomSetting'))
+  )
 }
 
 export async function fetchAllPages<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -37,11 +40,7 @@ export async function fetchAllPages<T extends Record<string, unknown> = Record<s
   initialPath: string,
   options: FetchOptions = {}
 ): Promise<T[]> {
-  const {
-    maxRecords = Infinity,
-    onBatch,
-    skipLocalCollection = false
-  } = options
+  const { maxRecords = Infinity, onBatch, skipLocalCollection = false } = options
 
   const allRecords: T[] = []
   let path: string | null = initialPath
@@ -91,10 +90,7 @@ export async function fetchAllPages<T extends Record<string, unknown> = Record<s
   return allRecords
 }
 
-export async function fetchMetadataFromAPI(
-  metadataType: string,
-  sfHost: string
-): Promise<Record<string, unknown>[]> {
+export async function fetchMetadataFromAPI(metadataType: string, sfHost: string): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
 
   if (metadataType === 'CustomMetadataType') {
@@ -201,10 +197,7 @@ interface FieldRecord extends Record<string, unknown> {
   EntityDefinition: { QualifiedApiName: string } | null
 }
 
-export async function fetchFieldsForObject(
-  objectApiName: string,
-  sfHost: string
-): Promise<Record<string, unknown>[]> {
+export async function fetchFieldsForObject(objectApiName: string, sfHost: string): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
   const escapedName = escapeSoqlLiteral(objectApiName)
@@ -234,10 +227,7 @@ interface CmdtRecord extends Record<string, unknown> {
   NamespacePrefix: string | null
 }
 
-async function fetchRecordsForCMDT(
-  cmdtApiName: string,
-  sfHost: string
-): Promise<Record<string, unknown>[]> {
+async function fetchRecordsForCMDT(cmdtApiName: string, sfHost: string): Promise<Record<string, unknown>[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
   const query = `SELECT Id, DeveloperName, MasterLabel, NamespacePrefix FROM ${cmdtApiName} ORDER BY MasterLabel ASC LIMIT 2000`
@@ -286,7 +276,11 @@ async function fetchRecordsForCustomSetting(
       _recordType: 'Record'
     }))
 
-    logger.debug('fetch:custom-setting-records', { setting: settingApiName, count: enrichedRecords.length, ms: Date.now() - start })
+    logger.debug('fetch:custom-setting-records', {
+      setting: settingApiName,
+      count: enrichedRecords.length,
+      ms: Date.now() - start
+    })
     return enrichedRecords
   } catch (error) {
     logger.error('fetch:custom-setting-records failed', { setting: settingApiName, error })
@@ -321,10 +315,7 @@ export async function ensureCustomSettingRecordIndex(settingName: string, sfHost
   }
 }
 
-export async function ensureMetadataIndex(
-  metadataType: string,
-  sfHost: string
-): Promise<void> {
+export async function ensureMetadataIndex(metadataType: string, sfHost: string): Promise<void> {
   const { data, fromCache } = await getMetadataWithCache(metadataType, sfHost)
 
   if (!fromCache || !hasSearchIndex(metadataType, sfHost)) {

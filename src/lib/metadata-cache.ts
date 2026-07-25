@@ -1,5 +1,11 @@
 import { logger } from './logger'
-import { metadataCacheKey as buildCacheKey, storageGet, storageSet, storageRemove, storageGetAll } from './storage-service'
+import {
+  metadataCacheKey as buildCacheKey,
+  storageGet,
+  storageSet,
+  storageRemove,
+  storageGetAll
+} from './storage-service'
 
 const CACHE_CONFIG = {
   TTL: 24 * 60 * 60 * 1000,
@@ -80,9 +86,8 @@ export class MetadataCache {
       const key = getCacheKey(orgId, metadataType)
 
       // For CustomLabel, strip Value field to reduce storage size
-      const cacheData = metadataType === 'CustomLabel'
-        ? data.map(({ Value: _Value, ...rest }: Record<string, unknown>) => rest)
-        : data
+      const cacheData =
+        metadataType === 'CustomLabel' ? data.map(({ Value: _Value, ...rest }: Record<string, unknown>) => rest) : data
 
       const cacheItem: CacheItem = {
         data: cacheData,
@@ -102,9 +107,10 @@ export class MetadataCache {
         await this.cleanupForQuota()
         try {
           const key = getCacheKey(orgId, metadataType)
-          const cacheData = metadataType === 'CustomLabel'
-            ? data.map(({ Value: _Value, ...rest }: Record<string, unknown>) => rest)
-            : data
+          const cacheData =
+            metadataType === 'CustomLabel'
+              ? data.map(({ Value: _Value, ...rest }: Record<string, unknown>) => rest)
+              : data
           const cacheItem: CacheItem = {
             data: cacheData,
             timestamp: Date.now(),
@@ -205,9 +211,7 @@ export class MetadataCache {
     const refreshPromise = new Promise<Record<string, unknown>[]>((resolve) => {
       setTimeout(() => {
         try {
-          document.dispatchEvent(
-            new CustomEvent('metadataRefreshRequest', { detail: { orgId, metadataType } })
-          )
+          document.dispatchEvent(new CustomEvent('metadataRefreshRequest', { detail: { orgId, metadataType } }))
         } finally {
           this.refreshPromises.delete(key)
         }

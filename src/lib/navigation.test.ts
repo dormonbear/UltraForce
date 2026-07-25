@@ -376,9 +376,7 @@ describe('buildActionUrl', () => {
         metadata: { DurableId: 'Account', QualifiedApiName: 'Account' }
       })
       const url = buildActionUrl(stdResult, 'layouts', classicCtx)
-      expect(url).toBe(
-        'https://test.my.salesforce.com/ui/setup/layout/PageLayouts?type=Account&setupid=AccountLayouts'
-      )
+      expect(url).toBe('https://test.my.salesforce.com/ui/setup/layout/PageLayouts?type=Account&setupid=AccountLayouts')
     })
 
     it('should build classic recordtypes url for standard objects', () => {
@@ -451,9 +449,7 @@ describe('buildNavigationUrl additional Lightning branches', () => {
   it('should build LightningComponentBundle url', () => {
     const result = makeResult({ type: 'LightningComponentBundle', id: '0Rbxxx' })
     const url = buildNavigationUrl(result, lightningCtx)
-    expect(url).toBe(
-      'https://test.my.salesforce.com/lightning/setup/LightningComponentBundles/page?address=%2F0Rbxxx'
-    )
+    expect(url).toBe('https://test.my.salesforce.com/lightning/setup/LightningComponentBundles/page?address=%2F0Rbxxx')
   })
 
   it('should build AuraDefinitionBundle url', () => {
@@ -539,9 +535,7 @@ describe('buildNavigationUrl additional Lightning branches', () => {
       metadata: { Id: 'm01record' }
     })
     const url = buildNavigationUrl(result, lightningCtx)
-    expect(url).toBe(
-      'https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01record'
-    )
+    expect(url).toBe('https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01record')
   })
 
   it('should build CustomSetting record url for non-definition', () => {
@@ -551,9 +545,7 @@ describe('buildNavigationUrl additional Lightning branches', () => {
       metadata: { DurableId: '01Ndurable' }
     })
     const url = buildNavigationUrl(result, lightningCtx)
-    expect(url).toBe(
-      'https://test.my.salesforce-setup.com/lightning/setup/CustomSettings/page?address=%2F01Nrecord'
-    )
+    expect(url).toBe('https://test.my.salesforce-setup.com/lightning/setup/CustomSettings/page?address=%2F01Nrecord')
   })
 
   it('should fall back to DurableId when CustomMetadataType has no Id', () => {
@@ -563,17 +555,13 @@ describe('buildNavigationUrl additional Lightning branches', () => {
       metadata: { DurableId: 'm01durable', _isTypeDefinition: true }
     })
     const url = buildNavigationUrl(result, lightningCtx)
-    expect(url).toBe(
-      'https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01durable'
-    )
+    expect(url).toBe('https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01durable')
   })
 
   it('should fall back to result id when CustomMetadataType has neither Id nor DurableId', () => {
     const result = makeResult({ type: 'CustomMetadataType', id: 'm01xxx', metadata: {} })
     const url = buildNavigationUrl(result, lightningCtx)
-    expect(url).toBe(
-      'https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01xxx'
-    )
+    expect(url).toBe('https://test.my.salesforce-setup.com/lightning/setup/CustomMetadata/page?address=%2Fm01xxx')
   })
 
   it('should fall back to result id when CustomSetting definition has no DurableId', () => {

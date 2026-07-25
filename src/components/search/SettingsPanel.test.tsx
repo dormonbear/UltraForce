@@ -126,7 +126,14 @@ describe('SettingsPanel custom commands', () => {
   it('lists an existing custom command and deletes it', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const existing: Record<string, CustomCommand> = {
-      log: { key: 'log', description: 'My Logs', soql: "SELECT Id FROM ApexLog WHERE Id LIKE '%{query}%'", useToolingApi: true, isBuiltin: false, nameField: 'Id' }
+      log: {
+        key: 'log',
+        description: 'My Logs',
+        soql: "SELECT Id FROM ApexLog WHERE Id LIKE '%{query}%'",
+        useToolingApi: true,
+        isBuiltin: false,
+        nameField: 'Id'
+      }
     }
     const { onCustomCommandsChange } = renderPanel({ customCommands: existing })
     expect(await screen.findByText('My Logs')).toBeTruthy()
@@ -137,7 +144,15 @@ describe('SettingsPanel custom commands', () => {
 
   it('loads an existing command into the form on Edit and re-saves it', async () => {
     const existing: Record<string, CustomCommand> = {
-      log: { key: 'log', description: 'My Logs', soql: "SELECT Id FROM ApexLog WHERE Name LIKE '%{query}%'", useToolingApi: true, isBuiltin: false, nameField: 'Id', descriptionFields: ['Operation'] }
+      log: {
+        key: 'log',
+        description: 'My Logs',
+        soql: "SELECT Id FROM ApexLog WHERE Name LIKE '%{query}%'",
+        useToolingApi: true,
+        isBuiltin: false,
+        nameField: 'Id',
+        descriptionFields: ['Operation']
+      }
     }
     const { onCustomCommandsChange } = renderPanel({ customCommands: existing })
     fireEvent.click(await screen.findByTitle('Edit'))
@@ -249,7 +264,15 @@ describe('SettingsPanel toggles and export', () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
 
     const existing: Record<string, CustomCommand> = {
-      log: { key: 'log', description: 'My Logs', soql: "SELECT Id FROM ApexLog WHERE Name LIKE '%{query}%'", useToolingApi: true, isBuiltin: false, nameField: 'Id', descriptionFields: ['Operation'] }
+      log: {
+        key: 'log',
+        description: 'My Logs',
+        soql: "SELECT Id FROM ApexLog WHERE Name LIKE '%{query}%'",
+        useToolingApi: true,
+        isBuiltin: false,
+        nameField: 'Id',
+        descriptionFields: ['Operation']
+      }
     }
     renderPanel({ customCommands: existing })
     const exportBtn = (await screen.findByText('Export')) as HTMLButtonElement

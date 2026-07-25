@@ -95,24 +95,16 @@ describe('IdPreview', () => {
 
     render(<IdPreview recordId={TEST_ID} sfHost={TEST_HOST} onNavigate={vi.fn()} />)
 
-    expect(mockFetchPreview).toHaveBeenCalledWith(
-      TEST_HOST,
-      TEST_ID,
-      expect.any(AbortSignal)
-    )
+    expect(mockFetchPreview).toHaveBeenCalledWith(TEST_HOST, TEST_ID, expect.any(AbortSignal))
   })
 
   it('aborts previous request when recordId changes', async () => {
     const abortSpy = vi.spyOn(AbortController.prototype, 'abort')
     mockFetchPreview.mockReturnValue(new Promise(() => {}))
 
-    const { rerender } = render(
-      <IdPreview recordId={TEST_ID} sfHost={TEST_HOST} onNavigate={vi.fn()} />
-    )
+    const { rerender } = render(<IdPreview recordId={TEST_ID} sfHost={TEST_HOST} onNavigate={vi.fn()} />)
 
-    rerender(
-      <IdPreview recordId="003000000000001AAA" sfHost={TEST_HOST} onNavigate={vi.fn()} />
-    )
+    rerender(<IdPreview recordId="003000000000001AAA" sfHost={TEST_HOST} onNavigate={vi.fn()} />)
 
     expect(abortSpy).toHaveBeenCalled()
     abortSpy.mockRestore()

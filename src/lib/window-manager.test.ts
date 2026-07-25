@@ -465,9 +465,11 @@ describe('UltraForceWindowManager', () => {
       instance.updateState({ isLoading: true })
 
       expect(handler).toHaveBeenCalledTimes(1)
-      expect(handler).toHaveBeenCalledWith(expect.objectContaining({
-        updates: { isLoading: true }
-      }))
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          updates: { isLoading: true }
+        })
+      )
     })
   })
 
@@ -604,9 +606,7 @@ describe('UltraForceWindowManager', () => {
       await handler('debug logs')
       const state2 = instance.getState()
 
-      expect(state1.searchResults['SetupShortcut']?.length).toBe(
-        state2.searchResults['SetupShortcut']?.length
-      )
+      expect(state1.searchResults['SetupShortcut']?.length).toBe(state2.searchResults['SetupShortcut']?.length)
     })
 
     it('should match by description category', async () => {
@@ -656,10 +656,7 @@ describe('UltraForceWindowManager', () => {
         type: 'ApexClass'
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('01pDn00000abcde'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('01pDn00000abcde'), '_blank')
     })
 
     it('should navigate to Flow builder', async () => {
@@ -671,10 +668,7 @@ describe('UltraForceWindowManager', () => {
         type: 'Flow'
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('flowBuilder'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('flowBuilder'), '_blank')
     })
 
     it('should navigate to user profile page', async () => {
@@ -686,10 +680,7 @@ describe('UltraForceWindowManager', () => {
         type: 'User'
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('ManageUsers'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('ManageUsers'), '_blank')
     })
 
     it('should record User command results in recent history', async () => {
@@ -724,10 +715,7 @@ describe('UltraForceWindowManager', () => {
         metadata: { QualifiedApiName: 'ASR_Hotel__c' }
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('ASR_Hotel__c'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('ASR_Hotel__c'), '_blank')
     })
 
     it('should navigate to PermissionSet page', async () => {
@@ -739,10 +727,7 @@ describe('UltraForceWindowManager', () => {
         type: 'PermissionSet'
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('PermSets'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('PermSets'), '_blank')
     })
 
     it('should navigate to Profile page', async () => {
@@ -754,10 +739,7 @@ describe('UltraForceWindowManager', () => {
         type: 'Profile'
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('EnhancedProfiles'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('EnhancedProfiles'), '_blank')
     })
 
     it('should record Profile command results in recent history', async () => {
@@ -846,11 +828,13 @@ describe('UltraForceWindowManager', () => {
       const handler = (instance as any).handleResultClick.bind(instance)
 
       // Should not throw
-      expect(() => handler({
-        id: 'unknown-123',
-        name: 'Unknown Item',
-        type: 'UnknownType'
-      })).not.toThrow()
+      expect(() =>
+        handler({
+          id: 'unknown-123',
+          name: 'Unknown Item',
+          type: 'UnknownType'
+        })
+      ).not.toThrow()
     })
 
     it('should not navigate when sfHost is null', async () => {
@@ -876,10 +860,7 @@ describe('UltraForceWindowManager', () => {
         type: 'CustomLabel'
       })
 
-      expect(openSpy).toHaveBeenCalledWith(
-        expect.stringContaining('ExternalStrings'),
-        '_blank'
-      )
+      expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('ExternalStrings'), '_blank')
     })
   })
 
@@ -933,12 +914,10 @@ describe('UltraForceWindowManager', () => {
 
       await handler('test', ['ApexClass'], true, true)
 
-      expect(mockSearchMetadata).toHaveBeenCalledWith(
-        'test',
-        ['ApexClass'],
-        TEST_HOST,
-        { useFuzzy: true, hideManagedPackage: true }
-      )
+      expect(mockSearchMetadata).toHaveBeenCalledWith('test', ['ApexClass'], TEST_HOST, {
+        useFuzzy: true,
+        hideManagedPackage: true
+      })
     })
 
     it('should update state with search results', async () => {
@@ -1005,7 +984,9 @@ describe('UltraForceWindowManager', () => {
 
       // Simulate slow search that gets superseded
       let resolveFirst: (value: any) => void
-      const slowPromise = new Promise((resolve) => { resolveFirst = resolve })
+      const slowPromise = new Promise((resolve) => {
+        resolveFirst = resolve
+      })
 
       mockSearchMetadata
         .mockReturnValueOnce(slowPromise as any)
@@ -1033,18 +1014,15 @@ describe('UltraForceWindowManager', () => {
       const instance = await UltraForceWindowManager.getInstance()
       const handler = (instance as any).handleCustomSearch.bind(instance)
 
-      vi.mocked(executeCustomCommand).mockResolvedValue([{
-        id: '01p',
-        name: 'WeatherService',
-        type: 'CustomQuery'
-      }])
+      vi.mocked(executeCustomCommand).mockResolvedValue([
+        {
+          id: '01p',
+          name: 'WeatherService',
+          type: 'CustomQuery'
+        }
+      ])
 
-      await handler(
-        "SELECT Id, Name FROM ApexClass WHERE Name LIKE '%{query}%'",
-        'Weather',
-        true,
-        'Name'
-      )
+      await handler("SELECT Id, Name FROM ApexClass WHERE Name LIKE '%{query}%'", 'Weather', true, 'Name')
 
       expect(executeCustomCommand).toHaveBeenCalled()
       const state = instance.getState()

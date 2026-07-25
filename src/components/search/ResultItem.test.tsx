@@ -34,19 +34,12 @@ describe('ResultItem', () => {
   })
 
   it('should render description when provided', () => {
-    render(
-      <ResultItem
-        {...defaultProps}
-        result={makeResult({ description: 'A test class' })}
-      />
-    )
+    render(<ResultItem {...defaultProps} result={makeResult({ description: 'A test class' })} />)
     expect(screen.getByText('A test class')).toBeTruthy()
   })
 
   it('should apply selected class when isSelected is true', () => {
-    const { container } = render(
-      <ResultItem {...defaultProps} isSelected={true} />
-    )
+    const { container } = render(<ResultItem {...defaultProps} isSelected={true} />)
     const item = container.querySelector('.result-item')
     expect(item?.classList.contains('selected')).toBe(true)
   })
@@ -71,24 +64,12 @@ describe('ResultItem', () => {
   })
 
   it('should show pin icon when onToggleFavorite is provided', () => {
-    render(
-      <ResultItem
-        {...defaultProps}
-        onToggleFavorite={vi.fn()}
-        isFavorite={false}
-      />
-    )
+    render(<ResultItem {...defaultProps} onToggleFavorite={vi.fn()} isFavorite={false} />)
     expect(screen.getByTitle('Pin to favorites')).toBeTruthy()
   })
 
   it('should show unpin title when isFavorite is true', () => {
-    render(
-      <ResultItem
-        {...defaultProps}
-        onToggleFavorite={vi.fn()}
-        isFavorite={true}
-      />
-    )
+    render(<ResultItem {...defaultProps} onToggleFavorite={vi.fn()} isFavorite={true} />)
     expect(screen.getByTitle('Remove from favorites')).toBeTruthy()
   })
 
@@ -119,25 +100,13 @@ describe('ResultItem', () => {
   })
 
   it('should show filled star SVG when pinned', () => {
-    const { container } = render(
-      <ResultItem
-        {...defaultProps}
-        onToggleFavorite={vi.fn()}
-        isFavorite={true}
-      />
-    )
+    const { container } = render(<ResultItem {...defaultProps} onToggleFavorite={vi.fn()} isFavorite={true} />)
     const svg = container.querySelector('.pin-icon-filled')
     expect(svg).toBeTruthy()
   })
 
   it('should show outline star SVG when not pinned', () => {
-    const { container } = render(
-      <ResultItem
-        {...defaultProps}
-        onToggleFavorite={vi.fn()}
-        isFavorite={false}
-      />
-    )
+    const { container } = render(<ResultItem {...defaultProps} onToggleFavorite={vi.fn()} isFavorite={false} />)
     const svg = container.querySelector('.pin-icon-outline')
     expect(svg).toBeTruthy()
   })
@@ -145,14 +114,7 @@ describe('ResultItem', () => {
   it('should not propagate click from pin button to result item', () => {
     const onClick = vi.fn()
     const onToggleFavorite = vi.fn()
-    render(
-      <ResultItem
-        {...defaultProps}
-        onClick={onClick}
-        onToggleFavorite={onToggleFavorite}
-        isFavorite={false}
-      />
-    )
+    render(<ResultItem {...defaultProps} onClick={onClick} onToggleFavorite={onToggleFavorite} isFavorite={false} />)
     fireEvent.click(screen.getByTitle('Pin to favorites'))
     expect(onToggleFavorite).toHaveBeenCalledTimes(1)
     expect(onClick).not.toHaveBeenCalled()
@@ -177,13 +139,7 @@ describe('ResultItem', () => {
 
   it('renders a Preview action for ApexPage', () => {
     const onActionClick = vi.fn()
-    render(
-      <ResultItem
-        {...defaultProps}
-        result={makeResult({ type: 'ApexPage' })}
-        onActionClick={onActionClick}
-      />
-    )
+    render(<ResultItem {...defaultProps} result={makeResult({ type: 'ApexPage' })} onActionClick={onActionClick} />)
     fireEvent.click(screen.getByTitle('Preview'))
     expect(onActionClick).toHaveBeenCalledWith(expect.objectContaining({ type: 'ApexPage' }), 'preview')
   })
@@ -194,7 +150,11 @@ describe('ResultItem', () => {
     render(
       <ResultItem
         {...defaultProps}
-        result={makeResult({ type: 'CustomField', name: 'Industry', metadata: { QualifiedApiName: 'Account.Industry' } })}
+        result={makeResult({
+          type: 'CustomField',
+          name: 'Industry',
+          metadata: { QualifiedApiName: 'Account.Industry' }
+        })}
       />
     )
     await act(async () => {

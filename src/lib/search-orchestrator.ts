@@ -4,10 +4,7 @@ import type { SearchResult } from '~types'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
 import { normalizeHost, escapeSoql } from './domain-utils'
-import {
-  searchIndex,
-  hasSearchIndex
-} from './fuzzy-search'
+import { searchIndex, hasSearchIndex } from './fuzzy-search'
 import {
   parseProfileDotNotation,
   buildProfileSubMenu,
@@ -47,7 +44,11 @@ interface SfGroupSearchRecord extends Record<string, unknown> {
   Email?: string
 }
 
-interface DotNotationResult { objectName: string; fieldQuery: string; isCMDT: boolean }
+interface DotNotationResult {
+  objectName: string
+  fieldQuery: string
+  isCMDT: boolean
+}
 
 function parseDotNotation(query: string): DotNotationResult | null {
   const dotIndex = query.indexOf('.')
@@ -116,7 +117,9 @@ export async function searchSalesforceMetadata(
     }
   }
 
-  const typesToSearch = selectedTypes.filter((t) => t !== 'CustomField' && t !== 'User' && t !== 'Queue' && t !== 'Group')
+  const typesToSearch = selectedTypes.filter(
+    (t) => t !== 'CustomField' && t !== 'User' && t !== 'Queue' && t !== 'Group'
+  )
   if (typesToSearch.length > 0) {
     const otherResults = await searchMetadataTypes(query, typesToSearch, apiHost, useFuzzy, hideManagedPackage)
     Object.assign(results, otherResults)
@@ -175,7 +178,14 @@ async function handleDotNotationSearch(
 
   // Profile sub-data search: "System Administrator.Users.john"
   if (!isCMDT && selectedTypes.includes('Profile')) {
-    const profileResult = await handleProfileDotSearch(query, apiHost, session, selectedTypes, useFuzzy, hideManagedPackage)
+    const profileResult = await handleProfileDotSearch(
+      query,
+      apiHost,
+      session,
+      selectedTypes,
+      useFuzzy,
+      hideManagedPackage
+    )
     if (profileResult) return profileResult
   }
 
@@ -207,8 +217,9 @@ async function handleProfileDotSearch(
   useFuzzy: boolean,
   hideManagedPackage: boolean
 ): Promise<Record<string, SearchResult[]> | null> {
-  const cachedProfiles = searchIndex('', 'Profile', apiHost, { useFuzzy: false, hideManagedPackage: false })
-    .map((r) => ({ id: r.id, name: r.name }))
+  const cachedProfiles = searchIndex('', 'Profile', apiHost, { useFuzzy: false, hideManagedPackage: false }).map(
+    (r) => ({ id: r.id, name: r.name })
+  )
 
   const profileDot = parseProfileDotNotation(query, cachedProfiles)
   if (!profileDot) return null
@@ -220,9 +231,7 @@ async function handleProfileDotSearch(
     logger.debug('search:profile-submenu', { profile: profileName })
     let subMenu = buildProfileSubMenu(profileId, profileName)
     if (filter) {
-      subMenu = subMenu.filter((item) =>
-        item.name.toLowerCase().includes(filter.toLowerCase())
-      )
+      subMenu = subMenu.filter((item) => item.name.toLowerCase().includes(filter.toLowerCase()))
     }
     results['Profile'] = subMenu
   } else {
@@ -249,21 +258,35 @@ async function dispatchProfileSubQuery(
   sessionKey: string
 ): Promise<SearchResult[]> {
   switch (subCategory) {
-    case 'Users': return queryProfileUsers(profileId, apiHost, sessionKey)
-    case 'ObjectPermissions': return queryProfileObjectPermissions(profileId, apiHost, sessionKey)
-    case 'FieldPermissions': return queryProfileFieldPermissions(profileId, apiHost, sessionKey)
-    case 'CustomPermissions': return queryProfileCustomPermissions(profileId, apiHost, sessionKey)
-    case 'ApexClassAccess': return queryProfileApexClassAccess(profileId, apiHost, sessionKey)
-    case 'VFPageAccess': return queryProfileVFPageAccess(profileId, apiHost, sessionKey)
-    case 'ConnectedApps': return queryProfileConnectedApps(profileId, apiHost, sessionKey)
-    case 'AssignedApps': return queryProfileAssignedApps(profileId, apiHost, sessionKey)
-    default: return []
+    case 'Users':
+      return queryProfileUsers(profileId, apiHost, sessionKey)
+    case 'ObjectPermissions':
+      return queryProfileObjectPermissions(profileId, apiHost, sessionKey)
+    case 'FieldPermissions':
+      return queryProfileFieldPermissions(profileId, apiHost, sessionKey)
+    case 'CustomPermissions':
+      return queryProfileCustomPermissions(profileId, apiHost, sessionKey)
+    case 'ApexClassAccess':
+      return queryProfileApexClassAccess(profileId, apiHost, sessionKey)
+    case 'VFPageAccess':
+      return queryProfileVFPageAccess(profileId, apiHost, sessionKey)
+    case 'ConnectedApps':
+      return queryProfileConnectedApps(profileId, apiHost, sessionKey)
+    case 'AssignedApps':
+      return queryProfileAssignedApps(profileId, apiHost, sessionKey)
+    default:
+      return []
   }
 }
 
 async function mergeOtherTypes(
-  results: Record<string, SearchResult[]>, query: string, selectedTypes: string[],
-  excludeType: string, apiHost: string, useFuzzy: boolean, hideManagedPackage: boolean
+  results: Record<string, SearchResult[]>,
+  query: string,
+  selectedTypes: string[],
+  excludeType: string,
+  apiHost: string,
+  useFuzzy: boolean,
+  hideManagedPackage: boolean
 ): Promise<void> {
   const otherTypes = selectedTypes.filter((t) => t !== excludeType)
   if (otherTypes.length > 0) {
@@ -271,10 +294,7 @@ async function mergeOtherTypes(
   }
 }
 
-async function searchUsersRealtime(
-  searchTerm: string,
-  sfHost: string
-): Promise<SearchResult[]> {
+async function searchUsersRealtime(searchTerm: string, sfHost: string): Promise<SearchResult[]> {
   const host = normalizeHost(sfHost)
   const start = Date.now()
   const escaped = escapeSoql(searchTerm)
@@ -321,16 +341,21 @@ async function searchGroupsRealtime(
   const searchPattern = `%${escaped}%`
   const resultType = groupType === 'Queue' ? 'Queue' : 'Group'
 
-  const query = groupType === 'Queue'
-    ? `SELECT Id, Name, DeveloperName, Email FROM Group WHERE Type = 'Queue' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
-    : `SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Regular' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
+  const query =
+    groupType === 'Queue'
+      ? `SELECT Id, Name, DeveloperName, Email FROM Group WHERE Type = 'Queue' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
+      : `SELECT Id, Name, DeveloperName FROM Group WHERE Type = 'Regular' AND (Name LIKE '${searchPattern}' OR DeveloperName LIKE '${searchPattern}') ORDER BY Name ASC LIMIT 50`
 
   const queryPath = `/services/data/v${API_VERSION}/query?q=${encodeURIComponent(query)}`
   logger.debug(`search:${resultType.toLowerCase()}:soql`, { query })
 
   try {
     const records = await fetchAllPages<SfGroupSearchRecord>(host, queryPath)
-    logger.debug(`search:${resultType.toLowerCase()}`, { term: searchTerm, count: records.length, ms: Date.now() - start })
+    logger.debug(`search:${resultType.toLowerCase()}`, {
+      term: searchTerm,
+      count: records.length,
+      ms: Date.now() - start
+    })
 
     return records.map((record) => {
       const parts = [record.DeveloperName]
@@ -394,4 +419,3 @@ async function searchMetadataTypes(
 
   return results
 }
-

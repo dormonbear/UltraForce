@@ -52,10 +52,7 @@ export async function fetchRecordTypeId(
   }
 }
 
-export async function resolveObjectApiNameFromRecord(
-  sfHost: string,
-  recordId: string
-): Promise<string | null> {
+export async function resolveObjectApiNameFromRecord(sfHost: string, recordId: string): Promise<string | null> {
   const prefix = recordId.slice(0, 3)
   if (KEY_PREFIX_MAP[prefix]) {
     return KEY_PREFIX_MAP[prefix]
@@ -70,7 +67,10 @@ export async function resolveObjectApiNameFromRecord(
   }
 
   try {
-    const resp = await sfRest<{ sobjects?: Array<{ keyPrefix?: string; name?: string }> }>(sfHost, `/services/data/v${API_VERSION}/sobjects/`)
+    const resp = await sfRest<{ sobjects?: Array<{ keyPrefix?: string; name?: string }> }>(
+      sfHost,
+      `/services/data/v${API_VERSION}/sobjects/`
+    )
     if (resp?.sobjects) {
       if (!sobjectPrefixCache[hostKey]) {
         sobjectPrefixCache[hostKey] = {}
@@ -129,7 +129,10 @@ export async function getCurrentUserProfileId(sfHost: string): Promise<string | 
 
   try {
     const soql = encodeURIComponent(`SELECT ProfileId FROM User WHERE Id = '${userId}'`)
-    const resp = await sfRest<{ records?: Array<{ ProfileId?: string }> }>(sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+    const resp = await sfRest<{ records?: Array<{ ProfileId?: string }> }>(
+      sfHost,
+      `/services/data/v${API_VERSION}/query/?q=${soql}`
+    )
     const profileId = resp?.records?.[0]?.ProfileId
     if (profileId) {
       currentUserProfileIdCache[hostKey] = profileId
@@ -157,7 +160,10 @@ export async function getUserLightningPreference(sfHost: string): Promise<boolea
     const soql = encodeURIComponent(
       `SELECT UserPreferencesLightningExperiencePreferred FROM User WHERE Id = '${userId}'`
     )
-    const resp = await sfRest<{ records?: Array<{ UserPreferencesLightningExperiencePreferred?: boolean }> }>(sfHost, `/services/data/v${API_VERSION}/query/?q=${soql}`)
+    const resp = await sfRest<{ records?: Array<{ UserPreferencesLightningExperiencePreferred?: boolean }> }>(
+      sfHost,
+      `/services/data/v${API_VERSION}/query/?q=${soql}`
+    )
     const preference = resp?.records?.[0]?.UserPreferencesLightningExperiencePreferred
 
     if (typeof preference === 'boolean') {
@@ -261,10 +267,7 @@ export async function handleRecordTypeNavigation(
     )
     const objectDurableId = entityResp?.records?.[0]?.DurableId
     if (objectDurableId) {
-      return buildSetupUrl(
-        sfHost,
-        `/lightning/setup/ObjectManager/${objectDurableId}/RecordTypes/${recordTypeId}/view`
-      )
+      return buildSetupUrl(sfHost, `/lightning/setup/ObjectManager/${objectDurableId}/RecordTypes/${recordTypeId}/view`)
     }
   } else {
     return `https://${sfHost}/setup/ui/recordtypefields.jsp?id=${recordTypeId}&type=${objectApiName}&setupid=${objectApiName}Records`
