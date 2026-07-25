@@ -67,6 +67,10 @@ backup/
 # GSD planning artifacts
 .planning/
 
+# Playwright run artifacts
+test-results/
+playwright-report/
+
 # Playwright MCP screenshots
 .playwright-mcp/
 
