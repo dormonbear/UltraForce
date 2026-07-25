@@ -39,7 +39,7 @@ interface FavoritesActions {
   clearFavorites: () => void
 }
 
-export type FavoritesStore = FavoritesState & FavoritesActions
+type FavoritesStore = FavoritesState & FavoritesActions
 
 const MAX_FAVORITES = 20
 

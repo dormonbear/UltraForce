@@ -1,6 +1,5 @@
 // Centralized storage service - single typed gateway for chrome.storage.local
 
-import type { NavigationMode, CustomCommand } from '~types'
 import { logger } from './logger'
 
 // --- Storage key constants ---
@@ -37,19 +36,6 @@ export function favoritesKey(host: string): string {
 
 // --- Value interfaces ---
 
-export interface SearchSettings {
-  selectedTypes?: string[]
-  shortcutKey?: string
-  closeOnNavigate?: boolean
-  navigationMode?: NavigationMode
-  fuzzySearch?: boolean
-  maxResults?: number
-  maxResultsPerType?: number
-  hideManagedPackage?: boolean
-  customCommands?: Record<string, CustomCommand>
-  autoLoadFields?: boolean
-}
-
 export interface UnsupportedTypesState {
   [host: string]: {
     types: string[]
@@ -76,12 +62,6 @@ export interface ErrorLogEntry {
   url: string
   userAgent: string
   timestamp?: number
-}
-
-export interface LegacySettings {
-  searchLimit: number
-  autoSearch: boolean
-  showDebug: boolean
 }
 
 // --- Storage operations ---

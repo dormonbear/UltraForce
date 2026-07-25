@@ -367,7 +367,7 @@ async function checkIsCustomSetting(objectName: string, sfHost: string): Promise
 }
 
 /** Searches cached metadata indexes for all requested types in parallel. */
-export async function searchMetadataTypes(
+async function searchMetadataTypes(
   query: string,
   selectedTypes: string[],
   apiHost: string,

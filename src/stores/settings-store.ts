@@ -27,7 +27,7 @@ interface SettingsActions {
   setCustomCommands: (commands: Record<string, CustomCommand>) => void
 }
 
-export type SettingsStore = SettingsState & SettingsActions
+type SettingsStore = SettingsState & SettingsActions
 
 export const SETTINGS_DEFAULTS: SettingsState = {
   selectedTypes: ['CustomObject', 'CustomField'],

@@ -351,4 +351,3 @@ const styles = {
 }
 
 export default ErrorBoundary
-export type { ErrorBoundaryProps, ErrorBoundaryState }

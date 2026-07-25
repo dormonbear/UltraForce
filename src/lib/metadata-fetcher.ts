@@ -234,7 +234,7 @@ interface CmdtRecord extends Record<string, unknown> {
   NamespacePrefix: string | null
 }
 
-export async function fetchRecordsForCMDT(
+async function fetchRecordsForCMDT(
   cmdtApiName: string,
   sfHost: string
 ): Promise<Record<string, unknown>[]> {
@@ -267,7 +267,7 @@ interface CustomSettingDataRecord extends Record<string, unknown> {
   SetupOwnerId: string
 }
 
-export async function fetchRecordsForCustomSetting(
+async function fetchRecordsForCustomSetting(
   settingApiName: string,
   sfHost: string
 ): Promise<Record<string, unknown>[]> {

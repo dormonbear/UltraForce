@@ -1,5 +1,5 @@
-// Salesforce API facade - thin re-export layer + API availability and permission checking
-// Delegates to search-orchestrator, custom-command, metadata-types, and metadata-fetcher
+// Salesforce API facade - API availability, permission checking, and cache control
+// Delegates search to search-orchestrator and custom commands to custom-command
 
 import { MetadataCache } from './metadata-cache'
 import { getSession, API_VERSION } from './auth'
@@ -19,37 +19,6 @@ import {
 import { getMetadataWithCache, fetchMetadataFromAPI } from './metadata-fetcher'
 import { METADATA_TYPES } from './metadata-types'
 
-// Re-exports from extracted modules
-export { METADATA_TYPES, type SearchOptions } from './metadata-types'
-export type {
-  SfApexRecord,
-  SfEntityDefinition,
-  SfFieldDefinition,
-  SfFlow,
-  SfUser,
-  SfPermissionSet,
-  SfProfile,
-  SfBundleRecord,
-  SfReport,
-  SfDashboard,
-  SfCustomLabel,
-  SfCustomMetadataType,
-  SfCustomSetting,
-  SfQueue,
-  SfGroup
-} from './metadata-types'
-export {
-  fetchAllPages,
-  fetchMetadataFromAPI,
-  fetchFieldsForObject,
-  getMetadataWithCache,
-  ensureCMDTRecordIndex,
-  ensureCustomSettingRecordIndex,
-  ensureFieldIndex,
-  ensureMetadataIndex,
-  fetchRecordsForCMDT,
-  fetchRecordsForCustomSetting
-} from './metadata-fetcher'
 export { searchSalesforceMetadata } from './search-orchestrator'
 export { executeCustomCommand, type CustomCommandOptions } from './custom-command'
 
@@ -274,10 +243,6 @@ export async function warmupMetadataCache(sfHost: string): Promise<void> {
   )
 
   logger.debug('warmup:done', { types: typesToWarmup.length, ms: Date.now() - start })
-}
-
-export async function getCacheStats() {
-  return MetadataCache.getInstance().getStats()
 }
 
 export async function clearMetadataCache(): Promise<void> {

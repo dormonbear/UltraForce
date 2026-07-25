@@ -34,22 +34,6 @@ import {
 import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
-// Facade re-exports: keep all external importers unchanged
-export { getSetupHost, buildSetupUrl, resolveSetupShortcutPath, getCurrentRecordFromUrl, shouldUseLightning } from '~lib/url-builder'
-export { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
-export type { SetupShortcut } from '~lib/setup-shortcuts'
-export { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl, KEY_PREFIX_MAP } from '~lib/navigation'
-export type { NavigationContext } from '~lib/navigation'
-export {
-  fetchRecordTypeId,
-  getCurrentRecordLayoutInfo,
-  resolveObjectApiNameFromRecord,
-  getCurrentUserId,
-  getCurrentUserProfileId,
-  getUserLightningPreference,
-  getLayoutAssignment
-} from '~lib/record-context'
-
 /**
  * Composite state type for backward compatibility.
  * All state is now managed by Zustand stores; this interface
@@ -916,4 +900,3 @@ class UltraForceWindowManager {
 }
 
 export default UltraForceWindowManager
-export type { WindowManagerState, WindowManagerOptions }

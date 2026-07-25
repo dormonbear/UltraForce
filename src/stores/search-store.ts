@@ -4,7 +4,7 @@
 import { create } from 'zustand'
 import type { SearchResult, RecordContext } from '~types'
 
-export interface SearchState {
+interface SearchState {
   isVisible: boolean
   searchResults: Record<string, SearchResult[]>
   isLoading: boolean
@@ -23,7 +23,7 @@ interface SearchActions {
   reset: () => void
 }
 
-export type SearchStore = SearchState & SearchActions
+type SearchStore = SearchState & SearchActions
 
 const INITIAL_STATE: SearchState = {
   isVisible: false,

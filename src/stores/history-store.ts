@@ -38,7 +38,7 @@ interface HistoryActions {
   clearHistory: () => void
 }
 
-export type HistoryStore = HistoryState & HistoryActions
+type HistoryStore = HistoryState & HistoryActions
 
 const MAX_HISTORY_ITEMS = 200
 const DECAY_HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
