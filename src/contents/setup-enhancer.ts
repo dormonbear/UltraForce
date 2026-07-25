@@ -250,5 +250,3 @@ window.addEventListener('beforeunload', () => {
     enhancer.destroy()
   }
 })
-
-export {}
