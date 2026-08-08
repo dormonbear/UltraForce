@@ -53,9 +53,9 @@ export default defineConfig({
       // cannot regress. Raise them whenever the measured numbers move up.
       thresholds: {
         lines: 81,
-        functions: 83,
-        branches: 67,
-        statements: 80
+        functions: 84,
+        branches: 68,
+        statements: 81
       }
     }
   },
