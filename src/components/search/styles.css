@@ -678,6 +678,15 @@ kbd {
   line-height: 1.5;
 }
 
+.managed-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .type-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

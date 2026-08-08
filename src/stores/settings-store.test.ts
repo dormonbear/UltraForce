@@ -1,13 +1,30 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { useSettingsStore, SETTINGS_DEFAULTS } from './settings-store'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { useSettingsStore, SETTINGS_DEFAULTS, applyManagedPolicy } from './settings-store'
+import { readManagedPolicy, subscribeManagedPolicy } from '../lib/managed-policy'
+
+// vitest-chrome does not type chrome storage areas as mocks; tests are excluded
+// from tsc (tsconfig.json) and these casts are test-only
+const managedGet = chrome.storage.managed.get as unknown as ReturnType<typeof vi.fn>
+const localGet = chrome.storage.local.get as unknown as ReturnType<typeof vi.fn>
+const localSet = chrome.storage.local.set as unknown as ReturnType<typeof vi.fn>
+const localRemove = chrome.storage.local.remove as unknown as ReturnType<typeof vi.fn>
+const storeState = useSettingsStore.getState
 
 describe('settings-store', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    chrome.storage.local.get.mockResolvedValue({})
-    chrome.storage.local.set.mockResolvedValue(undefined)
-    chrome.storage.local.remove.mockResolvedValue(undefined)
+    managedGet.mockReset()
+    managedGet.mockResolvedValue({})
+    localGet.mockResolvedValue({})
+    localSet.mockResolvedValue(undefined)
+    localRemove.mockResolvedValue(undefined)
     useSettingsStore.setState(SETTINGS_DEFAULTS)
+  })
+
+  afterEach(async () => {
+    // Reset the managed-policy module cache so tests do not leak policy
+    managedGet.mockReset()
+    await readManagedPolicy()
   })
 
   describe('defaults', () => {
@@ -75,25 +92,102 @@ describe('settings-store', () => {
     })
   })
 
-  describe('subscriptions', () => {
-    it('should notify subscribers on state change', () => {
-      const listener = vi.fn()
-      const unsub = useSettingsStore.subscribe(listener)
+  describe('managed policy', () => {
+    it('policy value overrides a persisted user value and blocks action writes', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
 
-      useSettingsStore.getState().setFuzzySearch(false)
+      useSettingsStore.getState().updateSettings({ navigationMode: 'auto' })
+      expect(useSettingsStore.getState().navigationMode).toBe('classic')
+    })
 
-      expect(listener).toHaveBeenCalledTimes(1)
+    it('policy wins over code defaults', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+
+      expect(useSettingsStore.getState().navigationMode).toBe('classic')
+      expect(useSettingsStore.getState().managedKeys).toEqual(['navigationMode'])
+    })
+
+    it('blocks direct setState writes from other modules', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'lightning' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+
+      useSettingsStore.setState({ navigationMode: 'classic' })
+      expect(useSettingsStore.getState().navigationMode).toBe('lightning')
+    })
+
+    it('settings reset cannot override policy-controlled keys', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic', hideManagedPackage: false })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+
+      // A replace-style reset with a full state object must keep policy values
+      // and the managedKeys marker while resetting everything else
+      const snapshot = useSettingsStore.getState()
+      useSettingsStore.setState({ ...SETTINGS_DEFAULTS } as unknown as typeof snapshot, true)
+      const state = useSettingsStore.getState()
+      expect(state.navigationMode).toBe('classic')
+      expect(state.hideManagedPackage).toBe(false)
+      expect(state.managedKeys).toEqual(['navigationMode', 'hideManagedPackage'])
+      // Non-policy keys reset normally
+      expect(state.shortcutKey).toBe('b')
+      expect(state.fuzzySearch).toBe(true)
+      // Restore actions (they live in state and a replace reset drops them)
+      useSettingsStore.setState(snapshot)
+    })
+
+    it('hydration merge applies policy over persisted user values', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      await readManagedPolicy()
+
+      const merge = useSettingsStore.persist.getOptions().merge!
+      const merged = merge({ navigationMode: 'auto', shortcutKey: 'm' }, {
+        ...SETTINGS_DEFAULTS
+      } as unknown as ReturnType<typeof storeState>)
+      expect(merged.navigationMode).toBe('classic')
+      expect(merged.shortcutKey).toBe('m')
+      expect(merged.hideManagedPackage).toBe(true)
+    })
+
+    it('applies live managed policy changes without a restart', () => {
+      let registeredListener:
+        | ((changes: Record<string, chrome.storage.StorageChange>, areaName: string) => void)
+        | undefined
+      chrome.storage.onChanged.addListener = vi.fn((fn) => {
+        registeredListener = fn
+      }) as unknown as typeof chrome.storage.onChanged.addListener
+      chrome.storage.onChanged.removeListener = vi.fn() as unknown as typeof chrome.storage.onChanged.removeListener
+
+      const unsub = subscribeManagedPolicy(applyManagedPolicy)
+      registeredListener!({ navigationMode: { newValue: 'classic' } }, 'managed')
+
+      expect(useSettingsStore.getState().navigationMode).toBe('classic')
+      expect(useSettingsStore.getState().managedKeys).toEqual(['navigationMode'])
       unsub()
     })
 
-    it('should not notify after unsubscribe', () => {
-      const listener = vi.fn()
-      const unsub = useSettingsStore.subscribe(listener)
-      unsub()
+    it('unmanaged Chrome (empty area) keeps today behaviour exactly', async () => {
+      managedGet.mockResolvedValue({})
 
-      useSettingsStore.getState().setFuzzySearch(false)
+      const values = await readManagedPolicy()
+      expect(values).toEqual({})
 
-      expect(listener).not.toHaveBeenCalled()
+      useSettingsStore.getState().updateSettings({ navigationMode: 'classic' })
+      expect(useSettingsStore.getState().navigationMode).toBe('classic')
+      expect(useSettingsStore.getState().managedKeys).toEqual([])
+    })
+
+    it('unmanaged Chrome (rejected area) degrades silently', async () => {
+      managedGet.mockRejectedValue(new Error('not managed'))
+
+      await expect(readManagedPolicy()).resolves.toEqual({})
+
+      useSettingsStore.getState().setNavigationMode('lightning')
+      expect(useSettingsStore.getState().navigationMode).toBe('lightning')
     })
   })
 })

@@ -39,6 +39,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof SettingsPane
     onHideManagedPackageChange: vi.fn(),
     maxResultsPerType: 10,
     onMaxResultsPerTypeChange: vi.fn(),
+    managedKeys: [],
     navigationMode: 'auto' as const,
     onNavigationModeChange: vi.fn(),
     sfHost: 'myorg.my.salesforce.com',
@@ -298,5 +299,32 @@ describe('SettingsPanel toggles and export', () => {
     await screen.findByText('Rebuild Cache')
     expect(clearMetadataCache).toHaveBeenCalled()
     expect(warmupMetadataCache).toHaveBeenCalledWith('myorg.my.salesforce.com')
+  })
+})
+
+describe('SettingsPanel managed policy', () => {
+  beforeEach(() => cleanup())
+
+  it('disables policy-controlled fields and shows the managed note', async () => {
+    renderPanel({ managedKeys: ['navigationMode', 'hideManagedPackage', 'maxResultsPerType'] })
+
+    const hideManaged = (await screen.findByLabelText('Hide managed package items')) as HTMLInputElement
+    expect(hideManaged.disabled).toBe(true)
+
+    const modeRadio = (await screen.findByLabelText('Salesforce Classic')) as HTMLInputElement
+    expect(modeRadio.disabled).toBe(true)
+
+    const maxSelect = (await screen.findByDisplayValue('10')) as HTMLSelectElement
+    expect(maxSelect.disabled).toBe(true)
+
+    expect(screen.getAllByText('Managed by your organization')).toHaveLength(3)
+  })
+
+  it('keeps uncontrolled fields editable and hides the managed note', async () => {
+    renderPanel({ managedKeys: ['navigationMode'] })
+
+    const hideManaged = (await screen.findByLabelText('Hide managed package items')) as HTMLInputElement
+    expect(hideManaged.disabled).toBe(false)
+    expect(screen.getAllByText('Managed by your organization')).toHaveLength(1)
   })
 })

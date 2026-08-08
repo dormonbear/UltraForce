@@ -157,6 +157,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     hideManagedPackage,
     maxResultsPerType,
     customCommands,
+    managedKeys,
     setSelectedTypes,
     updateSettings,
     setNavigationMode: storeSetNavMode,
@@ -629,6 +630,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
               onHideManagedPackageChange={(val) => updateSettings({ hideManagedPackage: val })}
               maxResultsPerType={maxResultsPerType}
               onMaxResultsPerTypeChange={(val) => updateSettings({ maxResultsPerType: val })}
+              managedKeys={managedKeys}
               navigationMode={navigationMode}
               onNavigationModeChange={(mode) => storeSetNavMode(mode)}
               sfHost={sfHost}

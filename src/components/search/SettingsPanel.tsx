@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import type { CustomCommand, NavigationMode } from '~types'
+import type { SettingsState } from '~stores/settings-store'
 import {
   BUILTIN_COMMANDS,
   isKeyUnique,
@@ -27,6 +28,8 @@ interface SettingsPanelProps {
   onHideManagedPackageChange: (value: boolean) => void
   maxResultsPerType: number
   onMaxResultsPerTypeChange: (value: number) => void
+  /** Settings keys locked by enterprise policy; their fields render disabled */
+  managedKeys: ReadonlyArray<keyof SettingsState>
   navigationMode: NavigationMode
   onNavigationModeChange: (mode: NavigationMode) => void
   sfHost: string | null
@@ -54,6 +57,8 @@ const NAVIGATION_MODES = [
   { value: 'lightning', label: 'Lightning Experience' },
   { value: 'classic', label: 'Salesforce Classic' }
 ]
+
+const MANAGED_NOTE = 'Managed by your organization'
 
 const getAppVersion = () => {
   try {
@@ -90,6 +95,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onHideManagedPackageChange,
   maxResultsPerType,
   onMaxResultsPerTypeChange,
+  managedKeys,
   navigationMode,
   onNavigationModeChange,
   sfHost,
@@ -129,6 +135,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [formError, setFormError] = useState<string | null>(null)
 
   const allCommands = mergeCommands(customCommands)
+
+  const isManaged = (key: keyof SettingsState) => managedKeys.includes(key)
+
+  const renderManagedNote = (key: keyof SettingsState) =>
+    isManaged(key) ? (
+      <p className="managed-note">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 3.1 1.39 3.1 3.1v2z" />
+        </svg>
+        {MANAGED_NOTE}
+      </p>
+    ) : null
 
   const handleEditCommand = (cmd: CustomCommand) => {
     setEditingKey(cmd.key)
@@ -533,15 +551,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               type="checkbox"
               checked={hideManagedPackage}
               onChange={(e) => onHideManagedPackageChange(e.target.checked)}
+              disabled={isManaged('hideManagedPackage')}
               className="toggle-checkbox"
             />
             <span className="toggle-label">Hide managed package items</span>
           </label>
+          {renderManagedNote('hideManagedPackage')}
           <div className="toggle-option">
             <span className="toggle-label">Max results per type</span>
             <select
               value={maxResultsPerType}
               onChange={(e) => onMaxResultsPerTypeChange(Number(e.target.value))}
+              disabled={isManaged('maxResultsPerType')}
               className="shortcut-key-select"
               style={{ marginLeft: 'auto', width: 'auto' }}
             >
@@ -553,6 +574,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <option value={500}>500</option>
             </select>
           </div>
+          {renderManagedNote('maxResultsPerType')}
         </div>
 
         <div className="setting-section">
@@ -566,12 +588,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   name="navigationMode"
                   checked={navigationMode === mode.value}
                   onChange={() => onNavigationModeChange(mode.value as NavigationMode)}
+                  disabled={isManaged('navigationMode')}
                   className="type-checkbox"
                 />
                 <span className="type-label">{mode.label}</span>
               </label>
             ))}
           </div>
+          {renderManagedNote('navigationMode')}
         </div>
 
         <div className="setting-section">

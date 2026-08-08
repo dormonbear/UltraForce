@@ -64,7 +64,10 @@
       "https://*.setup.sfcrmapps.cn/*",
       "https://login.salesforce.com/*",
       "https://test.salesforce.com/*"
-    ]
+    ],
+    "storage": {
+      "managed_schema": "/managed_schema.json"
+    }
   },
   "dependencies": {
     "minisearch": "^7.2.0",
