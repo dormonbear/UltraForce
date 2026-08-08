@@ -91,6 +91,9 @@ jobs:
       - name: Build Extension
         run: pnpm build
 
+      - name: Verify Bundled Fonts Shipped
+        run: node scripts/verify-fonts.mjs
+
       - name: Package Extension
         run: pnpm package
 

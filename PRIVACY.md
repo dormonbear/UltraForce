@@ -102,10 +102,9 @@ exists solely to read the `sid` cookie described above.
 
 ## Claims not verified at runtime
 
-- The packaged build's font behavior is inferred from the built manifest and build
-  output, not observed in a running browser: the build output does not include the
-  `assets/fonts/*.woff2` files and `web_accessible_resources` does not list them, so the
-  local `chrome-extension://` font fetch is expected to fail and fall back to system
-  fonts. This is a functional gap, not a data leak.
 - The docs/privacy links in the settings panel are plain anchors and were not clicked
   during this audit.
+- Whether the bundled Inter typeface visually renders for a human user: an E2E
+  test (`tests/e2e/fonts.spec.ts`) confirms in a real browser that opening the modal
+  makes the renderer fetch the bundled woff2 files with HTTP 200 (and fails without
+  `web_accessible_resources`), but no pixel-level visual check was performed.
