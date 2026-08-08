@@ -7,6 +7,7 @@ interface ResultRowProps {
   result: SearchResult
   isSelected: boolean
   isFavorite?: boolean
+  optionId?: string
   onResultClick: (result: SearchResult) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
@@ -16,7 +17,7 @@ interface ResultRowProps {
 // callback, so ResultItem's `onClick: () => void` interface stays intact while
 // avoiding a fresh closure each render.
 const ResultRow: React.FC<ResultRowProps> = React.memo(
-  ({ result, isSelected, isFavorite, onResultClick, onActionClick, onToggleFavorite }) => {
+  ({ result, isSelected, isFavorite, optionId, onResultClick, onActionClick, onToggleFavorite }) => {
     const handleClick = useCallback(() => onResultClick(result), [onResultClick, result])
     return (
       <ResultItem
@@ -26,6 +27,7 @@ const ResultRow: React.FC<ResultRowProps> = React.memo(
         onActionClick={onActionClick}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
+        optionId={optionId}
       />
     )
   }
@@ -41,6 +43,8 @@ interface SearchResultsProps {
   onToggleCollapse?: (type: string) => void
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
   isFavorite?: (id: string) => boolean
+  /** id referenced by the combobox input's aria-controls. */
+  listboxId?: string
 }
 
 const METADATA_LABELS: Record<string, string> = {
@@ -62,7 +66,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   collapsedGroups: externalCollapsedGroups,
   onToggleCollapse,
   onToggleFavorite,
-  isFavorite
+  isFavorite,
+  listboxId
 }) => {
   const [internalCollapsedGroups, setInternalCollapsedGroups] = useState<Record<string, boolean>>({})
 
@@ -99,7 +104,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   let currentIndex = 0
 
   return (
-    <div className="search-results" data-ultraforce-results role="listbox" aria-label="Search results">
+    <div className="search-results" data-ultraforce-results id={listboxId} role="listbox" aria-label="Search results">
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 
@@ -116,6 +121,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                   result={result}
                   isSelected={globalIndex === selectedIndex}
                   isFavorite={isFavorite?.(result.id)}
+                  optionId={`ultraforce-option-${globalIndex}`}
                   onResultClick={onResultClick}
                   onActionClick={onActionClick}
                   onToggleFavorite={onToggleFavorite}

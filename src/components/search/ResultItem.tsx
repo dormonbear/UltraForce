@@ -11,6 +11,8 @@ interface ResultItemProps {
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   isFavorite?: boolean
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
+  /** Unique id for aria-activedescendant references from the combobox input. */
+  optionId?: string
 }
 
 const ActionButton: React.FC<{
@@ -29,7 +31,8 @@ const ResultItem: React.FC<ResultItemProps> = ({
   onClick,
   onActionClick,
   isFavorite,
-  onToggleFavorite
+  onToggleFavorite,
+  optionId
 }) => {
   const itemRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
@@ -83,6 +86,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
   return (
     <div
       ref={itemRef}
+      id={optionId}
       className={`result-item ${isSelected ? 'selected' : ''}`}
       data-ultraforce-result-item
       data-selected={isSelected}

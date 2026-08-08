@@ -7,6 +7,12 @@ interface SearchInputProps {
   onQueryChange: (query: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
   sfHost: string | null
+  /** Whether the results listbox is currently shown; drives aria-expanded. */
+  expanded?: boolean
+  /** id of the results listbox; drives aria-controls. */
+  controlsId?: string
+  /** id of the highlighted option; drives aria-activedescendant. */
+  activeDescendantId?: string | null
 }
 
 function detectOrgType(sfHost: string | null): OrgType {
@@ -63,7 +69,7 @@ function getOrgTypeLabel(orgType: OrgType): string {
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ query, onQueryChange, onKeyDown, sfHost }, ref) => {
+  ({ query, onQueryChange, onKeyDown, sfHost, expanded, controlsId, activeDescendantId }, ref) => {
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
 
@@ -131,6 +137,12 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           }}
           placeholder={displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'}
           aria-label="Search Salesforce metadata"
+          role="combobox"
+          aria-expanded={expanded ? 'true' : 'false'}
+          aria-controls={controlsId}
+          aria-activedescendant={activeDescendantId ?? undefined}
+          aria-autocomplete="list"
+          autoComplete="off"
           className="search-input"
           data-ultraforce-input
           autoFocus

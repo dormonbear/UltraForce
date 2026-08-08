@@ -30,6 +30,9 @@ const MODAL_INLINE_STYLE: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(24px) saturate(180%)'
 }
 
+/** id of the results listbox; the combobox input references it via aria-controls. */
+const RESULTS_LISTBOX_ID = 'ultraforce-results-listbox'
+
 const ACTION_ICON_PROPS = {
   width: '16',
   height: '16',
@@ -452,13 +455,38 @@ const SearchModal: React.FC<SearchModalProps> = ({
     setShowUpdateNotification(false)
   }, [])
 
+  /**
+   * Wraps Tab/Shift+Tab between the focusable controls inside the modal so
+   * focus cannot escape into the host page (dialog focus trap).
+   * Works inside the shadow root because event.target is the focused element.
+   */
+  const trapFocus = (event: React.KeyboardEvent, forward: boolean) => {
+    const modal = modalRef.current
+    if (!modal) return
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    ).filter((el) => !el.hidden && el.getAttribute('aria-hidden') !== 'true')
+    if (focusables.length === 0) return
+    const currentIndex = focusables.indexOf(event.target as HTMLElement)
+    const next = forward
+      ? (focusables[currentIndex + 1] ?? focusables[0])
+      : (focusables[currentIndex - 1] ?? focusables[focusables.length - 1])
+    event.preventDefault()
+    event.stopPropagation()
+    next.focus()
+  }
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // When settings panel is open, only handle Escape to close it
+    // When settings panel is open, only handle Escape to close it and Tab to trap focus
     if (showSettings) {
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
         setShowSettings(false)
+      } else if (event.key === 'Tab') {
+        trapFocus(event, !event.shiftKey)
       }
       return
     }
@@ -503,8 +531,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
         break
 
       case 'Tab':
-        event.preventDefault()
         if (visibleResults[selectedIndex]) {
+          event.preventDefault()
           const selectedResult = visibleResults[selectedIndex]
           const prefix = getCommandPrefix(parsedCommand)
           if (selectedResult.type === 'CustomObject') {
@@ -563,6 +591,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
           } else if (selectedResult.type === 'ProfileSetupLink') {
             // Navigate-only link: Enter navigates, Tab does nothing special
           }
+        } else {
+          // No highlighted result: Tab/Shift+Tab cycle the modal's focusable controls
+          trapFocus(event, !event.shiftKey)
         }
         break
 
@@ -590,9 +621,38 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }
 
-  if (!isVisible) return null
-
   const hasResults = visibleResults.length > 0 || Object.values(limitedSearchResults).some((arr) => arr.length > 0)
+  const isCommandEmptyState = parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command
+  const showListbox =
+    !showSettings &&
+    hasSession &&
+    !isLoading &&
+    !searchError &&
+    query.trim() !== '' &&
+    !isCommandEmptyState &&
+    hasResults
+  const activeDescendantId = showListbox && visibleResults[selectedIndex] ? `ultraforce-option-${selectedIndex}` : null
+  // Announcement text for the visually-hidden live region. Deliberately does
+  // not embed the query string so repeated keystrokes do not re-announce.
+  const liveStatusText = (() => {
+    if (showListbox) {
+      return visibleResults.length === 1 ? '1 result' : `${visibleResults.length} results`
+    }
+    if (
+      hasSession &&
+      !isLoading &&
+      !searchError &&
+      query.trim() !== '' &&
+      !hasResults &&
+      !extractedId &&
+      !isCommandEmptyState
+    ) {
+      return 'No results'
+    }
+    return ''
+  })()
+
+  if (!isVisible) return null
 
   return (
     <>
@@ -650,6 +710,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     }
                   }}
                   sfHost={sfHost}
+                  expanded={showListbox}
+                  controlsId={RESULTS_LISTBOX_ID}
+                  activeDescendantId={activeDescendantId}
                 />
 
                 {showCommandHints && <CommandHints commands={matchingCommands} />}
@@ -745,8 +808,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     onToggleCollapse={handleToggleCollapse}
                     onToggleFavorite={handleToggleFavorite}
                     isFavorite={isFavoriteCheck}
+                    listboxId={RESULTS_LISTBOX_ID}
                   />
                 )}
+              </div>
+
+              <div className="ultraforce-sr-only" role="status" aria-atomic="true">
+                {liveStatusText}
               </div>
 
               <div className="search-footer">

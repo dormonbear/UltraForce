@@ -101,6 +101,8 @@ Click the gear icon to configure:
 
 UltraForce communicates directly between your web browser and Salesforce servers. **No data is sent to third parties.**
 
+See [PRIVACY.md](PRIVACY.md) for a complete, source-verified audit of outbound requests, storage, and the session cookie.
+
 ### Data Storage
 
 We store minimal data in the browser's extension storage (`chrome.storage.local`) to save your preferences (search settings, keyboard shortcut, custom commands) along with a locally cached metadata index, recent history, and favorites. Recent history and favorites are isolated per Salesforce org. None of the stored data is sent anywhere.

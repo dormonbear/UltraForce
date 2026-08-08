@@ -112,7 +112,7 @@ describe('SearchModal', () => {
 
     it('labels the search input', () => {
       renderModal()
-      expect(screen.getByRole('textbox', { name: /search/i })).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: /search/i })).toBeInTheDocument()
     })
 
     it('labels the settings button', () => {
@@ -136,10 +136,112 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('combobox and listbox wiring', () => {
+    it('exposes the search input as a collapsed combobox before a search runs', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      expect(input).toHaveAttribute('role', 'combobox')
+      expect(input).toHaveAttribute('aria-expanded', 'false')
+      expect(input).toHaveAttribute('aria-controls', 'ultraforce-results-listbox')
+      expect(input).not.toHaveAttribute('aria-activedescendant')
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    })
+
+    it('links the combobox to the listbox and tracks the highlighted option', async () => {
+      useSearchStore.setState({
+        searchResults: {
+          ApexClass: [
+            { id: '001', name: 'ClassA', type: 'ApexClass' },
+            { id: '002', name: 'ClassB', type: 'ApexClass' }
+          ]
+        }
+      })
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'test')
+
+      const listbox = screen.getByRole('listbox')
+      expect(listbox).toHaveAttribute('id', 'ultraforce-results-listbox')
+      expect(input).toHaveAttribute('aria-controls', 'ultraforce-results-listbox')
+      expect(input).toHaveAttribute('aria-expanded', 'true')
+      expect(input).toHaveAttribute('aria-activedescendant', 'ultraforce-option-0')
+
+      const firstOption = document.getElementById('ultraforce-option-0')
+      expect(firstOption).toHaveAttribute('role', 'option')
+      expect(firstOption).toHaveAttribute('aria-selected', 'true')
+
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      expect(input).toHaveAttribute('aria-activedescendant', 'ultraforce-option-1')
+      expect(document.getElementById('ultraforce-option-1')).toHaveAttribute('aria-selected', 'true')
+      expect(document.getElementById('ultraforce-option-0')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('collapses the combobox and announces no results when the search is empty', async () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'zzz')
+      expect(input).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(screen.getByRole('status').textContent).toBe('No results')
+    })
+
+    it('announces the result count in the live region', async () => {
+      useSearchStore.setState({
+        searchResults: {
+          ApexClass: [
+            { id: '001', name: 'ClassA', type: 'ApexClass' },
+            { id: '002', name: 'ClassB', type: 'ApexClass' }
+          ]
+        }
+      })
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'test')
+      expect(screen.getByRole('status').textContent).toBe('2 results')
+    })
+
+    it('keeps focus inside the dialog when Tab is pressed without a highlighted result', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      const modal = screen.getByRole('dialog')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'Tab' })
+      expect(modal.contains(document.activeElement)).toBe(true)
+      expect(document.activeElement).not.toBe(input)
+
+      // Tabbing cycles through the modal's focusable controls and wraps back to the input
+      let wrappedToInput = false
+      for (let i = 0; i < 8; i++) {
+        fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' })
+        expect(modal.contains(document.activeElement)).toBe(true)
+        if (document.activeElement === input) {
+          wrappedToInput = true
+          break
+        }
+      }
+      expect(wrappedToInput).toBe(true)
+
+      // Shift+Tab from the input wraps to the last focusable control
+      fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })
+      expect(modal.contains(document.activeElement)).toBe(true)
+      expect(document.activeElement).not.toBe(input)
+    })
+
+    it('traps Tab focus inside the settings panel', async () => {
+      renderModal()
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      const modal = screen.getByRole('dialog')
+
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' })
+      expect(modal.contains(document.activeElement)).toBe(true)
+    })
+  })
+
   describe('visibility', () => {
     it('should render search input when store isVisible is true', () => {
       renderModal()
-      expect(screen.getByRole('textbox')).toBeInTheDocument()
+      expect(screen.getByRole('combobox')).toBeInTheDocument()
     })
 
     it('should not render when store isVisible is false', () => {
@@ -152,7 +254,7 @@ describe('SearchModal', () => {
   describe('search input', () => {
     it('should call onSearch when user types in input', async () => {
       const { props } = renderModal()
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
 
       await userEvent.type(input, 'Account')
 
@@ -174,7 +276,7 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchResults: mockResults })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'Weather')
 
       await waitFor(() => {
@@ -192,7 +294,7 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchResults: { ApexClass: [mockResult] } })
       const { props } = renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'Weather')
 
       await waitFor(() => {
@@ -208,7 +310,7 @@ describe('SearchModal', () => {
   describe('keyboard navigation', () => {
     it('should call onClose when Escape key is pressed', async () => {
       const { props } = renderModal()
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
 
       fireEvent.keyDown(input, { key: 'Escape' })
 
@@ -226,7 +328,7 @@ describe('SearchModal', () => {
       })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'ArrowDown' })
@@ -246,7 +348,7 @@ describe('SearchModal', () => {
       })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'ArrowDown' })
@@ -264,7 +366,7 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchResults: { ApexClass: [mockResult] } })
       const { props } = renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'Enter' })
@@ -287,7 +389,7 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchError: 'API Error: Connection failed' })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       expect(screen.getByText(/API Error|Connection failed/)).toBeInTheDocument()
@@ -329,7 +431,7 @@ describe('SearchModal', () => {
       fireEvent.keyDown(modal!, { key: 'Escape' })
 
       await waitFor(() => {
-        expect(screen.getByRole('textbox')).toBeInTheDocument()
+        expect(screen.getByRole('combobox')).toBeInTheDocument()
       })
     })
   })

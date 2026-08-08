@@ -61,7 +61,7 @@ describe('SearchInput', () => {
   describe('query input', () => {
     it('calls onQueryChange when the user types', () => {
       const { onQueryChange } = renderInput()
-      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'account' } })
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'account' } })
       expect(onQueryChange).toHaveBeenCalledWith('account')
     })
 
@@ -69,7 +69,7 @@ describe('SearchInput', () => {
       const { onKeyDown } = renderInput()
       const docListener = vi.fn()
       document.addEventListener('keydown', docListener)
-      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+      fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Enter' })
       document.removeEventListener('keydown', docListener)
       expect(onKeyDown).toHaveBeenCalledWith(expect.objectContaining({ key: 'Enter' }))
       expect(docListener).not.toHaveBeenCalled()
@@ -79,7 +79,7 @@ describe('SearchInput', () => {
       const { onKeyDown } = renderInput()
       const docListener = vi.fn()
       document.addEventListener('keyup', docListener)
-      fireEvent.keyUp(screen.getByRole('textbox'), { key: 'a' })
+      fireEvent.keyUp(screen.getByRole('combobox'), { key: 'a' })
       document.removeEventListener('keyup', docListener)
       expect(onKeyDown).not.toHaveBeenCalled()
       expect(docListener).not.toHaveBeenCalled()
@@ -87,7 +87,10 @@ describe('SearchInput', () => {
 
     it('listens for ultraforce-input custom events and updates the query', () => {
       const { onQueryChange } = renderInput()
-      fireEvent(screen.getByRole('textbox'), new CustomEvent('ultraforce-input', { detail: { value: 'custom-query' } }))
+      fireEvent(
+        screen.getByRole('combobox'),
+        new CustomEvent('ultraforce-input', { detail: { value: 'custom-query' } })
+      )
       expect(onQueryChange).toHaveBeenCalledWith('custom-query')
     })
 
@@ -95,14 +98,14 @@ describe('SearchInput', () => {
       const { onQueryChange, rerender } = renderInput()
       const secondChange = vi.fn()
       rerender(<SearchInput query="" onQueryChange={secondChange} onKeyDown={vi.fn()} sfHost={null} />)
-      fireEvent(screen.getByRole('textbox'), new CustomEvent('ultraforce-input', { detail: { value: 'v2' } }))
+      fireEvent(screen.getByRole('combobox'), new CustomEvent('ultraforce-input', { detail: { value: 'v2' } }))
       expect(onQueryChange).not.toHaveBeenCalled()
       expect(secondChange).toHaveBeenCalledWith('v2')
     })
 
     it('uses an empty string when the custom event has no detail value', () => {
       const { onQueryChange } = renderInput()
-      fireEvent(screen.getByRole('textbox'), new CustomEvent('ultraforce-input'))
+      fireEvent(screen.getByRole('combobox'), new CustomEvent('ultraforce-input'))
       expect(onQueryChange).toHaveBeenCalledWith('')
     })
   })
@@ -123,7 +126,7 @@ describe('SearchInput', () => {
 
     it('focuses the input on mount and exposes an accessible name', () => {
       renderInput()
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       expect(document.activeElement).toBe(input)
       expect(input).toHaveAttribute('aria-label', 'Search Salesforce metadata')
     })

@@ -67,7 +67,37 @@
     ],
     "storage": {
       "managed_schema": "/managed_schema.json"
-    }
+    },
+    "web_accessible_resources": [
+      {
+        "resources": ["assets/fonts/inter-latin.woff2", "assets/fonts/inter-latin-ext.woff2"],
+        "matches": [
+          "https://*.salesforce.com/*",
+          "https://*.visual.force.com/*",
+          "https://*.visualforce.com/*",
+          "https://*.lightning.force.com/*",
+          "https://*.my.salesforce.com/*",
+          "https://*.salesforce-setup.com/*",
+          "https://*.force.com/*",
+          "https://*.my.salesforce-sites.com/*",
+          "https://*.salesforce-communities.com/*",
+          "https://*.sandbox.my.salesforce.com/*",
+          "https://*.scratch.my.salesforce.com/*",
+          "https://*.sfcrmapps.cn/*",
+          "https://*.lightning.sfcrmapps.cn/*",
+          "https://*.visual.sfcrmapps.cn/*",
+          "https://*.my.sfcrmapps.cn/*",
+          "https://*.sandbox.my.sfcrmapps.cn/*",
+          "https://*.sfcrmproducts.cn/*",
+          "https://*.lightning.sfcrmproducts.cn/*",
+          "https://*.visual.sfcrmproducts.cn/*",
+          "https://*.my.sfcrmproducts.cn/*",
+          "https://*.sandbox.my.sfcrmproducts.cn/*",
+          "https://*.setup.sfcrmproducts.cn/*",
+          "https://*.setup.sfcrmapps.cn/*"
+        ]
+      }
+    ]
   },
   "dependencies": {
     "minisearch": "^7.2.0",
