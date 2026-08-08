@@ -91,6 +91,9 @@ jobs:
       - name: Build Extension
         run: pnpm build
 
+      - name: Verify Managed Schema Shipped
+        run: node scripts/verify-managed-schema.mjs
+
       - name: Package Extension
         run: pnpm package
 

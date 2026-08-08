@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { useSettingsStore, SETTINGS_DEFAULTS, applyManagedPolicy } from './settings-store'
+import { useSettingsStore, SETTINGS_DEFAULTS, applyManagedPolicy, resetUserValuesCache } from './settings-store'
 import { readManagedPolicy, subscribeManagedPolicy } from '../lib/managed-policy'
+import { STORAGE_KEYS } from '../lib/storage-service'
 
 // vitest-chrome does not type chrome storage areas as mocks; tests are excluded
 // from tsc (tsconfig.json) and these casts are test-only
@@ -9,6 +10,11 @@ const localGet = chrome.storage.local.get as unknown as ReturnType<typeof vi.fn>
 const localSet = chrome.storage.local.set as unknown as ReturnType<typeof vi.fn>
 const localRemove = chrome.storage.local.remove as unknown as ReturnType<typeof vi.fn>
 const storeState = useSettingsStore.getState
+
+// Persist's write-through is fire-and-forget and the storage adapter awaits a
+// read before writing, so the actual chrome.storage.local.set lands on a later
+// microtask. Flush before asserting on the setItem payload.
+const flushStorageWrites = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('settings-store', () => {
   beforeEach(() => {
@@ -25,6 +31,7 @@ describe('settings-store', () => {
     // Reset the managed-policy module cache so tests do not leak policy
     managedGet.mockReset()
     await readManagedPolicy()
+    resetUserValuesCache()
   })
 
   describe('defaults', () => {
@@ -188,6 +195,105 @@ describe('settings-store', () => {
 
       useSettingsStore.getState().setNavigationMode('lightning')
       expect(useSettingsStore.getState().navigationMode).toBe('lightning')
+    })
+  })
+
+  describe('managed policy storage isolation', () => {
+    it('partialize excludes policy-controlled keys from the persisted payload', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+
+      const partialize = useSettingsStore.persist.getOptions().partialize!
+      const payload = partialize(useSettingsStore.getState())
+      expect(payload).not.toHaveProperty('navigationMode')
+      expect(payload).toHaveProperty('shortcutKey')
+      expect(payload).toHaveProperty('hideManagedPackage')
+    })
+
+    it('never writes the policy value over the user stored value (setItem payload check)', async () => {
+      // User's own value sits in local storage from before the policy arrived
+      localGet.mockResolvedValue({ [STORAGE_KEYS.SEARCH_SETTINGS]: { navigationMode: 'auto', shortcutKey: 'b' } })
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+      await flushStorageWrites()
+
+      const lastSet = localSet.mock.calls.at(-1)?.[0] as Record<string, Record<string, unknown>>
+      const payload = lastSet[STORAGE_KEYS.SEARCH_SETTINGS]
+      // What reaches local storage is the user value, not the policy value
+      expect(payload.navigationMode).toBe('auto')
+      expect(payload.shortcutKey).toBe('b')
+      // While the effective in-memory state shows the policy value
+      expect(useSettingsStore.getState().navigationMode).toBe('classic')
+    })
+
+    it('a user write to an unrelated setting also preserves the stored user value', async () => {
+      localGet.mockResolvedValue({ [STORAGE_KEYS.SEARCH_SETTINGS]: { navigationMode: 'auto', shortcutKey: 'b' } })
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+      await flushStorageWrites()
+      localSet.mockClear()
+
+      useSettingsStore.getState().updateSettings({ shortcutKey: 'k' })
+      await flushStorageWrites()
+
+      const lastSet = localSet.mock.calls.at(-1)?.[0] as Record<string, Record<string, unknown>>
+      expect(lastSet[STORAGE_KEYS.SEARCH_SETTINGS].navigationMode).toBe('auto')
+      expect(lastSet[STORAGE_KEYS.SEARCH_SETTINGS].shortcutKey).toBe('k')
+    })
+
+    it('removing the policy restores the user value, not the ex-policy value', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+      await flushStorageWrites()
+      // Hydration had seen the user's own stored value
+      const merge = useSettingsStore.persist.getOptions().merge!
+      merge({ navigationMode: 'auto', shortcutKey: 'm' }, { ...SETTINGS_DEFAULTS } as unknown as ReturnType<
+        typeof storeState
+      >)
+      expect(useSettingsStore.getState().navigationMode).toBe('classic')
+
+      // Admin removes the policy
+      managedGet.mockResolvedValue({})
+      applyManagedPolicy(await readManagedPolicy())
+      await flushStorageWrites()
+
+      const state = useSettingsStore.getState()
+      expect(state.navigationMode).toBe('auto')
+      expect(state.managedKeys).toEqual([])
+      const lastSet = localSet.mock.calls.at(-1)?.[0] as Record<string, Record<string, unknown>>
+      expect(lastSet[STORAGE_KEYS.SEARCH_SETTINGS].navigationMode).toBe('auto')
+    })
+
+    it('removing the policy restores the code default when the user never chose a value', async () => {
+      managedGet.mockResolvedValue({ hideManagedPackage: false })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+      expect(useSettingsStore.getState().hideManagedPackage).toBe(false)
+
+      managedGet.mockResolvedValue({})
+      applyManagedPolicy(await readManagedPolicy())
+
+      expect(useSettingsStore.getState().hideManagedPackage).toBe(true)
+    })
+
+    it('replace=true re-injects every active policy value even when the slice omits it', async () => {
+      managedGet.mockResolvedValue({ navigationMode: 'classic' })
+      const values = await readManagedPolicy()
+      applyManagedPolicy(values)
+      const snapshot = useSettingsStore.getState()
+
+      useSettingsStore.setState({ shortcutKey: 'x' } as unknown as ReturnType<typeof storeState>, true)
+
+      const state = useSettingsStore.getState()
+      expect(state.navigationMode).toBe('classic')
+      expect(state.managedKeys).toEqual(['navigationMode'])
+      expect(state.shortcutKey).toBe('x')
+      // Restore actions and state (they live in state and replace drops them)
+      useSettingsStore.setState(snapshot)
     })
   })
 })
