@@ -78,3 +78,6 @@ playwright-report/
 .codegraph/
 # Local-only working notes (internal planning, drafts) - never publish
 notes/
+
+# Node compile cache (created by running node scripts/verifiers locally)
+node-compile-cache/
