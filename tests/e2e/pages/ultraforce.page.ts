@@ -107,6 +107,25 @@ export class UltraForcePage {
   }
 
   /**
+   * Poll the context's page list for a newly created tab, bounded by
+   * timeoutMs. Unlike waitForEvent('page'), a slow event delivery cannot turn
+   * an actually-created tab into a missed one: the page list is re-read every
+   * 100ms until the bound expires.
+   */
+  private async waitForNewPage(timeoutMs: number): Promise<Page | null> {
+    const pagesBefore = this.context.pages().length
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      const pages = this.context.pages()
+      if (pages.length > pagesBefore) {
+        return pages[pages.length - 1]
+      }
+      await this.page.waitForTimeout(100)
+    }
+    return null
+  }
+
+  /**
    * Search, wait for a highlighted result, then navigate in a new tab.
    * Returns the new tab URL and closes the new tab.
    *
@@ -121,19 +140,7 @@ export class UltraForcePage {
     await this.openModal()
     await this.clearAndType(command)
     await this.waitForSelectedResult(timeoutMs)
-
-    // Listen for new page event before pressing Enter
-    const newPagePromise = this.context.waitForEvent('page', { timeout: 5000 }).catch(() => null)
-    await this.page.keyboard.press('Enter')
-
-    const newPage = await newPagePromise
-    if (newPage) {
-      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
-      const url = newPage.url()
-      await newPage.close()
-      return { opened: true, url }
-    }
-    return { opened: false, url: '' }
+    return this.pressEnterAndWaitForNewTab()
   }
 
   /**
@@ -191,12 +198,15 @@ export class UltraForcePage {
     return this.pressEnterAndWaitForNewTab()
   }
 
-  /** Press Enter on the currently selected result and wait for a new tab to open */
-  async pressEnterAndWaitForNewTab(): Promise<{ opened: boolean; url: string }> {
-    const newPagePromise = this.context.waitForEvent('page', { timeout: 5000 }).catch(() => null)
+  /**
+   * Press Enter on the currently selected result and wait for a new tab to
+   * open. timeoutMs bounds the page-list poll - the tab is detected by state,
+   * not by the 'page' event, so a slow event delivery under load cannot turn
+   * an opened tab into a reported failure.
+   */
+  async pressEnterAndWaitForNewTab(timeoutMs: number = 10000): Promise<{ opened: boolean; url: string }> {
     await this.page.keyboard.press('Enter')
-
-    const newPage = await newPagePromise
+    const newPage = await this.waitForNewPage(timeoutMs)
     if (newPage) {
       await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
       const url = newPage.url()
