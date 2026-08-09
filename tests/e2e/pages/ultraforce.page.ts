@@ -1,4 +1,4 @@
-import { type Page, type BrowserContext } from '@playwright/test'
+import { expect, type Page, type BrowserContext } from '@playwright/test'
 
 export class UltraForcePage {
   constructor(
@@ -9,7 +9,11 @@ export class UltraForcePage {
 
   async openModal() {
     await this.page.keyboard.press('Meta+b')
-    await this.page.waitForTimeout(1000)
+    // The modal is usable only once its input is mounted; typing earlier would
+    // be swallowed by the page (the keyboard shield intercepts it). Waiting on
+    // the element is the real condition - a fixed sleep would let an open
+    // failure surface later, in unrelated assertions.
+    await this.page.locator('[data-ultraforce-input]').waitFor({ state: 'visible', timeout: 5000 })
   }
 
   async closeModal() {
@@ -26,7 +30,10 @@ export class UltraForcePage {
   async clearAndType(text: string) {
     await this.clearInput()
     await this.page.keyboard.type(text)
-    await this.page.waitForTimeout(1500)
+    // No settle sleep here on purpose: typing is complete when this returns,
+    // and whether the search resolved is a condition callers must wait on
+    // explicitly (waitForSelectedResult / locator visibility), not a fixed
+    // number of milliseconds.
   }
 
   async typeText(text: string) {
@@ -61,17 +68,59 @@ export class UltraForcePage {
     })
   }
 
+  /** Locator for the currently highlighted result row (the row Enter would navigate). */
+  private selectedRow() {
+    return this.page.locator('[data-ultraforce-result-item][data-selected="true"]').first()
+  }
+
+  /** Name text of the highlighted result row, or null when no row is rendered. */
+  private async selectedResultName(): Promise<string | null> {
+    const row = this.selectedRow()
+    if (!(await row.isVisible().catch(() => false))) return null
+    return (await row.locator('.result-name').first().textContent().catch(() => null)) ?? null
+  }
+
   /**
-   * Search, select result, and navigate in a new tab.
+   * Waits until the results list has rendered a highlighted row - the real
+   * readiness condition for pressing Enter. Bounded by timeoutMs; throws with
+   * the locator's own timeout message when the search never resolves.
+   */
+  async waitForSelectedResult(timeoutMs: number = 5000): Promise<void> {
+    await this.selectedRow().waitFor({ state: 'visible', timeout: timeoutMs })
+  }
+
+  /**
+   * Waits until the highlighted row's name differs from `previousName`. Used
+   * after Tab autocomplete rewrote the query: the old result set stays
+   * rendered until the new search lands, and Enter must not fire on it.
+   */
+  async waitForSelectedResultChange(previousName: string | null, timeoutMs: number = 5000): Promise<void> {
+    await expect
+      .poll(
+        async () => {
+          const name = await this.selectedResultName()
+          return name !== null && name !== previousName
+        },
+        { timeout: timeoutMs, message: `highlighted result did not change after Tab (was: ${String(previousName)})` }
+      )
+      .toBe(true)
+  }
+
+  /**
+   * Search, wait for a highlighted result, then navigate in a new tab.
    * Returns the new tab URL and closes the new tab.
+   *
+   * timeoutMs bounds the readiness wait for the result list - it is not a
+   * sleep. Enter is only pressed once a row is actually highlighted, so a slow
+   * org search can never turn Enter into a no-op.
    */
   async searchAndNavigateNewTab(
     command: string,
-    waitMs: number = 3000
+    timeoutMs: number = 5000
   ): Promise<{ opened: boolean; url: string }> {
     await this.openModal()
     await this.clearAndType(command)
-    await this.page.waitForTimeout(waitMs)
+    await this.waitForSelectedResult(timeoutMs)
 
     // Listen for new page event before pressing Enter
     const newPagePromise = this.context.waitForEvent('page', { timeout: 5000 }).catch(() => null)
@@ -89,12 +138,13 @@ export class UltraForcePage {
 
   /**
    * Navigate to a setup shortcut and return the new tab URL.
+   * timeoutMs bounds the readiness wait (see searchAndNavigateNewTab).
    */
   async navigateSetupShortcut(
     shortcutName: string,
-    waitMs: number = 3000
+    timeoutMs: number = 5000
   ): Promise<{ opened: boolean; url: string }> {
-    return this.searchAndNavigateNewTab(`:g ${shortcutName}`, waitMs)
+    return this.searchAndNavigateNewTab(`:g ${shortcutName}`, timeoutMs)
   }
 
   /** Ensure the modal is closed, regardless of current state */
@@ -130,14 +180,14 @@ export class UltraForcePage {
   }
 
   /**
-   * Tab on the currently selected result, then press Enter to navigate.
-   * Returns the new tab URL (if opened) for assertion.
+   * Tab-autocomplete the selected result (dot-notation), then press Enter to
+   * navigate the NEW result set. timeoutMs bounds the wait for the new
+   * highlighted row; Enter never fires on the stale pre-Tab list.
    */
-  async tabThenNavigateNewTab(
-    waitAfterTab: number = 3000
-  ): Promise<{ opened: boolean; url: string }> {
+  async tabThenNavigateNewTab(timeoutMs: number = 5000): Promise<{ opened: boolean; url: string }> {
+    const selectedBefore = await this.selectedResultName()
     await this.page.keyboard.press('Tab')
-    await this.page.waitForTimeout(waitAfterTab)
+    await this.waitForSelectedResultChange(selectedBefore, timeoutMs)
     return this.pressEnterAndWaitForNewTab()
   }
 
@@ -194,7 +244,7 @@ export class UltraForcePage {
     const row = this.rowByText(text)
     await row.hover()
     await row.getByTitle(/favorites/i).click()
-    await this.wait(400)
+    // No settle sleep: the caller asserts the resulting state with expect.poll.
   }
 
   /**
@@ -239,7 +289,7 @@ export class UltraForcePage {
     const item = this.homeFavoriteItems().filter({ hasText: text }).first()
     await item.hover()
     await item.getByTitle('Unpin').click()
-    await this.wait(400)
+    // No settle sleep: the caller asserts the resulting state with expect.poll.
   }
 
   // --- Settings panel helpers (open-shadow build) ---
@@ -248,7 +298,6 @@ export class UltraForcePage {
   async openSettings(): Promise<void> {
     await this.page.locator('[data-ultraforce-settings-button]').click()
     await this.page.locator('[data-ultraforce-settings]').waitFor({ state: 'visible', timeout: 5000 })
-    await this.wait(400)
   }
 
   /** The Settings panel root locator. */
@@ -276,19 +325,19 @@ export class UltraForcePage {
     await form.getByPlaceholder('e.g. My Logs').fill(description)
     await form.locator('.command-textarea').fill(soql)
     await form.getByRole('button', { name: 'Save' }).click()
-    await this.wait(400)
+    // No settle sleep: the caller asserts the resulting state with expect.poll.
   }
 
   /** Click "+ Add Command" to reveal the new-command form. */
   async clickAddCommand(): Promise<void> {
     await this.settingsPanel().getByRole('button', { name: '+ Add Command' }).click()
-    await this.wait(300)
+    // No settle sleep: the subsequent fill() auto-waits for the form to render.
   }
 
   /** Delete the custom command whose description contains the given text (accepts confirm dialog). */
   async deleteCommandByDescription(description: string): Promise<void> {
     const row = this.customCommandRows().filter({ hasText: description }).first()
     await row.getByTitle('Delete', { exact: true }).click()
-    await this.wait(400)
+    // No settle sleep: the caller asserts the resulting state with expect.poll.
   }
 }

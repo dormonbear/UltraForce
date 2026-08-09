@@ -34,7 +34,6 @@ test.describe('Result inline actions - CustomObject', () => {
   test('Fields action opens FieldsAndRelationships setup page', async () => {
     await uf.openModal()
     await uf.clearAndType(':o ASR_Hotel')
-    await uf.wait(2000)
 
     // The row name renders the object label ("Hotel"); the API name ASR_Hotel
     // appears elsewhere in the row, so match the row by its full text content.
@@ -49,7 +48,6 @@ test.describe('Result inline actions - CustomObject', () => {
   test('Page Layouts action opens PageLayouts setup page', async () => {
     await uf.openModal()
     await uf.clearAndType(':o ASR_Hotel')
-    await uf.wait(2000)
 
     const result = await uf.clickActionOnRow('ASR_Hotel', 'Page Layouts')
     expect(result.opened).toBe(true)
@@ -59,7 +57,6 @@ test.describe('Result inline actions - CustomObject', () => {
   test('Record Types action opens RecordTypes setup page', async () => {
     await uf.openModal()
     await uf.clearAndType(':o ASR_Hotel')
-    await uf.wait(2000)
 
     const result = await uf.clickActionOnRow('ASR_Hotel', 'Record Types')
     expect(result.opened).toBe(true)

@@ -35,13 +35,18 @@ test.describe('Settings UI custom command CRUD', () => {
     await uf.clickAddCommand()
     await uf.fillCommandForm('zz', 'E2E Cmd', "SELECT Id, Name FROM Account WHERE Name LIKE '%{query}%'")
 
-    expect(await uf.customCommandDescriptions()).toContain('E2E Cmd')
+    // The saved row appears after the store round-trip; poll the real state.
+    await expect
+      .poll(() => uf.customCommandDescriptions(), { timeout: 5000 })
+      .toContain('E2E Cmd')
 
     // 2. Delete it (accepting the window.confirm dialog) and assert it is gone.
     uf.rawPage.once('dialog', (d) => d.accept())
     await uf.deleteCommandByDescription('E2E Cmd')
 
-    expect(await uf.customCommandDescriptions()).not.toContain('E2E Cmd')
+    await expect
+      .poll(() => uf.customCommandDescriptions(), { timeout: 5000 })
+      .not.toContain('E2E Cmd')
   })
 
   test('rejects a SOQL query missing the {query} placeholder', async () => {
@@ -53,6 +58,8 @@ test.describe('Settings UI custom command CRUD', () => {
 
     const panel = uf.settingsPanel()
     await expect(panel.locator('.command-form-error')).toHaveText('SOQL must contain {query} placeholder')
-    expect(await uf.customCommandDescriptions()).not.toContain('No Placeholder')
+    await expect
+      .poll(() => uf.customCommandDescriptions(), { timeout: 5000 })
+      .not.toContain('No Placeholder')
   })
 })

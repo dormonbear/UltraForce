@@ -27,7 +27,9 @@ test.describe('Features', () => {
   test('search fields with dot notation', async () => {
     await uf.openModal()
     await uf.clearAndType('ASR_Hotel__c.')
-    await uf.wait(2000)
+    // Wait for the field search to resolve into a highlighted row; the
+    // resultNames() read below would otherwise race the org search.
+    await uf.waitForSelectedResult()
     const names = await uf.resultNames()
     await uf.closeModal()
     // Regression: escapeSoql over-escaped '_' in the '=' field query, so fields
@@ -56,7 +58,7 @@ test.describe('Features', () => {
 
     // Tab to autocomplete into "ASR_xxx__c." (field search)
     // Then navigate a field result to verify fields loaded
-    const result = await uf.tabThenNavigateNewTab(3000)
+    const result = await uf.tabThenNavigateNewTab()
     expect(result.opened).toBe(true)
     expect(result.url).toMatch(/\.(salesforce|force)\.com/)
     await uf.closeModal()
@@ -80,7 +82,9 @@ test.describe('Features', () => {
   test('Profile sub-menu Enter navigates to Profile setup page', async () => {
     await uf.openModal()
     await uf.clearAndType(':p System Administrator.')
-    await uf.wait(2000)
+    // Sub-menu results must be rendered before arrow keys can land on a
+    // navigable ProfileSetupLink item.
+    await uf.waitForSelectedResult()
 
     // Arrow down to a navigable ProfileSetupLink item
     for (let i = 0; i < 8; i++) {
