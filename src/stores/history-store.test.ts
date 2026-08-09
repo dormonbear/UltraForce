@@ -273,6 +273,59 @@ describe('history-store', () => {
       expect(useHistoryStore.getState().items).toEqual([])
     })
   })
+
+  describe('storage quota failure (defect proof)', () => {
+    const HOST = 'orgA.my.salesforce.com'
+    const scopedKey = `ultraforce_history__${HOST}`
+
+    it('defect: quota-rejected visit is silently lost while in-memory state claims success', async () => {
+      await setHistoryOrgScope(HOST)
+
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+
+      const writePromise = useHistoryStore.getState().recordVisit({
+        id: '001xxx',
+        name: 'Acme',
+        type: 'Account',
+        url: `https://${HOST}/001xxx`
+      })
+
+      // The UI shows the visit immediately (zustand state was updated before the write)...
+      expect(useHistoryStore.getState().items.map((i) => i.id)).toContain('001xxx')
+      // ...but the write rejected and nothing landed in storage
+      await expect(writePromise).rejects.toThrow(/QUOTA/)
+      expect(fakeStore.get(scopedKey)).toBeUndefined()
+
+      // Simulate a reload: re-scope + rehydrate reads only what was persisted
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST)
+      expect(useHistoryStore.getState().items).toEqual([])
+    })
+
+    it('defect: quota-rejected history removal is silently lost (entry returns after reload)', async () => {
+      await setHistoryOrgScope(HOST)
+      useHistoryStore.getState().recordVisit({
+        id: '001xxx',
+        name: 'Acme',
+        type: 'Account',
+        url: `https://${HOST}/001xxx`
+      })
+      await new Promise((r) => setTimeout(r, 0))
+      expect(fakeStore.get(scopedKey)).toBeDefined()
+
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      const writePromise = useHistoryStore.getState().removeItem('001xxx')
+
+      // In-memory state says it was removed...
+      expect(useHistoryStore.getState().items).toEqual([])
+      await expect(writePromise).rejects.toThrow(/QUOTA/)
+
+      // ...but after a reload the entry is back
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST)
+      expect(useHistoryStore.getState().items.map((i) => i.id)).toContain('001xxx')
+    })
+  })
 })
 
 describe('frecency', () => {

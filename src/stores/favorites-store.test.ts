@@ -259,4 +259,53 @@ describe('favorites-store', () => {
       expect(useFavoritesStore.getState().items).toEqual([])
     })
   })
+
+  describe('storage quota failure (defect proof)', () => {
+    const HOST = 'orgA.my.salesforce.com'
+    const scopedKey = `ultraforce_favorites__${HOST}`
+
+    it('defect: quota-rejected pin is silently lost while in-memory state claims success', async () => {
+      await setFavoritesOrgScope(HOST)
+
+      // chrome.storage.local.set rejects: the metadata cache has consumed the 10 MB quota
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+
+      const writePromise = useFavoritesStore.getState().addFavorite({
+        id: 'pin-1',
+        name: 'Pinned',
+        type: 'User',
+        url: 'u'
+      })
+
+      // The UI shows the pin immediately (zustand state was updated before the write)...
+      expect(useFavoritesStore.getState().items.map((i) => i.id)).toContain('pin-1')
+      // ...but the write rejected and nothing landed in storage
+      await expect(writePromise).rejects.toThrow(/QUOTA/)
+      expect(fakeStore.get(scopedKey)).toBeUndefined()
+
+      // Simulate a reload: re-scope + rehydrate reads only what was persisted
+      _resetFavoritesOrgScope()
+      await setFavoritesOrgScope(HOST)
+      expect(useFavoritesStore.getState().items).toEqual([])
+    })
+
+    it('defect: quota-rejected unpin is silently lost (pin reappears after reload)', async () => {
+      await setFavoritesOrgScope(HOST)
+      useFavoritesStore.getState().addFavorite({ id: 'pin-1', name: 'Pinned', type: 'User', url: 'u' })
+      await new Promise((r) => setTimeout(r, 0))
+      expect(fakeStore.get(scopedKey)).toBeDefined()
+
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      const writePromise = useFavoritesStore.getState().removeFavorite('pin-1')
+
+      // In-memory state says it was unpinned...
+      expect(useFavoritesStore.getState().items).toEqual([])
+      await expect(writePromise).rejects.toThrow(/QUOTA/)
+
+      // ...but after a reload the pin is back
+      _resetFavoritesOrgScope()
+      await setFavoritesOrgScope(HOST)
+      expect(useFavoritesStore.getState().items.map((i) => i.id)).toContain('pin-1')
+    })
+  })
 })
