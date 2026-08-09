@@ -106,23 +106,75 @@ export class UltraForcePage {
       .toBe(true)
   }
 
+  /** Service worker tab snapshot: ids of every tab in the extension session. */
+  private async swTabIds(): Promise<number[] | null> {
+    const sw = this.context.serviceWorkers()[0]
+    if (!sw) return null
+    try {
+      return await sw.evaluate(async () => (await chrome.tabs.query({})).map((t) => t.id ?? -1))
+    } catch {
+      return null
+    }
+  }
+
+  /** Service worker tab snapshot with urls (browser-level ground truth). */
+  private async swTabs(): Promise<{ id: number; url: string | undefined }[] | null> {
+    const sw = this.context.serviceWorkers()[0]
+    if (!sw) return null
+    try {
+      return await sw.evaluate(async () =>
+        (await chrome.tabs.query({})).map((t) => ({ id: t.id ?? -1, url: t.url }))
+      )
+    } catch {
+      return null
+    }
+  }
+
+  /** Close a tab that Playwright never materialized, via the service worker. */
+  private async closeTabViaSw(tabId: number): Promise<void> {
+    const sw = this.context.serviceWorkers()[0]
+    if (!sw) return
+    await sw.evaluate(async (id) => chrome.tabs.remove(id), tabId).catch((error) =>
+      console.log('[E2E-INFRA] orphan tab close failed', error)
+    )
+  }
+
   /**
-   * Poll the context's page list for a newly created tab, bounded by
-   * timeoutMs. Unlike waitForEvent('page'), a slow event delivery cannot turn
-   * an actually-created tab into a missed one: the page list is re-read every
-   * 100ms until the bound expires.
+   * Detect the tab a navigation opened. Primary channel: the context's page
+   * list, polled every 100ms up to timeoutMs. That channel relies on CDP
+   * target discovery, which periodically loses a target (the browser creates
+   * the tab, Playwright never hears about it). On timeout, cross-check with
+   * the extension service worker's chrome.tabs.query - browser-level ground
+   * truth on a separate channel. A recovery is logged with a distinctive tag
+   * so the CDP miss rate stays visible and countable. Returns a page when the
+   * CDP channel saw it, recoveredUrl when the SW proved the tab exists, and
+   * neither only when both channels agree no tab was opened.
    */
-  private async waitForNewPage(timeoutMs: number): Promise<Page | null> {
+  private async waitForNewPage(timeoutMs: number): Promise<{ page: Page | null; recoveredUrl: string | null }> {
     const pagesBefore = this.context.pages().length
+    const tabIdsBefore = await this.swTabIds()
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
       const pages = this.context.pages()
       if (pages.length > pagesBefore) {
-        return pages[pages.length - 1]
+        return { page: pages[pages.length - 1], recoveredUrl: null }
       }
       await this.page.waitForTimeout(100)
     }
-    return null
+    if (tabIdsBefore === null) {
+      // No SW baseline means no cross-check: fail honestly rather than guess.
+      console.log('[E2E-INFRA-CDP-MISS] cross-check unavailable (no service worker) - failing honestly')
+      return { page: null, recoveredUrl: null }
+    }
+    const tabsAfter = await this.swTabs()
+    const newTab = tabsAfter?.find((t) => !tabIdsBefore.includes(t.id))
+    if (newTab && newTab.id !== -1) {
+      console.log(`[E2E-INFRA-CDP-MISS] recovered via SW ground truth: ${newTab.url ?? '(url unknown)'}`)
+      await this.closeTabViaSw(newTab.id)
+      return { page: null, recoveredUrl: newTab.url ?? '' }
+    }
+    console.log('[E2E-INFRA-CDP-MISS] SW ground truth confirms no tab was opened - real failure')
+    return { page: null, recoveredUrl: null }
   }
 
   /**
@@ -200,18 +252,23 @@ export class UltraForcePage {
 
   /**
    * Press Enter on the currently selected result and wait for a new tab to
-   * open. timeoutMs bounds the page-list poll - the tab is detected by state,
-   * not by the 'page' event, so a slow event delivery under load cannot turn
-   * an opened tab into a reported failure.
+   * open. timeoutMs bounds the observation; the tab is detected by page-list
+   * poll with a service-worker ground-truth cross-check on timeout (see
+   * waitForNewPage), so an opened tab can never be reported as a failure.
    */
   async pressEnterAndWaitForNewTab(timeoutMs: number = 10000): Promise<{ opened: boolean; url: string }> {
     await this.page.keyboard.press('Enter')
-    const newPage = await this.waitForNewPage(timeoutMs)
-    if (newPage) {
-      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
-      const url = newPage.url()
-      await newPage.close()
+    const { page, recoveredUrl } = await this.waitForNewPage(timeoutMs)
+    if (page) {
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+      const url = page.url()
+      await page.close()
       return { opened: true, url }
+    }
+    if (recoveredUrl !== null) {
+      // SW ground truth proved the tab exists; Playwright's CDP channel lost
+      // it. The url below is the browser's own record of the tab.
+      return { opened: true, url: recoveredUrl }
     }
     return { opened: false, url: '' }
   }
@@ -259,20 +316,23 @@ export class UltraForcePage {
 
   /**
    * Hover the result row containing `text`, click the inline action button with
-   * `actionTitle`, and capture the new tab the action opens. Closes the new tab.
+   * `actionTitle`, and capture the new tab the action opens. Closes the new
+   * tab. Same SW ground-truth cross-check as pressEnterAndWaitForNewTab.
    */
   async clickActionOnRow(text: string, actionTitle: string): Promise<{ opened: boolean; url: string }> {
     const row = this.rowByText(text)
     await row.hover()
-    const newPagePromise = this.context.waitForEvent('page', { timeout: 8000 }).catch(() => null)
     await row.getByTitle(actionTitle, { exact: true }).click()
 
-    const newPage = await newPagePromise
-    if (newPage) {
-      await newPage.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
-      const url = newPage.url()
-      await newPage.close()
+    const { page, recoveredUrl } = await this.waitForNewPage(8000)
+    if (page) {
+      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {})
+      const url = page.url()
+      await page.close()
       return { opened: true, url }
+    }
+    if (recoveredUrl !== null) {
+      return { opened: true, url: recoveredUrl }
     }
     return { opened: false, url: '' }
   }
