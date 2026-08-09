@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useFavoritesStore, setFavoritesOrgScope, _resetFavoritesOrgScope, type FavoriteItem } from './favorites-store'
+import { usePersistErrorStore, _resetPersistErrors } from '~stores/persist-error-store'
 
 const fakeStore = new Map<string, unknown>()
 const storageGetMock = vi.fn(async (key: string) => fakeStore.get(key))
@@ -43,6 +44,7 @@ describe('favorites-store', () => {
     storageSetMock.mockClear()
     storageRemoveMock.mockClear()
     _resetFavoritesOrgScope()
+    _resetPersistErrors()
   })
 
   describe('addFavorite', () => {
@@ -260,14 +262,14 @@ describe('favorites-store', () => {
     })
   })
 
-  describe('storage quota failure (defect proof)', () => {
+  describe('storage quota failure', () => {
     const HOST = 'orgA.my.salesforce.com'
     const scopedKey = `ultraforce_favorites__${HOST}`
 
-    it('defect: quota-rejected pin is silently lost while in-memory state claims success', async () => {
+    it('surfaces a quota-rejected pin: memory shows it, storage misses it, error is reported', async () => {
       await setFavoritesOrgScope(HOST)
 
-      // chrome.storage.local.set rejects: the metadata cache has consumed the 10 MB quota
+      // chrome.storage.local.set rejects: the metadata cache has consumed the quota
       storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
 
       const writePromise = useFavoritesStore.getState().addFavorite({
@@ -277,19 +279,22 @@ describe('favorites-store', () => {
         url: 'u'
       })
 
-      // The UI shows the pin immediately (zustand state was updated before the write)...
+      // zustand updated the in-memory state before the write: the UI shows the pin...
       expect(useFavoritesStore.getState().items.map((i) => i.id)).toContain('pin-1')
-      // ...but the write rejected and nothing landed in storage
-      await expect(writePromise).rejects.toThrow(/QUOTA/)
+      // ...the action resolves cleanly (the adapter caught the failure, no unhandled rejection)...
+      await expect(writePromise).resolves.toBeUndefined()
+      // ...nothing landed in storage...
       expect(fakeStore.get(scopedKey)).toBeUndefined()
+      // ...and the failure is surfaced, not silent
+      expect(usePersistErrorStore.getState().errors.favorites).toMatch(/could not be saved/i)
 
-      // Simulate a reload: re-scope + rehydrate reads only what was persisted
+      // A reload loses the pin - the banner warning is the user's only signal
       _resetFavoritesOrgScope()
       await setFavoritesOrgScope(HOST)
       expect(useFavoritesStore.getState().items).toEqual([])
     })
 
-    it('defect: quota-rejected unpin is silently lost (pin reappears after reload)', async () => {
+    it('surfaces a quota-rejected unpin: memory hides it, storage keeps it, error is reported', async () => {
       await setFavoritesOrgScope(HOST)
       useFavoritesStore.getState().addFavorite({ id: 'pin-1', name: 'Pinned', type: 'User', url: 'u' })
       await new Promise((r) => setTimeout(r, 0))
@@ -300,12 +305,24 @@ describe('favorites-store', () => {
 
       // In-memory state says it was unpinned...
       expect(useFavoritesStore.getState().items).toEqual([])
-      await expect(writePromise).rejects.toThrow(/QUOTA/)
-
-      // ...but after a reload the pin is back
+      await expect(writePromise).resolves.toBeUndefined()
+      // ...the persisted copy survives (pin returns after reload), and the user is warned
+      expect(usePersistErrorStore.getState().errors.favorites).toMatch(/could not be saved/i)
       _resetFavoritesOrgScope()
       await setFavoritesOrgScope(HOST)
       expect(useFavoritesStore.getState().items.map((i) => i.id)).toContain('pin-1')
+    })
+
+    it('clears the reported error once a later write succeeds', async () => {
+      await setFavoritesOrgScope(HOST)
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      await useFavoritesStore.getState().addFavorite({ id: 'pin-1', name: 'Pinned', type: 'User', url: 'u' })
+      expect(usePersistErrorStore.getState().errors.favorites).toBeDefined()
+
+      // The next write succeeds (e.g. storage was freed) and clears the warning
+      await useFavoritesStore.getState().addFavorite({ id: 'pin-2', name: 'Pinned 2', type: 'User', url: 'u2' })
+      expect(usePersistErrorStore.getState().errors.favorites).toBeUndefined()
+      expect(fakeStore.get(scopedKey)).toBeDefined()
     })
   })
 })

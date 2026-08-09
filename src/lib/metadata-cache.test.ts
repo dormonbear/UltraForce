@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { MetadataCache } from './metadata-cache'
+import { MetadataCache, CACHE_CONFIG, CHROME_STORAGE_QUOTA_BYTES } from './metadata-cache'
 
 describe('MetadataCache', () => {
   let cache: MetadataCache
@@ -29,6 +29,24 @@ describe('MetadataCache', () => {
       const instance1 = MetadataCache.getInstance()
       const instance2 = MetadataCache.getInstance()
       expect(instance1).toBe(instance2)
+    })
+  })
+
+  describe('storage budget', () => {
+    it('caps the metadata cache below the total storage quota (never the whole pool)', () => {
+      // chrome.storage.local without unlimitedStorage is 10 MiB. The cache must
+      // not claim all of it: favorites/history/settings share the same pool and
+      // are not re-fetchable the way cache entries are.
+      expect(CACHE_CONFIG.MAX_CACHE_SIZE).toBeLessThan(CHROME_STORAGE_QUOTA_BYTES)
+      expect(CACHE_CONFIG.MAX_CACHE_SIZE).toBeLessThanOrEqual(CHROME_STORAGE_QUOTA_BYTES / 2)
+    })
+
+    it('leaves at least half the quota free for user data even after eviction', () => {
+      // cleanupIfNeeded evicts down to 80% of the cap; that steady state must
+      // still leave >= 50% of the pool for user data (measured worst case for
+      // history/favorites across 10 orgs is ~0.4 MiB)
+      const steadyStateCache = CACHE_CONFIG.MAX_CACHE_SIZE * 0.8
+      expect(CHROME_STORAGE_QUOTA_BYTES - steadyStateCache).toBeGreaterThanOrEqual(CHROME_STORAGE_QUOTA_BYTES / 2)
     })
   })
 

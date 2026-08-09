@@ -12,6 +12,7 @@ import {
   storageRemove
 } from '~lib/storage-service'
 import { logger } from '~lib/logger'
+import { reportPersistError, clearPersistError } from '~stores/persist-error-store'
 
 export interface FavoriteItem {
   id: string
@@ -44,6 +45,10 @@ type FavoritesStore = FavoritesState & FavoritesActions
 const MAX_FAVORITES = 20
 
 // Writes/reads no-op while persist name is still the pending placeholder (sfHost unknown).
+// A failed write (e.g. chrome.storage quota) is caught here: zustand already
+// updated the in-memory state, so without this the user sees the pin appear
+// and silently lose it on reload. The error is reported to the persist-error
+// store and surfaced by the SearchModal banner.
 const chromeFavoritesStorage: PersistStorage<Partial<FavoritesState>> = {
   getItem: async (name) => {
     if (name === PENDING_FAVORITES_KEY) return null
@@ -53,7 +58,16 @@ const chromeFavoritesStorage: PersistStorage<Partial<FavoritesState>> = {
   },
   setItem: async (name, value) => {
     if (name === PENDING_FAVORITES_KEY) return
-    await storageSet(name, value.state)
+    try {
+      await storageSet(name, value.state)
+      clearPersistError('favorites')
+    } catch (error) {
+      logger.error('favorites:persist-failed', { name, error })
+      reportPersistError(
+        'favorites',
+        'Pin could not be saved to browser storage (browser storage may be full). It will be gone after reload.'
+      )
+    }
   },
   removeItem: async (name) => {
     if (name === PENDING_FAVORITES_KEY) return

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useSettingsStore, SETTINGS_DEFAULTS, applyManagedPolicy, resetUserValuesCache } from './settings-store'
 import { readManagedPolicy, subscribeManagedPolicy } from '../lib/managed-policy'
 import { STORAGE_KEYS } from '../lib/storage-service'
+import { usePersistErrorStore, _resetPersistErrors } from '~stores/persist-error-store'
 
 // vitest-chrome does not type chrome storage areas as mocks; tests are excluded
 // from tsc (tsconfig.json) and these casts are test-only
@@ -25,6 +26,7 @@ describe('settings-store', () => {
     localSet.mockResolvedValue(undefined)
     localRemove.mockResolvedValue(undefined)
     useSettingsStore.setState(SETTINGS_DEFAULTS)
+    _resetPersistErrors()
   })
 
   afterEach(async () => {
@@ -294,6 +296,36 @@ describe('settings-store', () => {
       expect(state.shortcutKey).toBe('x')
       // Restore actions and state (they live in state and replace drops them)
       useSettingsStore.setState(snapshot)
+    })
+  })
+
+  describe('storage quota failure', () => {
+    it('reports a persist error when a settings write hits the quota', async () => {
+      localSet.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+
+      useSettingsStore.getState().updateSettings({ shortcutKey: 'k' })
+      await flushStorageWrites()
+
+      expect(usePersistErrorStore.getState().errors.settings).toMatch(/could not be saved/i)
+    })
+
+    it('resolves without surfacing when the write succeeds', async () => {
+      useSettingsStore.getState().updateSettings({ shortcutKey: 'k' })
+      await flushStorageWrites()
+
+      expect(usePersistErrorStore.getState().errors.settings).toBeUndefined()
+    })
+
+    it('clears the reported error once a later write succeeds', async () => {
+      localSet.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      useSettingsStore.getState().updateSettings({ shortcutKey: 'k' })
+      await flushStorageWrites()
+      expect(usePersistErrorStore.getState().errors.settings).toBeDefined()
+
+      useSettingsStore.getState().updateSettings({ shortcutKey: 'j' })
+      await flushStorageWrites()
+
+      expect(usePersistErrorStore.getState().errors.settings).toBeUndefined()
     })
   })
 })

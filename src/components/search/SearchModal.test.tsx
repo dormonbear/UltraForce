@@ -6,6 +6,8 @@ import type { SearchResult } from '~types'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
+import { useFavoritesStore, setFavoritesOrgScope, _resetFavoritesOrgScope } from '~stores/favorites-store'
+import { usePersistErrorStore, _resetPersistErrors, reportPersistError } from '~stores/persist-error-store'
 
 // jsdom doesn't implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
@@ -78,6 +80,8 @@ describe('SearchModal', () => {
 
     // Reset stores to defaults
     useSettingsStore.setState(SETTINGS_DEFAULTS)
+    _resetPersistErrors()
+    _resetFavoritesOrgScope()
     useSessionStore.getState().setSession('test.my.salesforce.com', true)
     useSearchStore.setState({
       isVisible: true,
@@ -98,6 +102,42 @@ describe('SearchModal', () => {
           expect.objectContaining({ error: expect.any(Error) })
         )
       })
+    })
+  })
+
+  describe('storage warning banner', () => {
+    it('is absent when no persist write has failed', () => {
+      renderModal()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('renders a warning when a persist write failed', () => {
+      reportPersistError(
+        'favorites',
+        'Pin could not be saved to browser storage (browser storage may be full). It will be gone after reload.'
+      )
+      renderModal()
+      expect(screen.getByRole('alert')).toHaveTextContent(/Pin could not be saved/i)
+    })
+
+    it('dismisses the warning via its dismiss button', () => {
+      reportPersistError(
+        'history',
+        'Recent items could not be saved to browser storage (browser storage may be full). History may be missing after reload.'
+      )
+      renderModal()
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss storage warning' }))
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(usePersistErrorStore.getState().errors).toEqual({})
+    })
+
+    it('appears end-to-end when a quota-exceeded pin write fails', async () => {
+      await setFavoritesOrgScope('orgA.my.salesforce.com')
+      chrome.storage.local.set.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      useFavoritesStore.getState().addFavorite({ id: 'pin-1', name: 'Pinned', type: 'User', url: 'u' })
+
+      renderModal()
+      expect(await screen.findByRole('alert')).toHaveTextContent(/Pin could not be saved/i)
     })
   })
 

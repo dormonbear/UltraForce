@@ -521,6 +521,43 @@ kbd {
   color: rgba(255, 255, 255, 0.8);
 }
 
+/* Storage quota warning: a persist write (favorites/history/settings) failed.
+   Rendered as the modal's bottom strip in both search and settings modes. */
+.storage-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: rgba(180, 130, 30, 0.16);
+  border-top: 1px solid rgba(230, 170, 60, 0.35);
+  color: #e8c26a;
+  font-size: 11px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.storage-warning-text {
+  flex: 1;
+}
+
+.storage-warning-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+}
+
+.storage-warning-dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 1;
+}
+
 /* Loading State */
 .loading-container {
   display: flex;

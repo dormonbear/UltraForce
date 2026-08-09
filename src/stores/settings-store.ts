@@ -11,6 +11,8 @@ import { persist } from 'zustand/middleware'
 import type { PersistStorage } from 'zustand/middleware'
 import type { NavigationMode, CustomCommand } from '~types'
 import { STORAGE_KEYS, storageGet, storageSet, storageRemove } from '~lib/storage-service'
+import { logger } from '~lib/logger'
+import { reportPersistError, clearPersistError } from '~stores/persist-error-store'
 import {
   MANAGED_POLICY_KEYS,
   getManagedPolicyValues,
@@ -87,7 +89,16 @@ const chromeSettingsStorage: PersistStorage<Partial<SettingsState>> = {
     // policy-controlled keys, and a plain replace would delete the user's own
     // stored value for those keys from local storage
     const existing = await storageGet<Record<string, unknown>>(name)
-    await storageSet(name, { ...existing, ...value.state })
+    try {
+      await storageSet(name, { ...existing, ...value.state })
+      clearPersistError('settings')
+    } catch (error) {
+      logger.error('settings:persist-failed', { name, error })
+      reportPersistError(
+        'settings',
+        'Settings could not be saved to browser storage (browser storage may be full). Changes may not persist after reload.'
+      )
+    }
   },
   removeItem: async (name) => {
     await storageRemove(name)

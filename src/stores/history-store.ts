@@ -13,6 +13,7 @@ import {
   storageRemove
 } from '~lib/storage-service'
 import { logger } from '~lib/logger'
+import { reportPersistError, clearPersistError } from '~stores/persist-error-store'
 
 export interface HistoryItem {
   id: string
@@ -64,7 +65,10 @@ export function sortByLastVisited(items: HistoryItem[]): HistoryItem[] {
 }
 
 // Writes/reads no-op while persist name is still the pending placeholder (sfHost unknown).
-// Once setHistoryOrgScope() is called the placeholder is swapped for a host-scoped key.
+// A failed write (e.g. chrome.storage quota) is caught here: zustand already
+// updated the in-memory state, so without this the visit would silently
+// vanish on reload. The error is reported to the persist-error store and
+// surfaced by the SearchModal banner.
 const chromeHistoryStorage: PersistStorage<Partial<HistoryState>> = {
   getItem: async (name) => {
     if (name === PENDING_HISTORY_KEY) return null
@@ -74,7 +78,16 @@ const chromeHistoryStorage: PersistStorage<Partial<HistoryState>> = {
   },
   setItem: async (name, value) => {
     if (name === PENDING_HISTORY_KEY) return
-    await storageSet(name, value.state)
+    try {
+      await storageSet(name, value.state)
+      clearPersistError('history')
+    } catch (error) {
+      logger.error('history:persist-failed', { name, error })
+      reportPersistError(
+        'history',
+        'Recent items could not be saved to browser storage (browser storage may be full). History may be missing after reload.'
+      )
+    }
   },
   removeItem: async (name) => {
     if (name === PENDING_HISTORY_KEY) return
