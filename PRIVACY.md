@@ -58,10 +58,12 @@ No other hosts are ever contacted. Specifically:
   org (`src/lib/auth.ts:85-87`).
 - It is **never** written to `chrome.storage`, never logged (the logger only emits error
   objects; `src/lib/logger.ts:21-36`), and never sent to any host other than your org.
-- The first 8 characters of the sid value are stored in `chrome.storage.local` as a
-  session-change fingerprint (`src/lib/unsupported-types.ts:10-13`, persisted at
-  `src/lib/unsupported-types.ts:43-49`). A sid typically begins with the org ID, so treat
-  this as org-identifying; it is not enough to impersonate a session.
+- A 32-bit FNV-1a digest of the sid value (hex, 8 characters) is stored in
+  `chrome.storage.local` as a session-change fingerprint
+  (`src/lib/unsupported-types.ts:7-28`, persisted at
+  `src/lib/unsupported-types.ts:58`). The sid is `<orgId>!<token>`; the digest is
+  session-specific (the token rotates on every login) and cannot be reversed into
+  the sid or the org ID. It is not enough to impersonate a session.
 
 ## What is stored locally (chrome.storage.local)
 
@@ -73,7 +75,7 @@ your browser profile and never leaves the browser.
 | `settings`, `ultraforce_search_settings` | User preferences (search limit, types, behavior) | — |
 | `ultraforce_history__<host>` | Up to 200 recently visited items: name, type, URL, description, visit counts and timestamps (`src/stores/history-store.ts:15-25`) | Keyed per org host |
 | `ultraforce_favorites__<host>` | Same shape, items you pinned | Keyed per org host |
-| `metadata_<orgId>_<type>` | Cached org metadata catalog: API names, labels, namespaces, custom-setting and custom-metadata names (`src/lib/metadata-fetcher.ts:138-266`) | 24 h TTL, 10 MB cap (`src/lib/metadata-cache.ts:8-16`) |
+| `metadata_<orgId>_<type>` | Cached org metadata catalog: API names, labels, namespaces, custom-setting and custom-metadata names (`src/lib/metadata-fetcher.ts:138-266`) | 24 h TTL, 5 MiB cap - half of the 10 MiB storage quota (`src/lib/metadata-cache.ts:8-25`) |
 | `ultraforce_unsupported_types` | Per-org list of inaccessible metadata types, checked timestamp, sid fingerprint | — |
 | `ultraforce_api_stats` | API request count and timestamps, 30-day window only (`src/lib/api-stats.ts`) | No URLs, no payloads |
 | `ultraforce_version_check` | Last seen extension version | — |

@@ -63,7 +63,9 @@ vi.mock('./unsupported-types', () => ({
   getUnsupportedTypes: vi.fn().mockResolvedValue([]),
   markTypesChecked: vi.fn(),
   needsPermissionCheck: vi.fn().mockResolvedValue(false),
-  clearUnsupportedTypesCache: vi.fn()
+  clearUnsupportedTypesCache: vi.fn(),
+  // identity hash: same key -> same value, different key -> different value
+  hashSession: vi.fn((key: string) => key)
 }))
 
 vi.mock('./domain-utils', () => ({
@@ -101,7 +103,7 @@ import {
 import { getSession, sfRest } from './auth'
 import { MetadataCache } from './metadata-cache'
 import { buildSearchIndex, searchIndex, hasSearchIndex, clearSearchIndex, clearAllSearchIndexes } from './fuzzy-search'
-import { needsPermissionCheck } from './unsupported-types'
+import { needsPermissionCheck, markTypesChecked } from './unsupported-types'
 
 const mockGetSession = vi.mocked(getSession)
 const mockSfRest = vi.mocked(sfRest)
@@ -874,15 +876,59 @@ describe('salesforce-api', () => {
       expect(Array.isArray(result)).toBe(true)
     })
 
-    it('should skip tooling API types when no ViewSetup permission', async () => {
-      // ViewSetup check fails
-      mockFetch.mockResolvedValue({ ok: false })
+    it('should skip tooling API types when no ViewSetup permission (403 persists)', async () => {
+      // ViewSetup check fails with a real permission denial
+      mockFetch.mockResolvedValue({ ok: false, status: 403, text: async () => '[]' })
 
       const result = await checkMetadataPermissions(TEST_HOST)
 
       // Should return tooling API types as unsupported
       expect(result).toContain('ApexClass')
       expect(result).toContain('Flow')
+      expect(markTypesChecked).toHaveBeenCalledWith(TEST_HOST, expect.arrayContaining(['ApexClass']), TEST_SESSION.key)
+    })
+
+    it('does not persist a verdict when the ViewSetup probe gets a 401 (session expired)', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 401, text: async () => '[]' })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).not.toHaveBeenCalled()
+    })
+
+    it('does not persist partial verdicts when a per-type probe gets a 401', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true }) // ViewSetup probe passes
+      mockFetch.mockResolvedValue({ ok: false, status: 401, text: async () => '[]' })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).not.toHaveBeenCalled()
+    })
+
+    it('defaults to supported on ambiguous 5xx failures instead of hiding types', async () => {
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => '[]' })
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => '[]' })
+        .mockResolvedValue({ ok: true })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).toHaveBeenCalledWith(TEST_HOST, [], TEST_SESSION.key)
+    })
+
+    it('defaults to supported when the probe hits a network error instead of hiding types', async () => {
+      mockFetch
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValue({ ok: true })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).toHaveBeenCalledWith(TEST_HOST, [], TEST_SESSION.key)
     })
   })
 

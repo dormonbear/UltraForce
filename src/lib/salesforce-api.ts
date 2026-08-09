@@ -9,7 +9,8 @@ import {
   getUnsupportedTypes as getUnsupportedTypesRaw,
   markTypesChecked,
   needsPermissionCheck,
-  clearUnsupportedTypesCache
+  clearUnsupportedTypesCache,
+  hashSession
 } from './unsupported-types'
 import { buildSearchIndex, clearSearchIndex, clearAllSearchIndexes } from './fuzzy-search'
 import { getMetadataWithCache, fetchMetadataFromAPI } from './metadata-fetcher'
@@ -23,7 +24,7 @@ export { executeCustomCommand, type CustomCommandOptions } from './custom-comman
 const apiAvailabilityCache = new Map<string, { available: boolean; sessionHash: string }>()
 
 function getSessionHash(sessionKey: string): string {
-  return sessionKey.substring(0, 8)
+  return hashSession(sessionKey)
 }
 
 export function isApiAvailable(sfHost: string, sessionKey?: string): boolean {
@@ -106,6 +107,13 @@ const TOOLING_API_TYPES = [
   'CustomLabel'
 ]
 
+/**
+ * Thrown when a permission probe gets HTTP 401. The session is invalid, so no
+ * verdict produced under it can be trusted; the probe aborts without
+ * persisting anything.
+ */
+class SessionExpiredProbeError extends Error {}
+
 async function checkViewSetupPermission(apiHost: string, sessionKey: string): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -114,10 +122,13 @@ async function checkViewSetupPermission(apiHost: string, sessionKey: string): Pr
         headers: { Authorization: `Bearer ${sessionKey}` }
       })
       if (response.ok) return true
-      if (response.status === 403 || response.status === 401) return false
+      if (response.status === 401) throw new SessionExpiredProbeError('Session expired or invalid')
+      // 403 is a real, persistable verdict: the user has no View Setup access.
+      if (response.status === 403) return false
       // Transient error (5xx, timeout) - retry once
-    } catch {
-      if (attempt > 0) return false
+    } catch (error) {
+      if (error instanceof SessionExpiredProbeError) throw error
+      if (attempt > 0) return true
     }
   }
   // Default to true on ambiguous failures to avoid hiding types for admin users
@@ -134,60 +145,77 @@ export async function checkMetadataPermissions(sfHost: string): Promise<string[]
   }
 
   const apiHost = normalizeHost(session.hostname)
-  const hasViewSetup = await checkViewSetupPermission(apiHost, session.key)
 
-  if (!hasViewSetup) {
-    logger.debug('permission:check - no ViewSetup, skipping Tooling API types')
-    const unsupportedTypes = TOOLING_API_TYPES.filter((t) => allTypes.includes(t))
-    await markTypesChecked(apiHost, unsupportedTypes, session.key)
-    return unsupportedTypes
-  }
+  try {
+    const hasViewSetup = await checkViewSetupPermission(apiHost, session.key)
 
-  const checkedObjects = new Map<string, boolean>()
-
-  const checkType = async (type: string): Promise<boolean> => {
-    const config = PERMISSION_CHECK_MAP[type]
-    if (!config) return true
-
-    const cacheKey = `${config.object}:${config.useRestApi}`
-    if (checkedObjects.has(cacheKey)) {
-      return checkedObjects.get(cacheKey)!
+    if (!hasViewSetup) {
+      logger.debug('permission:check - no ViewSetup, skipping Tooling API types')
+      const unsupportedTypes = TOOLING_API_TYPES.filter((t) => allTypes.includes(t))
+      await markTypesChecked(apiHost, unsupportedTypes, session.key)
+      return unsupportedTypes
     }
 
-    try {
-      const apiPath = config.useRestApi ? 'query' : 'tooling/query'
-      const url = `https://${apiHost}/services/data/v${API_VERSION}/${apiPath}?q=SELECT+Id+FROM+${config.object}+LIMIT+1`
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${session.key}` }
-      })
-      if (!response.ok) {
-        const text = await response.text()
-        if (text.includes('INVALID_TYPE') || text.includes('not supported') || text.includes('sObject type')) {
-          checkedObjects.set(cacheKey, false)
-          return false
+    const checkedObjects = new Map<string, boolean>()
+
+    const checkType = async (type: string): Promise<boolean> => {
+      const config = PERMISSION_CHECK_MAP[type]
+      if (!config) return true
+
+      const cacheKey = `${config.object}:${config.useRestApi}`
+      if (checkedObjects.has(cacheKey)) {
+        return checkedObjects.get(cacheKey)!
+      }
+
+      try {
+        const apiPath = config.useRestApi ? 'query' : 'tooling/query'
+        const url = `https://${apiHost}/services/data/v${API_VERSION}/${apiPath}?q=SELECT+Id+FROM+${config.object}+LIMIT+1`
+        const response = await fetch(url, {
+          headers: { Authorization: `Bearer ${session.key}` }
+        })
+        if (!response.ok) {
+          const text = await response.text()
+          if (response.status === 401) throw new SessionExpiredProbeError('Session expired or invalid')
+          if (text.includes('INVALID_TYPE') || text.includes('not supported') || text.includes('sObject type')) {
+            checkedObjects.set(cacheKey, false)
+            return false
+          }
         }
+        checkedObjects.set(cacheKey, true)
+        return true
+      } catch (error) {
+        if (error instanceof SessionExpiredProbeError) throw error
+        // Ambiguous failure (network, timeout): assume supported - a transient
+        // blip must not hide the type for 24h.
+        checkedObjects.set(cacheKey, true)
+        return true
       }
-      checkedObjects.set(cacheKey, true)
-      return true
-    } catch {
-      checkedObjects.set(cacheKey, false)
-      return false
     }
+
+    const unsupported: string[] = []
+    await Promise.all(
+      allTypes.map(async (type) => {
+        const isSupported = await checkType(type)
+        if (!isSupported) {
+          unsupported.push(type)
+        }
+        return undefined
+      })
+    )
+
+    await markTypesChecked(apiHost, unsupported, session.key)
+    logger.debug('permission:check done', { hasViewSetup, unsupported })
+    return unsupported
+  } catch (error) {
+    if (error instanceof SessionExpiredProbeError) {
+      // A 401 says nothing about permissions - persist no verdict, keep the
+      // previous state. The search flow already surfaces the session error
+      // ("Session expired. Please refresh the page and try again.", auth.ts:106).
+      logger.warn('permission:check - session expired, skipping probe', { host: apiHost })
+      return []
+    }
+    throw error
   }
-
-  const unsupported: string[] = []
-  await Promise.all(
-    allTypes.map(async (type) => {
-      const isSupported = await checkType(type)
-      if (!isSupported) {
-        unsupported.push(type)
-      }
-    })
-  )
-
-  await markTypesChecked(apiHost, unsupported, session.key)
-  logger.debug('permission:check done', { hasViewSetup, unsupported })
-  return unsupported
 }
 
 // --- Cache management ---
@@ -244,6 +272,7 @@ export async function warmupMetadataCache(sfHost: string): Promise<void> {
       } catch (error) {
         logger.error('warmup failed', { type, error })
       }
+      return undefined
     })
   )
 

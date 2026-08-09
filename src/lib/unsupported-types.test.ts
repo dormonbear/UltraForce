@@ -3,7 +3,8 @@ import {
   markTypesChecked,
   getUnsupportedTypes,
   needsPermissionCheck,
-  clearUnsupportedTypesCache
+  clearUnsupportedTypesCache,
+  hashSession
 } from './unsupported-types'
 import { STORAGE_KEYS, storageGet, storageSet, storageRemove } from './storage-service'
 
@@ -74,7 +75,7 @@ describe('unsupported-types', () => {
       })
     })
 
-    it('stores session hash when provided', async () => {
+    it('stores a digest of the session when provided', async () => {
       const now = 1_800_000_000_001
       vi.spyOn(Date, 'now').mockReturnValue(now)
       vi.mocked(storageGet).mockResolvedValue({})
@@ -85,7 +86,7 @@ describe('unsupported-types', () => {
         'host.test': {
           types: ['CustomObject'],
           checkedAt: now,
-          sessionHash: 'abcdefgh'
+          sessionHash: hashSession('abcdefgh-extra')
         }
       })
     })
@@ -158,6 +159,62 @@ describe('unsupported-types', () => {
       const needs = await needsPermissionCheck('sess.host', '22222222-rest')
 
       expect(needs).toBe(true)
+    })
+
+    it('returns true when the session changed within the same org (new token, same org prefix)', async () => {
+      const now = 1_800_000_000_000
+      const sid1 = '00D5g00000000XYZ!TOKEN_AAAA'
+      const sid2 = '00D5g00000000XYZ!TOKEN_BBBB' // fresh login, same org
+      vi.spyOn(Date, 'now').mockReturnValue(now)
+      vi.mocked(storageGet).mockResolvedValue({
+        'sameorg.host': {
+          types: [],
+          checkedAt: now,
+          sessionHash: hashSession(sid1)
+        }
+      })
+
+      const needs = await needsPermissionCheck('sameorg.host', sid2)
+
+      expect(needs).toBe(true)
+    })
+
+    it('rechecks when the stored fingerprint is a legacy plaintext org prefix', async () => {
+      const now = 1_800_000_000_000
+      vi.spyOn(Date, 'now').mockReturnValue(now)
+      // Pre-fix data: the org-ID prefix stored verbatim
+      vi.mocked(storageGet).mockResolvedValue({
+        'legacy.host': {
+          types: ['ApexClass'],
+          checkedAt: now,
+          sessionHash: '00D5g000'
+        }
+      })
+
+      const needs = await needsPermissionCheck('legacy.host', '00D5g00000000XYZ!TOKEN_AAAA')
+
+      expect(needs).toBe(true)
+    })
+  })
+
+  describe('hashSession', () => {
+    it('distinguishes two sessions of the same org', () => {
+      const sid1 = '00D5g00000000XYZ!TOKEN_AAAA'
+      const sid2 = '00D5g00000000XYZ!TOKEN_BBBB'
+      expect(sid1.substring(0, 8)).toBe(sid2.substring(0, 8)) // same org prefix
+      expect(hashSession(sid1)).not.toBe(hashSession(sid2))
+    })
+
+    it('stores a fixed-width hex digest, not the org ID in plaintext', () => {
+      const sid = '00D5g00000000XYZ!TOKEN_AAAA'
+      const digest = hashSession(sid)
+      expect(digest).toMatch(/^[0-9a-f]{8}$/)
+      expect(digest).not.toContain(sid.substring(0, 8))
+    })
+
+    it('is deterministic for the same sid', () => {
+      const sid = '00D5g00000000XYZ!TOKEN_AAAA'
+      expect(hashSession(sid)).toBe(hashSession(sid))
     })
   })
 
