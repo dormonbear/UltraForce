@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   STORAGE_KEYS,
   metadataCacheKey,
+  historyKey,
+  favoritesKey,
   storageGet,
   storageSet,
   storageRemove,
@@ -37,6 +39,31 @@ describe('storage-service', () => {
     it('should handle various orgId and type combinations', () => {
       expect(metadataCacheKey('00D000000000001', 'Flow')).toBe('metadata_00D000000000001_Flow')
       expect(metadataCacheKey('org', 'CustomObject')).toBe('metadata_org_CustomObject')
+    })
+  })
+
+  describe('historyKey / favoritesKey', () => {
+    it('keeps the common case byte-identical to today', () => {
+      expect(historyKey('acme.my.salesforce.com')).toBe('ultraforce_history__acme.my.salesforce.com')
+      expect(favoritesKey('acme.my.salesforce.com')).toBe('ultraforce_favorites__acme.my.salesforce.com')
+    })
+
+    it('resolves every host form of one org to a single history bucket', () => {
+      const expected = 'ultraforce_history__acme.my.salesforce.com'
+      expect(historyKey('acme.my.salesforce.com')).toBe(expected)
+      expect(historyKey('acme.lightning.force.com')).toBe(expected)
+      expect(historyKey('acme.my.salesforce-setup.com')).toBe(expected)
+      expect(historyKey('acme.setup.sfcrmproducts.cn')).toBe('ultraforce_history__acme.my.sfcrmproducts.cn')
+      expect(historyKey('acme.lightning.sfcrmproducts.cn')).toBe('ultraforce_history__acme.my.sfcrmproducts.cn')
+    })
+
+    it('resolves every host form of one org to a single favorites bucket', () => {
+      const expected = 'ultraforce_favorites__acme.my.salesforce.com'
+      expect(favoritesKey('acme.my.salesforce.com')).toBe(expected)
+      expect(favoritesKey('acme.lightning.force.com')).toBe(expected)
+      expect(favoritesKey('acme.my.salesforce-setup.com')).toBe(expected)
+      expect(favoritesKey('acme.setup.sfcrmapps.cn')).toBe('ultraforce_favorites__acme.my.sfcrmapps.cn')
+      expect(favoritesKey('acme.lightning.sfcrmapps.cn')).toBe('ultraforce_favorites__acme.my.sfcrmapps.cn')
     })
   })
 
