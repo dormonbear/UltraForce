@@ -1,6 +1,7 @@
 // Centralized storage service - single typed gateway for chrome.storage.local
 
 import { logger } from './logger'
+import { normalizeHost } from './domain-utils'
 
 // --- Storage key constants ---
 
@@ -26,12 +27,12 @@ export function metadataCacheKey(orgId: string, metadataType: string): string {
 
 /** Builds the per-org history persistence key. Host (sfHost) is preferred over orgId since it is known earlier. */
 export function historyKey(host: string): string {
-  return `ultraforce_history__${host}`
+  return `ultraforce_history__${normalizeHost(host)}`
 }
 
 /** Builds the per-org favorites persistence key. */
 export function favoritesKey(host: string): string {
-  return `ultraforce_favorites__${host}`
+  return `ultraforce_favorites__${normalizeHost(host)}`
 }
 
 // --- Value interfaces ---

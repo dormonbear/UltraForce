@@ -13,6 +13,9 @@ export function normalizeHost(host: string): string {
 
   normalized = normalized.replace(/\.lightning\.force\./, '.my.salesforce.')
 
+  // US Setup: .my.salesforce-setup. -> .my.salesforce.
+  normalized = normalized.replace(/\.my\.salesforce-setup\./, '.my.salesforce.')
+
   // China: .sandbox.setup. -> .sandbox.my., .setup. -> .my.
   normalized = normalized.replace(
     /\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\./,
