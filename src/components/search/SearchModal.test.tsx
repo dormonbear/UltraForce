@@ -176,6 +176,52 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('focus reclaim', () => {
+    it('pulls focus back when the host page steals it after open', async () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      expect(document.activeElement).toBe(input)
+
+      const stealer = document.createElement('input')
+      document.body.appendChild(stealer)
+      stealer.focus()
+      expect(document.activeElement).toBe(stealer)
+
+      await waitFor(() => expect(document.activeElement).toBe(input))
+      document.body.removeChild(stealer)
+    })
+
+    it('does not fight focus that moves to another control inside the modal', async () => {
+      renderModal()
+      const settingsButton = screen.getByRole('button', { name: 'Settings' })
+      settingsButton.focus()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(document.activeElement).toBe(settingsButton)
+    })
+
+    it('does not reclaim focus once the modal is closed', async () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+      const { unmount } = renderModal()
+      unmount()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(document.activeElement).toBe(trigger)
+      document.body.removeChild(trigger)
+    })
+
+    it('tells the user to click when the page itself has no focus', async () => {
+      const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+      renderModal()
+      expect(await screen.findByPlaceholderText('Click here to focus, then type to search')).toBeInTheDocument()
+
+      hasFocus.mockReturnValue(true)
+      fireEvent(window, new Event('focus'))
+      expect(await screen.findByPlaceholderText('Search test metadata...')).toBeInTheDocument()
+      hasFocus.mockRestore()
+    })
+  })
+
   describe('combobox and listbox wiring', () => {
     it('exposes the search input as a collapsed combobox before a search runs', () => {
       renderModal()
