@@ -7,6 +7,8 @@ interface SearchInputProps {
   onQueryChange: (query: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
   sfHost: string | null
+  /** False when the browser UI holds focus and only a click can return it to the page. */
+  pageHasFocus?: boolean
   /** Whether the results listbox is currently shown; drives aria-expanded. */
   expanded?: boolean
   /** id of the results listbox; drives aria-controls. */
@@ -69,7 +71,7 @@ function getOrgTypeLabel(orgType: OrgType): string {
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ query, onQueryChange, onKeyDown, sfHost, expanded, controlsId, activeDescendantId }, ref) => {
+  ({ query, onQueryChange, onKeyDown, sfHost, pageHasFocus = true, expanded, controlsId, activeDescendantId }, ref) => {
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
 
@@ -135,7 +137,13 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             e.stopPropagation()
             e.nativeEvent.stopImmediatePropagation()
           }}
-          placeholder={displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'}
+          placeholder={
+            !pageHasFocus
+              ? 'Click here to focus, then type to search'
+              : displayName
+                ? `Search ${displayName} metadata...`
+                : 'Search Salesforce metadata...'
+          }
           aria-label="Search Salesforce metadata"
           role="combobox"
           aria-expanded={expanded ? 'true' : 'false'}

@@ -191,6 +191,12 @@ export function createKeyboardInterceptor(
       return
     }
 
+    // The host page may have stolen focus after the modal opened. Pull it back so
+    // the caret (and any IME composition) follows the text we are about to inject.
+    if (opts.getShadowRoot && opts.getShadowRoot()?.activeElement !== input) {
+      input.focus()
+    }
+
     if (e.key === 'Backspace') {
       const newValue = deleteChar(input, 'backward')
       notifyValueChange(input, newValue)

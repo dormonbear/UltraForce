@@ -26,6 +26,9 @@ import { useHistoryStore } from '~stores/history-store'
 import { usePersistErrorStore, type PersistErrorSource } from '~stores/persist-error-store'
 import type { ObjectAction } from './ResultItem'
 
+// Bound on refocus attempts per open so a host page that keeps re-focusing itself cannot start a fight.
+const MAX_FOCUS_RECLAIMS = 5
+
 const MODAL_INLINE_STYLE: React.CSSProperties = {
   backdropFilter: 'blur(24px) saturate(180%)',
   WebkitBackdropFilter: 'blur(24px) saturate(180%)'
@@ -272,6 +275,36 @@ const SearchModal: React.FC<SearchModalProps> = ({
       }
     }
   }, [isVisible, showSettings])
+
+  // The host page can steal focus after the modal opened (a component mounting late, an
+  // iframe finishing its load). Pull it back unless focus moved to another modal control.
+  useEffect(() => {
+    const input = inputRef.current
+    if (!isVisible || showSettings || !input) return
+    let reclaims = 0
+    const handleFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget as Node | null
+      if (next && modalRef.current?.contains(next)) return
+      if (reclaims++ >= MAX_FOCUS_RECLAIMS) return
+      requestAnimationFrame(() => {
+        if (input.isConnected && useSearchStore.getState().isVisible) {
+          input.focus()
+        }
+      })
+    }
+    input.addEventListener('focusout', handleFocusOut)
+    return () => input.removeEventListener('focusout', handleFocusOut)
+  }, [isVisible, showSettings])
+
+  // When the browser UI (omnibox, DevTools) holds focus, focus() cannot bring it back to
+  // the page; the only remedy is a click, so say so in the placeholder until it happens.
+  const [pageHasFocus, setPageHasFocus] = useState(true)
+  useEffect(() => {
+    setPageHasFocus(document.hasFocus())
+    const handleWindowFocus = () => setPageHasFocus(true)
+    window.addEventListener('focus', handleWindowFocus)
+    return () => window.removeEventListener('focus', handleWindowFocus)
+  }, [])
 
   // Refs to avoid re-triggering useEffect on callback changes
   const onSearchRef = React.useRef(onSearch)
@@ -726,6 +759,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     }
                   }}
                   sfHost={sfHost}
+                  pageHasFocus={pageHasFocus}
                   expanded={showListbox}
                   controlsId={RESULTS_LISTBOX_ID}
                   activeDescendantId={activeDescendantId}
