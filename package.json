@@ -1,6 +1,6 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "type": "module",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
@@ -25,7 +25,10 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "src/**/*.{ts,tsx}": ["oxlint --fix", "oxfmt"]
+    "src/**/*.{ts,tsx}": [
+      "oxlint --fix",
+      "oxfmt"
+    ]
   },
   "keywords": [
     "salesforce",
@@ -70,7 +73,10 @@
     },
     "web_accessible_resources": [
       {
-        "resources": ["assets/fonts/inter-latin.woff2", "assets/fonts/inter-latin-ext.woff2"],
+        "resources": [
+          "assets/fonts/inter-latin.woff2",
+          "assets/fonts/inter-latin-ext.woff2"
+        ],
         "matches": [
           "https://*.salesforce.com/*",
           "https://*.visual.force.com/*",

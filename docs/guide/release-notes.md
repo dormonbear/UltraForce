@@ -1,5 +1,27 @@
 # Release Notes
 
+## v0.4.0
+
+Release Date: 2026-09-10
+
+### New Features
+
+- **Enterprise Managed Policy**: Administrators can force-install UltraForce and push settings through Chrome's managed storage (`managed_schema.json`). Policy-controlled settings (`navigationMode`, `hideManagedPackage`, `maxResultsPerType`) override user values, show as disabled with a "Managed by your organization" note in the settings panel, and apply live without a browser restart. Removing a policy restores the user's own values.
+- **Screen-Reader Combobox**: The search input and result list now follow the WAI-ARIA combobox/listbox pattern, so assistive technology announces the highlighted result as you navigate.
+
+### Improvements
+
+- **No External Font Requests**: The Inter font is bundled with the extension instead of loaded from Google Fonts; no request leaves the Salesforce page for styling.
+- **Privacy Audit**: A source-verified [PRIVACY.md](https://github.com/dormonbear/UltraForce/blob/main/PRIVACY.md) documents every network call and stored value.
+- **Storage Warning**: If the browser rejects a favorites, history, or settings write (storage quota exceeded), the modal shows a warning instead of silently dropping the change.
+
+### Bug Fixes
+
+- **Focus Lost on Open**: Opening the modal right after navigating to a page (especially Setup pages) could leave the keyboard focus on the host page, requiring a click before typing. The modal now reclaims focus when the page steals it, and typing always lands in the search box. When the browser UI itself holds focus, the placeholder tells you to click first.
+- **Metadata Cache Starving User Data**: The metadata cache could fill the entire `chrome.storage.local` budget on large orgs, so pins and recents were lost after reload. The cache is now capped at half the quota.
+- **Metadata Types Hidden After Session Expiry**: A permission probe made while the session had expired marked Tooling API types as unsupported for 24 hours. Probes now abort on 401, and the session fingerprint is a digest of the full session token rather than the org-ID prefix.
+- **Duplicate Recents/Favorites Buckets**: Reaching the same org through its Setup domain (`*.my.salesforce-setup.com`) and its My Domain produced separate recents and favorites lists. All host forms of one org now share one bucket; existing data under the My Domain key is untouched.
+
 ## v0.3.2
 
 Release Date: 2026-06-17
