@@ -72,6 +72,9 @@ importers:
       vitest-chrome:
         specifier: 0.1.0
         version: 0.1.0
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
 packages:
 
@@ -8496,8 +8499,7 @@ snapshots:
 
   yaml@2.8.1: {}
 
-  yaml@2.9.0:
-    optional: true
+  yaml@2.9.0: {}
 
   yoctocolors-cjs@2.1.2: {}
 

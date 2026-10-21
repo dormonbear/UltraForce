@@ -30,13 +30,15 @@ jobs:
 
       - name: Lint
         run: pnpm lint
-        continue-on-error: true
 
       - name: Format Check
         run: pnpm format:check
 
       - name: Type Check
         run: pnpm type-check
+
+      - name: Release Workflow Tests
+        run: node --test scripts/release-workflow.test.mjs
 
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
