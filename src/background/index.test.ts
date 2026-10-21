@@ -14,6 +14,7 @@ vi.mock('~lib/storage-service', () => ({
 // module import below via vi.hoisted.
 vi.hoisted(() => {
   const chromeAny = (globalThis as any).chrome
+  chromeAny.runtime.id = 'fixture-extension'
   chromeAny.action = { onClicked: { addListener: () => {} } }
   chromeAny.commands = { onCommand: { addListener: () => {} } }
 })
@@ -23,12 +24,12 @@ import './index'
 
 // vitest-chrome exposes a callListeners() helper that dispatches to every
 // registered onMessage listener; the module registers its handler at import.
-const SF_SENDER = { url: 'https://myorg.my.salesforce.com/lightning/page' }
+const SF_SENDER = { id: chrome.runtime.id, url: 'https://myorg.my.salesforce.com/lightning/page' }
 
 function invoke(request: any, sender: Partial<chrome.runtime.MessageSender> = SF_SENDER): Promise<any> {
   return new Promise((resolve) => {
     const sendResponse = (response: any) => resolve(response)
-    ;(chrome.runtime.onMessage as any).callListeners(request, sender, sendResponse)
+    ;(chrome.runtime.onMessage as any).callListeners(request, { id: chrome.runtime.id, ...sender }, sendResponse)
   })
 }
 
@@ -99,13 +100,19 @@ describe('background message handlers', () => {
       }
       return null
     })
-    const res = await invoke({ message: 'getSession', sfHost: 'org.sfcrmapps.cn' })
+    const res = await invoke(
+      { message: 'getSession', sfHost: 'org.sfcrmapps.cn' },
+      { url: 'https://org.sfcrmapps.cn/' }
+    )
     expect(res).toEqual({ key: 'CN_SID', hostname: 'org.sfcrmproducts.cn' })
   })
 
-  it('getSfHost returns the mcas.ms domain verbatim', async () => {
-    const res = await invoke({ message: 'getSfHost', url: 'https://example.mcas.ms/page' })
-    expect(res).toBe('example.mcas.ms')
+  it('getSfHost rejects an unrelated mcas.ms payload', async () => {
+    const res = await invoke(
+      { message: 'getSfHost', url: 'https://example.mcas.ms/page' },
+      { url: 'https://example.mcas.ms/page' }
+    )
+    expect(res).toBeNull()
   })
 
   it('getSfHost maps salesforce-setup.com to my.salesforce.com when the sid cookie exists', async () => {
@@ -114,14 +121,20 @@ describe('background message handlers', () => {
       value: 'x',
       name: 'sid'
     } as chrome.cookies.Cookie)
-    const res = await invoke({ message: 'getSfHost', url: 'https://acme.my.salesforce-setup.com/setup' })
+    const res = await invoke(
+      { message: 'getSfHost', url: 'https://acme.my.salesforce-setup.com/setup' },
+      { url: 'https://acme.my.salesforce-setup.com/setup' }
+    )
     expect(res).toBe('acme.my.salesforce.com')
   })
 
   it('getSfHost falls back to the current domain when no sid cookie is found', async () => {
     chrome.cookies.get.mockResolvedValue(null)
     chrome.cookies.getAll.mockResolvedValue([])
-    const res = await invoke({ message: 'getSfHost', url: 'https://acme.my.salesforce.com/page' })
+    const res = await invoke(
+      { message: 'getSfHost', url: 'https://acme.my.salesforce.com/page' },
+      { url: 'https://acme.my.salesforce.com/page' }
+    )
     expect(res).toBe('acme.my.salesforce.com')
   })
 
@@ -132,39 +145,56 @@ describe('background message handlers', () => {
       }
       return null
     })
-    const res = await invoke({ message: 'getSfHost', url: 'https://acme.setup.sfcrmproducts.cn/page' })
+    const res = await invoke(
+      { message: 'getSfHost', url: 'https://acme.setup.sfcrmproducts.cn/page' },
+      { url: 'https://acme.setup.sfcrmproducts.cn/page' }
+    )
     expect(res).toBe('acme.my.sfcrmproducts.cn')
   })
 
   it('getSfHost prefers a matching my-domain cookie sharing the org id', async () => {
     chrome.cookies.get.mockImplementation(async ({ url }: { url: string }) => {
       if (url === 'https://acme.lightning.force.com') {
-        return { domain: 'acme.lightning.force.com', value: '00Dxx!SID', name: 'sid' } as chrome.cookies.Cookie
+        return {
+          domain: 'acme.lightning.force.com',
+          value: '00D000000000001!SID',
+          name: 'sid'
+        } as chrome.cookies.Cookie
       }
       if (url === 'https://acme.my.salesforce.com') {
-        return { domain: 'acme.my.salesforce.com', value: '00Dxx!OTHER', name: 'sid' } as chrome.cookies.Cookie
+        return {
+          domain: 'acme.my.salesforce.com',
+          value: '00D000000000001!OTHER',
+          name: 'sid'
+        } as chrome.cookies.Cookie
       }
       return null
     })
-    const res = await invoke({ message: 'getSfHost', url: 'https://acme.lightning.force.com/page' })
+    const res = await invoke(
+      { message: 'getSfHost', url: 'https://acme.lightning.force.com/page' },
+      { url: 'https://acme.lightning.force.com/page' }
+    )
     expect(res).toBe('acme.my.salesforce.com')
   })
 
-  it('getSfHost scans SF_DOMAINS via getAll to locate the session domain', async () => {
+  it('getSfHost discovers an org-linked legacy instance with getAll', async () => {
     chrome.cookies.get.mockImplementation(async ({ url }: { url: string }) => {
-      if (url === 'https://acme.lightning.force.com/page') {
-        return { domain: 'acme.lightning.force.com', value: '00Dxx!SID', name: 'sid' } as chrome.cookies.Cookie
+      if (url === 'https://acme--pkg.na99.visual.force.com' || url === 'https://na99.salesforce.com') {
+        return { domain: new URL(url).hostname, value: '00D000000000001!SID', name: 'sid' } as chrome.cookies.Cookie
       }
       return null
     })
     chrome.cookies.getAll.mockImplementation(async ({ domain }: { domain: string }) => {
       if (domain === 'salesforce.com') {
-        return [{ domain: 'acme.my.salesforce.com', value: '00Dxx!SID', name: 'sid' } as chrome.cookies.Cookie]
+        return [{ domain: 'na99.salesforce.com', value: '00D000000000001!SID', name: 'sid' } as chrome.cookies.Cookie]
       }
       return []
     })
-    const res = await invoke({ message: 'getSfHost', url: 'https://acme.lightning.force.com/page' })
-    expect(res).toBe('acme.my.salesforce.com')
+    const res = await invoke(
+      { message: 'getSfHost', url: 'https://acme--pkg.na99.visual.force.com/page' },
+      { url: 'https://acme--pkg.na99.visual.force.com/page' }
+    )
+    expect(res).toBe('na99.salesforce.com')
   })
 })
 
