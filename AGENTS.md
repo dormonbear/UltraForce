@@ -4,6 +4,9 @@ Guidance for AI coding agents (Codex, Cursor, Copilot, Gemini CLI, Aider, Zed, a
 working in this repository. Claude Code users: see `CLAUDE.md` for the full, richer guide.
 This file is the cross-tool summary; `CLAUDE.md` is the source of truth where the two overlap.
 
+Before any task, read the collaboration policy in [CLAUDE.md](CLAUDE.md), including bilingual writing, pre-approved UI localization, feature review and regression requirements.
+开展任何任务前，请阅读 [CLAUDE.md](CLAUDE.md) 中的协作规则，包括双语写作、已获批准的 UI 本地化、功能审查及回归测试要求。
+
 ## What this is
 
 UltraForce for Salesforce - a Manifest V3 Chrome extension that injects a Spotlight/Raycast-style
@@ -40,7 +43,8 @@ Always run `pnpm lint` and `pnpm type-check` before committing.
 - Named exports for utilities; default export only for React components
 - Async utilities never throw: log via the `logger` module and return `null`/`[]`/`{}`
 - Never use `console.*` in production code - use `src/lib/logger.ts`
-- No emoji anywhere (code, logs, UI, docs); keep text ASCII-friendly
+- Use English and Simplified Chinese as required by the collaboration policy; omit emoji in code, logs, UI and docs.
+  按协作规则使用英文和简体中文；代码、日志、UI 及文档中不使用表情符号。
 
 ## Conventions
 
