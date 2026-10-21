@@ -5,6 +5,7 @@ import { sfRest, API_VERSION } from './auth'
 import { MetadataCache } from './metadata-cache'
 import { METADATA_TYPES } from './metadata-types'
 import { logger } from './logger'
+import { t } from './i18n'
 import { markTypeUnsupported } from './unsupported-types'
 import { normalizeHost, escapeSoqlLiteral } from './domain-utils'
 import { buildSearchIndex, hasSearchIndex } from './fuzzy-search'
@@ -103,7 +104,7 @@ export async function fetchMetadataFromAPI(metadataType: string, sfHost: string)
 
   const config = METADATA_TYPES[metadataType]
   if (!config) {
-    throw new Error(`Unknown metadata type: ${metadataType}`)
+    throw new Error(t('Unknown metadata type: {type}', { type: metadataType }))
   }
 
   const start = Date.now()

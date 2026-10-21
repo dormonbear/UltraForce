@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test as extensionTest, expect } from './fixtures/extension'
 import { SettingsPage } from './pages/settings.page'
+import { waitForContentScript } from './helpers/content-script'
 
 const baseUrl = 'https://race.my.salesforce.com'
 const recordPath = '/lightning/r/Account/001000000000001AAA/view'
@@ -51,6 +52,7 @@ const test = extensionTest.extend({
     const page = await extensionContext.newPage()
     await page.goto(`${baseUrl}/lightning/page/home`)
     await expect(page.locator('[id^="ultraforce-modal"]')).toBeAttached()
+    await waitForContentScript(extensionContext, page)
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
     await expect(page.locator('[data-ultraforce-input]')).toBeVisible()
     await use(page)
@@ -59,7 +61,9 @@ const test = extensionTest.extend({
 
 function gate() {
   let release!: () => void
-  const promise = new Promise<void>((resolve) => { release = resolve })
+  const promise = new Promise<void>((resolve) => {
+    release = resolve
+  })
   return { promise, release }
 }
 
@@ -91,8 +95,8 @@ test('newer Setup search survives an older custom response', async ({ extensionP
     )
     response.release()
     await finished
-    await page.evaluate(() =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     )
     await expect(names).toHaveText(['Debug Logs'])
     await expect(input).toHaveValue(':g debug')
@@ -129,8 +133,8 @@ test('newer custom search survives an older Setup layout response', async ({ ext
     const finished = page.waitForEvent('requestfinished', (request) => request.url().includes('executeAnonymous'))
     response.release()
     await finished
-    await page.evaluate(() =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     )
     await expect(names).toHaveText(['Newest race result'])
     await expect(input).toHaveValue(':race new')

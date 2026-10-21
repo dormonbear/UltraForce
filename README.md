@@ -27,6 +27,9 @@ Demo media should be added at `docs/assets/ultraforce-demo.gif` before a public 
 2. Press `Cmd+B` (Mac) or `Ctrl+B` (Windows) to open UltraForce
 3. Start typing to search
 
+The interface follows the browser's preferred supported language (English or Simplified Chinese), with English as the fallback. Language selection uses browser preferences directly; it stores no language preference and contacts no translation service. User-defined commands and Salesforce names retain their original text.
+界面跟随浏览器首选的受支持语言（英文或简体中文），不支持的语言回退为英文。语言选择直接采用浏览器偏好，不存储语言偏好，也不联系翻译服务。用户自定义命令及 Salesforce 名称保留原文。
+
 ## Search Types
 
 - **Apex Classes / Triggers** - Search by name

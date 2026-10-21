@@ -1,4 +1,5 @@
 import React from 'react'
+import { t } from './i18n'
 import { createPrivateRoot } from './react-root'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
@@ -497,9 +498,9 @@ class UltraForceWindowManager {
     if (currentNonce !== this.searchNonce) return
 
     if (currentLayout) {
-      const name = `${currentLayout.objectApiName} Page Layout`
-      const desc = 'Open page layout used by current record'
-      const combinedText = `${name} ${desc} current`
+      const name = t('{object} Page Layout', { object: currentLayout.objectApiName })
+      const desc = t('Open page layout used by current record')
+      const combinedText = `${name} ${desc} ${currentLayout.objectApiName} Page Layout Open page layout used by current record current`
       if (matchesAllTerms(combinedText)) {
         results.push({
           id: 'current-record-layout',
@@ -517,7 +518,7 @@ class UltraForceWindowManager {
 
     const listResults = shortcuts
       .filter((shortcut) => {
-        const combinedText = `${shortcut.name} ${shortcut.description}`
+        const combinedText = `${shortcut.name} ${shortcut.description} ${t(shortcut.name)} ${t(shortcut.description)}`
         return matchesAllTerms(combinedText)
       })
       .map((shortcut) => {

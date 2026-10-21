@@ -1,0 +1,5 @@
+{
+  "extensionName": { "message": "UltraForce for Salesforce" },
+  "extensionDescription": { "message": "便捷的 Salesforce 元数据搜索与管理工具" },
+  "toggleSearch": { "message": "打开或关闭 UltraForce 搜索" }
+}

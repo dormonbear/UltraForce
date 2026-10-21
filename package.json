@@ -38,13 +38,16 @@
   ],
   "license": "MIT",
   "manifest": {
+    "default_locale": "en",
+    "name": "__MSG_extensionName__",
+    "description": "__MSG_extensionDescription__",
     "commands": {
       "toggle-search": {
         "suggested_key": {
           "default": "Ctrl+B",
           "mac": "Command+B"
         },
-        "description": "Toggle UltraForce Search"
+        "description": "__MSG_toggleSearch__"
       }
     },
     "permissions": [

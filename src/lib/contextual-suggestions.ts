@@ -9,6 +9,7 @@
  */
 
 import type { RecordContext } from '~types'
+import { t } from '~lib/i18n'
 import type { SetupShortcut } from '~lib/setup-shortcuts'
 
 export interface ContextualAction {
@@ -44,7 +45,7 @@ export function getRecordSuggestions(recordContext: RecordContext, sfHost: strin
   actions.push({
     id: 'object-setup',
     name: 'Object Setup',
-    description: `Open ${objectApiName} setup`,
+    description: t('Open {object} setup', { object: objectApiName }),
     icon: 'setup',
     url: `${baseUrl}/lightning/setup/ObjectManager/${objectApiName}/Details/view`
   })

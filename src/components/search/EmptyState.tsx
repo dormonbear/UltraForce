@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { useState } from 'react'
 
 interface EmptyStateProps {
@@ -56,7 +57,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
     return (
       <div className="loading-container" role="status" aria-live="polite">
         <div className="spinner" />
-        <span>Searching...</span>
+        <span>{t('Searching...')}</span>
       </div>
     )
   }
@@ -64,8 +65,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   if (type === 'command') {
     const title =
       commandTypes && commandTypes.length > 0
-        ? `Searching ${commandTypes.join(', ')}`
-        : commandDescription || 'Custom Search'
+        ? t('Searching {types}', { types: commandTypes.map((name) => t(TYPE_LABELS[name] || name)).join(', ') })
+        : commandDescription || t('Custom Search')
     return (
       <div className="search-empty">
         <div className="empty-icon">
@@ -83,18 +84,20 @@ const EmptyState: React.FC<EmptyStateProps> = ({
           </svg>
         </div>
         <div className="empty-title">{title}</div>
-        <div className="empty-desc">Type to search</div>
+        <div className="empty-desc">{t('Type to search')}</div>
       </div>
     )
   }
 
   if (type === 'start') {
-    const typeLabels = selectedTypes?.map((t) => TYPE_LABELS[t] || t).join(', ') || 'metadata'
+    const typeLabels = selectedTypes?.map((name) => t(TYPE_LABELS[name] || name)).join(', ') || t('metadata')
     return (
       <div className="search-empty">
-        <div className="empty-title">Searching {typeLabels}</div>
+        <div className="empty-title">{t('Searching {types}', { types: typeLabels })}</div>
         <div className="empty-desc">
-          <span style={{ fontSize: '11px', opacity: 0.6, display: 'block' }}>Tip: {randomHint}</span>
+          <span style={{ fontSize: '11px', opacity: 0.6, display: 'block' }}>
+            {t('Tip: {hint}', { hint: t(randomHint) })}
+          </span>
         </div>
       </div>
     )
@@ -103,15 +106,15 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   if (type === 'id-navigation') {
     return (
       <div className="search-empty">
-        <div className="empty-title">Salesforce Record ID</div>
+        <div className="empty-title">{t('Salesforce Record ID')}</div>
         <div className="empty-desc">
-          Press{' '}
+          {t('Press')}{' '}
           <kbd
             style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px' }}
           >
             Enter
           </kbd>{' '}
-          to open record {query}
+          {t('to open record {id}', { id: query || '' })}
         </div>
       </div>
     )
@@ -120,8 +123,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   if (type === 'empty') {
     return (
       <div className="search-empty">
-        <div className="empty-title">No Results Found</div>
-        <div className="empty-desc">No results for &quot;{query}&quot;</div>
+        <div className="empty-title">{t('No Results Found')}</div>
+        <div className="empty-desc">{t('No results for "{query}"', { query: query || '' })}</div>
       </div>
     )
   }
@@ -143,12 +146,12 @@ const EmptyState: React.FC<EmptyStateProps> = ({
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </div>
-        <div className="empty-title">Not Logged In</div>
+        <div className="empty-title">{t('Not Logged In')}</div>
         <div className="empty-desc">
-          Please log in to Salesforce in this browser to use UltraForce.
+          {t('Please log in to Salesforce in this browser to use UltraForce.')}
           <br />
           <span style={{ fontSize: '12px', opacity: 0.7, marginTop: '8px', display: 'block' }}>
-            UltraForce uses your browser session to access Salesforce APIs.
+            {t('UltraForce uses your browser session to access Salesforce APIs.')}
           </span>
         </div>
       </div>
@@ -156,7 +159,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   }
 
   if (type === 'error') {
-    const lines = (errorMessage || 'An error occurred').split('\n')
+    const lines = t(errorMessage || 'An error occurred').split('\n')
     return (
       <div className="search-empty search-error" role="alert">
         <div className="empty-icon">
@@ -174,7 +177,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         </div>
-        <div className="empty-title">Search Error</div>
+        <div className="empty-title">{t('Search Error')}</div>
         <div className="empty-desc error-message">
           {lines.map((line, i) => (
             <React.Fragment key={i}>

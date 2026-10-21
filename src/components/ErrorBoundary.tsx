@@ -1,3 +1,4 @@
+import { browserLocale, t } from '~lib/i18n'
 import React, { Component, ErrorInfo } from 'react'
 import { logger } from '~lib/logger'
 
@@ -128,31 +129,31 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
       // Default fallback UI
       return (
-        <div style={styles.errorContainer}>
+        <div style={styles.errorContainer} lang={browserLocale()}>
           <div style={styles.errorCard}>
             <div style={styles.errorIcon}>!</div>
-            <h2 style={styles.errorTitle}>UltraForce encountered an error</h2>
-            <p style={styles.errorMessage}>Something went wrong while loading the search interface.</p>
+            <h2 style={styles.errorTitle}>{t('UltraForce encountered an error')}</h2>
+            <p style={styles.errorMessage}>{t('Something went wrong while loading the search interface.')}</p>
 
             <div style={styles.errorDetails}>
               <details style={styles.detailsElement}>
-                <summary style={styles.detailsSummary}>Technical Details (Click to expand)</summary>
+                <summary style={styles.detailsSummary}>{t('Technical Details (Click to expand)')}</summary>
                 <div style={styles.errorContent}>
                   <div style={styles.errorField}>
-                    <strong>Error ID:</strong> {this.state.errorId}
+                    <strong>{t('Error ID:')}</strong> {this.state.errorId}
                   </div>
                   <div style={styles.errorField}>
-                    <strong>Message:</strong> {this.state.error?.message}
+                    <strong>{t('Message:')}</strong> {this.state.error?.message}
                   </div>
                   <div style={styles.errorField}>
-                    <strong>Time:</strong> {new Date().toLocaleString()}
+                    <strong>{t('Time:')}</strong> {new Date().toLocaleString()}
                   </div>
                   <div style={styles.errorField}>
-                    <strong>URL:</strong> {window.location.href}
+                    <strong>{t('URL:')}</strong> {window.location.href}
                   </div>
                   {this.state.error?.stack && (
                     <div style={styles.errorField}>
-                      <strong>Stack Trace:</strong>
+                      <strong>{t('Stack Trace:')}</strong>
                       <pre style={styles.stackTrace}>{this.state.error.stack}</pre>
                     </div>
                   )}
@@ -162,18 +163,18 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
             <div style={styles.errorActions}>
               <button onClick={this.handleManualRetry} style={styles.retryButton}>
-                Try Again
+                {t('Try Again')}
               </button>
 
               <button onClick={() => window.location.reload()} style={styles.reloadButton}>
-                Reload Page
+                {t('Reload Page')}
               </button>
             </div>
 
             {this.state.retryCount < MAX_AUTO_RETRIES ? (
-              <p style={styles.autoRetryNote}>Auto-retry in 5 seconds...</p>
+              <p style={styles.autoRetryNote}>{t('Auto-retry in 5 seconds...')}</p>
             ) : (
-              <p style={styles.autoRetryNote}>Automatic retries exhausted. Use Try Again or Reload Page.</p>
+              <p style={styles.autoRetryNote}>{t('Automatic retries exhausted. Use Try Again or Reload Page.')}</p>
             )}
           </div>
         </div>

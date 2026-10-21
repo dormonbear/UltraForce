@@ -1,6 +1,7 @@
 import type { SearchResult } from '~types'
 import { sfRest, API_VERSION } from './auth'
 import { logger } from './logger'
+import { t } from './i18n'
 import { normalizeHost } from './domain-utils'
 
 export interface ProfileDotNotationResult {
@@ -242,7 +243,7 @@ export async function queryProfileUsers(profileId: string, sfHost: string, sessi
     return records.map((record) => {
       const parts = [record.Username]
       if (record.Email) parts.push(record.Email)
-      parts.push(record.IsActive ? 'Active' : 'Inactive')
+      parts.push(t(record.IsActive ? 'Active' : 'Inactive'))
 
       return {
         id: record.Id,
@@ -354,7 +355,7 @@ export async function queryProfileApexClassAccess(
         id: record.Id,
         name: displayName,
         type: 'ApexClassAccess',
-        description: record.NamespacePrefix ? `Namespace: ${record.NamespacePrefix}` : '',
+        description: record.NamespacePrefix ? t('Namespace: {namespace}', { namespace: record.NamespacePrefix }) : '',
         metadata: { ...record, profileId }
       }
     })
@@ -395,7 +396,7 @@ export async function queryProfileVFPageAccess(
         id: record.Id,
         name: displayName,
         type: 'VFPageAccess',
-        description: record.NamespacePrefix ? `Namespace: ${record.NamespacePrefix}` : '',
+        description: record.NamespacePrefix ? t('Namespace: {namespace}', { namespace: record.NamespacePrefix }) : '',
         metadata: { ...record, profileId }
       }
     })
@@ -572,7 +573,7 @@ export async function queryProfileFieldPermissions(
     logger.debug('profile:field-permissions', { profileId, count: records.length })
 
     return records.map((record) => {
-      const flags = [record.PermissionsRead ? 'Read' : '-', record.PermissionsEdit ? 'Edit' : '-'].join(' ')
+      const flags = [record.PermissionsRead ? t('Read') : '-', record.PermissionsEdit ? t('Edit') : '-'].join(' ')
 
       return {
         id: record.Id,
