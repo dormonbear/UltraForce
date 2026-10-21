@@ -22,6 +22,16 @@ memory and attached to Salesforce requests as `Authorization: Bearer` or
 cache stores a short, non-cryptographic session fingerprint to invalidate stale
 permission results after login changes; it is not an authentication credential.
 
+The cookie bridge accepts only this extension's content-script messages from
+supported HTTPS Salesforce document origins. Host resolution and session
+requests are bound to that document, including supported Setup, Lightning,
+Visualforce and China domain mappings. Discovery for unknown legacy instance
+domains requires an exact match with the document's own session cookie, rather
+than just an organization ID prefix. If this cannot be established, the bridge
+keeps the current host; open the organization's MyDomain or Lightning page if
+an older Visualforce page cannot authenticate. An unrelated hostname in a
+message cannot choose another organization's session.
+
 There is no analytics SDK, beacon, WebSocket, EventSource, or XMLHttpRequest in
 the application source. Fonts are bundled with the extension and loaded from
 `chrome-extension://` URLs. Version notifications compare packaged and locally
