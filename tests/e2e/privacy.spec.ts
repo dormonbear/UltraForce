@@ -61,7 +61,12 @@ test('built extension removes legacy diagnostics and never records request activ
       )
       .toEqual([])
     const preserved = await worker.evaluate(() =>
-      chrome.storage.local.get([
+      chrome.storage.local.get<{
+        ultraforce_favorites__fixture: unknown
+        ultraforce_history__fixture: unknown
+        metadata_fixture_ApexClass: unknown
+        ultraforce_search_settings: { customCommands: { private: { key: string } } }
+      }>([
         'ultraforce_favorites__fixture',
         'ultraforce_history__fixture',
         'metadata_fixture_ApexClass',
