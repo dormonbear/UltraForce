@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript"],
+  "categories": {
+    "correctness": "warn"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "eslint/prefer-const": "warn",
+    "eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "eslint/no-empty": ["error", { "allowEmptyCatch": true }],
+    "eslint/no-useless-escape": "warn",
+    "react-hooks/exhaustive-deps": "warn",
+    "react-hooks/rules-of-hooks": "error"
+  },
+  "ignorePatterns": ["node_modules/**", "build/**", ".plasmo/**", "dist/**", "coverage/**"]
+}

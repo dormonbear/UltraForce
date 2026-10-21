@@ -44,7 +44,3 @@ export type SearchCommand = BuiltinCommand | CustomCommand
 export function isCustomCommand(cmd: SearchCommand): cmd is CustomCommand {
   return cmd.isBuiltin === false
 }
-
-export function isBuiltinCommand(cmd: SearchCommand): cmd is BuiltinCommand {
-  return cmd.isBuiltin === true
-}

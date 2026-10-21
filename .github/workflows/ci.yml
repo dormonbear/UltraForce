@@ -32,6 +32,9 @@ jobs:
         run: pnpm lint
         continue-on-error: true
 
+      - name: Format Check
+        run: pnpm format:check
+
       - name: Type Check
         run: pnpm type-check
 
@@ -87,6 +90,12 @@ jobs:
 
       - name: Build Extension
         run: pnpm build
+
+      - name: Verify Managed Schema Shipped
+        run: node scripts/verify-managed-schema.mjs
+
+      - name: Verify Bundled Fonts Shipped
+        run: node scripts/verify-fonts.mjs
 
       - name: Package Extension
         run: pnpm package

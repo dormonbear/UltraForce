@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "navigationMode": {
+      "type": "string",
+      "enum": ["auto", "lightning", "classic"],
+      "title": "Navigation Mode",
+      "description": "Forces how UltraForce opens Salesforce pages. Values: auto (follow user preference), lightning (always Lightning Experience), classic (always Salesforce Classic)."
+    },
+    "hideManagedPackage": {
+      "type": "boolean",
+      "title": "Hide Managed Package Items",
+      "description": "When true, managed package metadata items are hidden from search results; when false, they are always shown."
+    },
+    "maxResultsPerType": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 500,
+      "title": "Max Results Per Type",
+      "description": "Maximum number of search results returned per metadata type. Capped between 10 and 500 to bound API usage."
+    }
+  }
+}

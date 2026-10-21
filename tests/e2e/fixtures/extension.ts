@@ -52,7 +52,12 @@ async function ensureContext() {
   sharedUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ultraforce-test-'))
 
   sharedContext = await chromium.launchPersistentContext(sharedUserDataDir, {
-    headless: false,
+    // MV3 extensions only load in the real browser, but with channel:
+    // 'chromium' (the full Chromium build, new headless mode) they load in
+    // headless too - so runs are invisible by default and E2E_VISIBLE=1 (or
+    // the CLI --headed flag, which overrides use.headless in the config) opts
+    // into an on-screen run for debugging.
+    channel: 'chromium',
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
@@ -60,6 +65,17 @@ async function ensureContext() {
       '--disable-gpu'
     ]
   })
+
+  // Forward the extension service worker's console (background logs land there,
+  // not on the page). Attach on every registration - MV3 workers can restart.
+  const attachSwConsole = (sw: import('@playwright/test').Worker) => {
+    sw.on('console', (msg) => {
+      console.log(`[extension-sw] ${msg.text().slice(0, 300)}`)
+    })
+  }
+  sharedContext.on('serviceworker', attachSwConsole)
+  const swProbe = sharedContext.serviceWorkers()[0]
+  if (swProbe) attachSwConsole(swProbe)
 
   sharedPage = await sharedContext.newPage()
 
@@ -94,20 +110,27 @@ export type TestFixtures = {
 }
 
 export const test = base.extend<TestFixtures>({
+  // The fixture callbacks below receive Playwright's positional `use` argument,
+  // not a React hook. rules-of-hooks misfires on the identifier - the pattern
+  // is the documented Playwright fixture contract.
   extensionContext: async ({}, use) => {
     const { context } = await ensureContext()
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(context)
   },
   extensionPage: async ({}, use) => {
     const { page } = await ensureContext()
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(page)
   },
   baseUrl: async ({}, use) => {
     const { baseUrl } = await ensureContext()
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(baseUrl)
   },
   orgInfo: async ({}, use) => {
     const { orgInfo } = await ensureContext()
+    // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(orgInfo)
   }
 })
@@ -124,6 +147,8 @@ test.afterAll(async () => {
   if (sharedUserDataDir) {
     try {
       fs.rmSync(sharedUserDataDir, { recursive: true, force: true })
-    } catch {}
+    } catch (error) {
+      console.warn('Failed to remove temp profile dir', error)
+    }
   }
 })

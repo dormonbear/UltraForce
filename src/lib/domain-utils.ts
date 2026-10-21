@@ -13,23 +13,17 @@ export function normalizeHost(host: string): string {
 
   normalized = normalized.replace(/\.lightning\.force\./, '.my.salesforce.')
 
+  // US Setup: .my.salesforce-setup. -> .my.salesforce.
+  normalized = normalized.replace(/\.my\.salesforce-setup\./, '.my.salesforce.')
+
   // China: .sandbox.setup. -> .sandbox.my., .setup. -> .my.
   normalized = normalized.replace(
     /\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\./,
     '.sandbox.my.sfcrmproducts.'
   )
-  normalized = normalized.replace(
-    /\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\./,
-    '.sandbox.my.sfcrmapps.'
-  )
-  normalized = normalized.replace(
-    /\.(lightning|file|content|c|setup)\.sfcrmproducts\./,
-    '.my.sfcrmproducts.'
-  )
-  normalized = normalized.replace(
-    /\.(lightning|file|content|c|setup)\.sfcrmapps\./,
-    '.my.sfcrmapps.'
-  )
+  normalized = normalized.replace(/\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\./, '.sandbox.my.sfcrmapps.')
+  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmproducts\./, '.my.sfcrmproducts.')
+  normalized = normalized.replace(/\.(lightning|file|content|c|setup)\.sfcrmapps\./, '.my.sfcrmapps.')
 
   normalized = normalized.replace(/\.mcas\.ms$/, '')
 

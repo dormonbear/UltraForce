@@ -34,22 +34,6 @@ import {
 import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
-// Facade re-exports: keep all external importers unchanged
-export { getSetupHost, buildSetupUrl, resolveSetupShortcutPath, getCurrentRecordFromUrl, shouldUseLightning } from '~lib/url-builder'
-export { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
-export type { SetupShortcut } from '~lib/setup-shortcuts'
-export { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl, KEY_PREFIX_MAP } from '~lib/navigation'
-export type { NavigationContext } from '~lib/navigation'
-export {
-  fetchRecordTypeId,
-  getCurrentRecordLayoutInfo,
-  resolveObjectApiNameFromRecord,
-  getCurrentUserId,
-  getCurrentUserProfileId,
-  getUserLightningPreference,
-  getLayoutAssignment
-} from '~lib/record-context'
-
 /**
  * Composite state type for backward compatibility.
  * All state is now managed by Zustand stores; this interface
@@ -123,9 +107,7 @@ class UltraForceWindowManager {
     return UltraForceWindowManager.initializationPromise
   }
 
-  private static async createInstance(
-    options?: WindowManagerOptions
-  ): Promise<UltraForceWindowManager> {
+  private static async createInstance(options?: WindowManagerOptions): Promise<UltraForceWindowManager> {
     await UltraForceWindowManager.cleanup()
 
     const instance = new UltraForceWindowManager(options)
@@ -253,9 +235,7 @@ class UltraForceWindowManager {
         this.log('Session status:', hasSession ? 'Active' : 'None')
 
         if (hasSession) {
-          this.fetchLightningPreference().catch((error) =>
-            logger.warn('fetchLightningPreference failed', { error })
-          )
+          this.fetchLightningPreference().catch((error) => logger.warn('fetchLightningPreference failed', { error }))
         }
       }
     } catch (error) {
@@ -395,8 +375,15 @@ class UltraForceWindowManager {
     this.log('React component rendered with error boundary')
   }
 
-  private async handleSearch(query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean): Promise<void> {
-    this.log(`Search requested: "${query}" for types: ${selectedTypes.join(', ')}, fuzzy: ${useFuzzy}, hideManagedPkg: ${hideManagedPkg}`)
+  private async handleSearch(
+    query: string,
+    selectedTypes: string[],
+    useFuzzy: boolean,
+    hideManagedPkg: boolean
+  ): Promise<void> {
+    this.log(
+      `Search requested: "${query}" for types: ${selectedTypes.join(', ')}, fuzzy: ${useFuzzy}, hideManagedPkg: ${hideManagedPkg}`
+    )
 
     const { sfHost } = useSessionStore.getState()
     if (!sfHost) {
@@ -410,7 +397,10 @@ class UltraForceWindowManager {
     this.emit('searchStart', { query, selectedTypes })
 
     try {
-      const results = await searchSalesforceMetadata(query, selectedTypes, sfHost, { useFuzzy, hideManagedPackage: hideManagedPkg })
+      const results = await searchSalesforceMetadata(query, selectedTypes, sfHost, {
+        useFuzzy,
+        hideManagedPackage: hideManagedPkg
+      })
 
       if (currentNonce !== this.searchNonce) {
         this.log(`Discarding stale search results (nonce ${currentNonce} vs ${this.searchNonce})`)
@@ -429,7 +419,13 @@ class UltraForceWindowManager {
     }
   }
 
-  private async handleCustomSearch(soqlTemplate: string, query: string, useToolingApi: boolean, nameField: string, descriptionFields?: string[]): Promise<void> {
+  private async handleCustomSearch(
+    soqlTemplate: string,
+    query: string,
+    useToolingApi: boolean,
+    nameField: string,
+    descriptionFields?: string[]
+  ): Promise<void> {
     this.log(`Custom search requested: "${query}" with template, tooling: ${useToolingApi}`)
 
     const { sfHost } = useSessionStore.getState()
@@ -655,14 +651,18 @@ class UltraForceWindowManager {
     const { userLightningPreference } = useSessionStore.getState()
 
     const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
-    const objectApiName = fromUrlObject || (recordId && sfHost ? await resolveObjectApiNameFromRecordFn(sfHost, recordId) : null)
+    const objectApiName =
+      fromUrlObject || (recordId && sfHost ? await resolveObjectApiNameFromRecordFn(sfHost, recordId) : null)
     if (!sfHost || !objectApiName || !recordId) return null
     const layoutInfo = await getCurrentRecordLayoutInfoFn(sfHost, objectApiName, recordId)
     if (!layoutInfo) return null
     // China (Alibaba) domains don't support Classic layout editor
     const useLightning = shouldUseLightning(navigationMode, userLightningPreference) || isChinaDomain(sfHost)
     const url = useLightning
-      ? buildSetupUrl(sfHost, `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`)
+      ? buildSetupUrl(
+          sfHost,
+          `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`
+        )
       : `https://${sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
     if (!url) return null
     return { objectApiName: layoutInfo.objectApiName, url }
@@ -740,10 +740,7 @@ class UltraForceWindowManager {
     const navContext = this.getNavigationContext()
     const targetUrl = buildActionUrl(result, action, navContext)
     if (targetUrl) {
-      this.trackNavigation(
-        { ...result, name: `${result.name} - ${action}` },
-        targetUrl
-      )
+      this.trackNavigation({ ...result, name: `${result.name} - ${action}` }, targetUrl)
       window.open(targetUrl, '_blank')
       if (useSettingsStore.getState().closeOnNavigate) {
         this.hide()
@@ -919,4 +916,3 @@ class UltraForceWindowManager {
 }
 
 export default UltraForceWindowManager
-export type { WindowManagerState, WindowManagerOptions }

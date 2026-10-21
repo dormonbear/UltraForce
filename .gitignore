@@ -67,6 +67,10 @@ backup/
 # GSD planning artifacts
 .planning/
 
+# Playwright run artifacts
+test-results/
+playwright-report/
+
 # Playwright MCP screenshots
 .playwright-mcp/
 
@@ -74,3 +78,6 @@ backup/
 .codegraph/
 # Local-only working notes (internal planning, drafts) - never publish
 notes/
+
+# Node compile cache (created by running node scripts/verifiers locally)
+node-compile-cache/

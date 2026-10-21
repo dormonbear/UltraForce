@@ -23,26 +23,31 @@ test.describe('Favorites', () => {
     // 1. Open modal, search for WeatherService and ensure it is unpinned to start.
     await uf.openModal()
     await uf.clearAndType(':c WeatherService')
-    await uf.wait(1500)
-
-    const names = await uf.resultNames()
-    expect(names).toContain('WeatherService')
+    // The row must be rendered before any pin interaction; this is the real
+    // condition instead of a fixed wait on the org search.
+    await expect(uf.rowByText('WeatherService')).toBeVisible({ timeout: 10000 })
 
     // Reset to a known unpinned state if a previous run left it pinned.
     if ((await uf.pinTitleOnRow('WeatherService')) === 'Remove from favorites') {
       await uf.togglePinOnRow('WeatherService')
     }
-    expect(await uf.pinTitleOnRow('WeatherService')).toBe('Pin to favorites')
+    await expect
+      .poll(() => uf.pinTitleOnRow('WeatherService'), { timeout: 5000 })
+      .toBe('Pin to favorites')
 
     // 1a. Pin the WeatherService row; the button should toggle to "Remove from favorites".
     await uf.togglePinOnRow('WeatherService')
-    expect(await uf.pinTitleOnRow('WeatherService')).toBe('Remove from favorites')
+    await expect
+      .poll(() => uf.pinTitleOnRow('WeatherService'), { timeout: 5000 })
+      .toBe('Remove from favorites')
 
     // 2. Reopen the modal on the empty/home state and assert the favorite shows
     //    in the home-screen Favorites section.
     await uf.closeModal()
     await uf.openModal()
-    await uf.wait(1000)
+    // The home screen must be rendered before reading its sections; the
+    // favorites list renders synchronously with it (store-backed props).
+    await expect(uf.rawPage.locator('.home-screen')).toBeVisible({ timeout: 5000 })
 
     expect(await uf.rawPage.locator('.home-screen').count()).toBe(1)
     const favHeaders = await uf.rawPage.locator('.home-section-header').allTextContents()
@@ -52,8 +57,12 @@ test.describe('Favorites', () => {
 
     // 3. Unpin from the home screen and assert it is removed from Favorites.
     await uf.unpinFromHome('WeatherService')
-    expect(await uf.homeFavoriteNames()).not.toContain('WeatherService')
-    expect(await uf.rawPage.getByTitle('Unpin').count()).toBe(0)
+    await expect
+      .poll(() => uf.homeFavoriteNames(), { timeout: 5000 })
+      .not.toContain('WeatherService')
+    await expect
+      .poll(() => uf.rawPage.getByTitle('Unpin').count(), { timeout: 5000 })
+      .toBe(0)
 
     await uf.closeModal()
   })

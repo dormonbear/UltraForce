@@ -28,7 +28,9 @@ test.describe('ID Navigation', () => {
   test('pasting a record id navigates to it on Enter', async () => {
     await uf.openModal()
     await uf.clearAndType(recordId)
-    await uf.wait(2500)
+    // The id-preview list renders once the id search settles; Enter must wait
+    // for it instead of a fixed sleep.
+    await expect(uf.rawPage.locator('.id-preview-list')).toBeVisible({ timeout: 8000 })
     const nav = await uf.pressEnterAndWaitForNewTab()
     expect(nav.opened).toBe(true)
     expect(nav.url).toContain(recordId.substring(0, 15))

@@ -11,6 +11,8 @@ interface ResultItemProps {
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   isFavorite?: boolean
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
+  /** Unique id for aria-activedescendant references from the combobox input. */
+  optionId?: string
 }
 
 const ActionButton: React.FC<{
@@ -18,17 +20,20 @@ const ActionButton: React.FC<{
   title: string
   onClick: (e: React.MouseEvent) => void
 }> = ({ icon, title, onClick }) => (
-  <button
-    className="object-action-btn"
-    title={title}
-    aria-label={title}
-    onClick={onClick}
-  >
+  <button className="object-action-btn" title={title} aria-label={title} onClick={onClick}>
     {icon}
   </button>
 )
 
-const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, onActionClick, isFavorite, onToggleFavorite }) => {
+const ResultItem: React.FC<ResultItemProps> = ({
+  result,
+  isSelected,
+  onClick,
+  onActionClick,
+  isFavorite,
+  onToggleFavorite,
+  optionId
+}) => {
   const itemRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
 
@@ -81,6 +86,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
   return (
     <div
       ref={itemRef}
+      id={optionId}
       className={`result-item ${isSelected ? 'selected' : ''}`}
       data-ultraforce-result-item
       data-selected={isSelected}
@@ -109,12 +115,16 @@ const ResultItem: React.FC<ResultItemProps> = ({ result, isSelected, onClick, on
                 })
               }}
               icon={
-                <svg width="14" height="14" viewBox="0 0 24 24"
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
                   fill={isFavorite ? 'currentColor' : 'none'}
-                  stroke="currentColor" strokeWidth="2"
+                  stroke="currentColor"
+                  strokeWidth="2"
                   className={isFavorite ? 'pin-icon-filled' : 'pin-icon-outline'}
                 >
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
               }
             />

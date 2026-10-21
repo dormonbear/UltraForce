@@ -40,7 +40,14 @@ const TYPE_LABELS: Record<string, string> = {
   CustomSetting: 'Custom Settings'
 }
 
-const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, commandDescription, selectedTypes, errorMessage }) => {
+const EmptyState: React.FC<EmptyStateProps> = ({
+  type,
+  query,
+  commandTypes,
+  commandDescription,
+  selectedTypes,
+  errorMessage
+}) => {
   const [randomHint] = useState(() => {
     return SEARCH_HINTS[Math.floor(Math.random() * SEARCH_HINTS.length)]
   })
@@ -55,13 +62,22 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
   }
 
   if (type === 'command') {
-    const title = commandTypes && commandTypes.length > 0
-      ? `Searching ${commandTypes.join(', ')}`
-      : commandDescription || 'Custom Search'
+    const title =
+      commandTypes && commandTypes.length > 0
+        ? `Searching ${commandTypes.join(', ')}`
+        : commandDescription || 'Custom Search'
     return (
       <div className="search-empty">
         <div className="empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
@@ -78,9 +94,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
       <div className="search-empty">
         <div className="empty-title">Searching {typeLabels}</div>
         <div className="empty-desc">
-          <span style={{ fontSize: '11px', opacity: 0.6, display: 'block' }}>
-            Tip: {randomHint}
-          </span>
+          <span style={{ fontSize: '11px', opacity: 0.6, display: 'block' }}>Tip: {randomHint}</span>
         </div>
       </div>
     )
@@ -91,7 +105,13 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
       <div className="search-empty">
         <div className="empty-title">Salesforce Record ID</div>
         <div className="empty-desc">
-          Press <kbd style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px' }}>Enter</kbd> to open record {query}
+          Press{' '}
+          <kbd
+            style={{ padding: '2px 6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px' }}
+          >
+            Enter
+          </kbd>{' '}
+          to open record {query}
         </div>
       </div>
     )
@@ -110,7 +130,15 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
     return (
       <div className="search-empty">
         <div className="empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
@@ -132,7 +160,15 @@ const EmptyState: React.FC<EmptyStateProps> = ({ type, query, commandTypes, comm
     return (
       <div className="search-empty search-error" role="alert">
         <div className="empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
             <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />

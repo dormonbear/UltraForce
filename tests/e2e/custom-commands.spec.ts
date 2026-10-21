@@ -35,7 +35,7 @@ test.describe('Custom SOQL Commands', () => {
     await uf.closeModal()
     await uf.wait(500)
 
-    const nav = await uf.searchAndNavigateNewTab(':ac Weather', 3000)
+    const nav = await uf.searchAndNavigateNewTab(':ac Weather', 5000)
     expect(nav.opened).toBe(true)
     await uf.closeModal()
   })

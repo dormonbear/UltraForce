@@ -102,7 +102,9 @@ async function handleGetSfHost(
     }
 
     // China sandbox domains: .sandbox.setup. -> .sandbox.my.
-    const sfcrmproductsSandboxMatch = currentDomain.match(/^(.+)\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\.cn$/)
+    const sfcrmproductsSandboxMatch = currentDomain.match(
+      /^(.+)\.sandbox\.(setup|lightning|file|content|c)\.sfcrmproducts\.cn$/
+    )
     if (sfcrmproductsSandboxMatch) {
       const orgName = sfcrmproductsSandboxMatch[1]
       const myDomain = `${orgName}.sandbox.my.sfcrmproducts.cn`
@@ -126,7 +128,9 @@ async function handleGetSfHost(
     }
 
     // SFoA sandbox: sfcrmapps.cn uses sfcrmproducts.cn cookies
-    const sfcrmappsSandboxMatch = currentDomain.match(/^(.+)\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\.cn$/)
+    const sfcrmappsSandboxMatch = currentDomain.match(
+      /^(.+)\.sandbox\.(setup|lightning|file|content|c)\.sfcrmapps\.cn$/
+    )
     if (sfcrmappsSandboxMatch) {
       const orgName = sfcrmappsSandboxMatch[1]
       for (const myDomain of [`${orgName}.sandbox.my.sfcrmproducts.cn`, `${orgName}.sandbox.my.sfcrmapps.cn`]) {
@@ -204,9 +208,7 @@ async function handleGetSfHost(
         storeId
       })
 
-      const sessionCookie = cookies.find(
-        (c) => c.value.startsWith(orgId + '!') && c.domain !== 'help.salesforce.com'
-      )
+      const sessionCookie = cookies.find((c) => c.value.startsWith(orgId + '!') && c.domain !== 'help.salesforce.com')
 
       if (sessionCookie) {
         sendResponse(sessionCookie.domain)

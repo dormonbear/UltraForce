@@ -24,10 +24,7 @@ export interface ContextualAction {
  * Supplements the existing Page Layout / Record Type / Fields actions
  * with URL-navigable shortcuts.
  */
-export function getRecordSuggestions(
-  recordContext: RecordContext,
-  sfHost: string
-): ContextualAction[] {
+export function getRecordSuggestions(recordContext: RecordContext, sfHost: string): ContextualAction[] {
   const { objectApiName, recordId } = recordContext
   if (!objectApiName || !sfHost) return []
 
@@ -62,10 +59,7 @@ const MAX_SETUP_SUGGESTIONS = 5
  * Matches the current page against setup shortcuts to find the category,
  * then returns other pages in the same category.
  */
-export function getSetupSuggestions(
-  currentPath: string,
-  shortcuts: SetupShortcut[]
-): SetupShortcut[] {
+export function getSetupSuggestions(currentPath: string, shortcuts: SetupShortcut[]): SetupShortcut[] {
   if (!currentPath) return []
 
   // Find which shortcut matches the current page
@@ -74,9 +68,7 @@ export function getSetupSuggestions(
 
   // Return other shortcuts in the same category
   return shortcuts
-    .filter(
-      (s) => s.description === currentShortcut.description && s.id !== currentShortcut.id
-    )
+    .filter((s) => s.description === currentShortcut.description && s.id !== currentShortcut.id)
     .slice(0, MAX_SETUP_SUGGESTIONS)
 }
 

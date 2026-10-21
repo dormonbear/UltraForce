@@ -38,7 +38,7 @@ const SETUP_ENTITY_PREFIXES = [
   '0Ab', // AuraDefinitionBundle
   '0Rd', // LightningComponentBundle
   '300', // Flow / FlowDefinition
-  '0PS'  // PermissionSet
+  '0PS' // PermissionSet
 ]
 
 export function getCurrentRecordFromUrl(): { objectApiName: string | null; recordId: string | null } {
@@ -97,14 +97,24 @@ export function shouldUseLightning(mode: NavigationMode, userPreference: boolean
     return true
   }
 
-  if (hostname.includes('.lightning.force.com') ||
-      hostname.includes('.salesforce-setup.com') ||
-      hostname.includes('.setup.sfcrmproducts.cn') ||
-      hostname.includes('.setup.sfcrmapps.cn')) {
+  if (
+    hostname.includes('.lightning.force.com') ||
+    hostname.includes('.salesforce-setup.com') ||
+    hostname.includes('.setup.sfcrmproducts.cn') ||
+    hostname.includes('.setup.sfcrmapps.cn')
+  ) {
     return true
   }
 
-  const classicPatterns = ['/home/home.jsp', '/setup/forcecomHomepage.apexp', '/ui/setup/', '/p/setup/', '/apexpages/', '/_ui/', '/servlet/']
+  const classicPatterns = [
+    '/home/home.jsp',
+    '/setup/forcecomHomepage.apexp',
+    '/ui/setup/',
+    '/p/setup/',
+    '/apexpages/',
+    '/_ui/',
+    '/servlet/'
+  ]
   if (classicPatterns.some((pattern) => pathname.includes(pattern))) {
     return false
   }

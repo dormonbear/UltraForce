@@ -7,6 +7,14 @@ interface SearchInputProps {
   onQueryChange: (query: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
   sfHost: string | null
+  /** False when the browser UI holds focus and only a click can return it to the page. */
+  pageHasFocus?: boolean
+  /** Whether the results listbox is currently shown; drives aria-expanded. */
+  expanded?: boolean
+  /** id of the results listbox; drives aria-controls. */
+  controlsId?: string
+  /** id of the highlighted option; drives aria-activedescendant. */
+  activeDescendantId?: string | null
 }
 
 function detectOrgType(sfHost: string | null): OrgType {
@@ -20,8 +28,13 @@ function detectOrgType(sfHost: string | null): OrgType {
     return 'scratch'
   }
 
-  if (host.includes('.sandbox.') || host.includes('--') || host.includes('.cs') ||
-      /--\w+\./.test(host) || host.includes('sandbox.my.salesforce')) {
+  if (
+    host.includes('.sandbox.') ||
+    host.includes('--') ||
+    host.includes('.cs') ||
+    /--\w+\./.test(host) ||
+    host.includes('sandbox.my.salesforce')
+  ) {
     return 'sandbox'
   }
 
@@ -30,8 +43,12 @@ function detectOrgType(sfHost: string | null): OrgType {
   }
 
   // Production - includes Alibaba domains (.sfcrmproducts.cn / .sfcrmapps.cn)
-  if (host.includes('.my.salesforce.') || host.includes('.lightning.force.') ||
-      host.includes('.sfcrmproducts.cn') || host.includes('.sfcrmapps.cn')) {
+  if (
+    host.includes('.my.salesforce.') ||
+    host.includes('.lightning.force.') ||
+    host.includes('.sfcrmproducts.cn') ||
+    host.includes('.sfcrmapps.cn')
+  ) {
     return 'production'
   }
 
@@ -40,16 +57,21 @@ function detectOrgType(sfHost: string | null): OrgType {
 
 function getOrgTypeLabel(orgType: OrgType): string {
   switch (orgType) {
-    case 'production': return 'PROD'
-    case 'sandbox': return 'SANDBOX'
-    case 'scratch': return 'SCRATCH'
-    case 'developer': return 'DEV'
-    default: return 'ORG'
+    case 'production':
+      return 'PROD'
+    case 'sandbox':
+      return 'SANDBOX'
+    case 'scratch':
+      return 'SCRATCH'
+    case 'developer':
+      return 'DEV'
+    default:
+      return 'ORG'
   }
 }
 
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ query, onQueryChange, onKeyDown, sfHost }, ref) => {
+  ({ query, onQueryChange, onKeyDown, sfHost, pageHasFocus = true, expanded, controlsId, activeDescendantId }, ref) => {
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
 
@@ -63,14 +85,17 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     }, [onQueryChange])
 
     // Merge forwarded ref and internal ref
-    const setRefs = useCallback((el: HTMLInputElement | null) => {
-      internalRef.current = el
-      if (typeof ref === 'function') {
-        ref(el)
-      } else if (ref) {
-        (ref as React.MutableRefObject<HTMLInputElement | null>).current = el
-      }
-    }, [ref])
+    const setRefs = useCallback(
+      (el: HTMLInputElement | null) => {
+        internalRef.current = el
+        if (typeof ref === 'function') {
+          ref(el)
+        } else if (ref) {
+          ;(ref as React.MutableRefObject<HTMLInputElement | null>).current = el
+        }
+      },
+      [ref]
+    )
 
     // Listen for custom 'ultraforce-input' events from the keyboard interceptor.
     // This bypasses React's event delegation which doesn't work reliably
@@ -90,13 +115,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 
     return (
       <div className="search-input-section">
-        <svg
-          className="search-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
+        <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
@@ -119,9 +138,19 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             e.nativeEvent.stopImmediatePropagation()
           }}
           placeholder={
-            displayName ? `Search ${displayName} metadata...` : 'Search Salesforce metadata...'
+            !pageHasFocus
+              ? 'Click here to focus, then type to search'
+              : displayName
+                ? `Search ${displayName} metadata...`
+                : 'Search Salesforce metadata...'
           }
           aria-label="Search Salesforce metadata"
+          role="combobox"
+          aria-expanded={expanded ? 'true' : 'false'}
+          aria-controls={controlsId}
+          aria-activedescendant={activeDescendantId ?? undefined}
+          aria-autocomplete="list"
+          autoComplete="off"
           className="search-input"
           data-ultraforce-input
           autoFocus

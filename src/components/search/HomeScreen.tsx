@@ -10,14 +10,22 @@ const MAX_RECENT_ITEMS = 8
 const MAX_FAVORITE_ITEMS = 10
 
 const TYPE_ICONS: Record<string, string> = {
-  ApexClass: '</>', ApexTrigger: '</>',
-  CustomObject: 'O', CustomField: 'F',
-  Flow: 'FL', User: 'U',
-  PermissionSet: 'PS', Profile: 'PR',
-  LightningComponentBundle: 'LW', AuraDefinitionBundle: 'AU',
-  ApexPage: 'VF', ApexComponent: 'VC',
-  CustomLabel: 'CL', Record: 'R',
-  SetupShortcut: 'S', CustomMetadataType: 'CM',
+  ApexClass: '</>',
+  ApexTrigger: '</>',
+  CustomObject: 'O',
+  CustomField: 'F',
+  Flow: 'FL',
+  User: 'U',
+  PermissionSet: 'PS',
+  Profile: 'PR',
+  LightningComponentBundle: 'LW',
+  AuraDefinitionBundle: 'AU',
+  ApexPage: 'VF',
+  ApexComponent: 'VC',
+  CustomLabel: 'CL',
+  Record: 'R',
+  SetupShortcut: 'S',
+  CustomMetadataType: 'CM',
   CustomSetting: 'CS'
 }
 
@@ -65,10 +73,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return sorted.slice(0, MAX_RECENT_ITEMS)
   }, [historyItems])
 
-  const visibleFavorites = useMemo(
-    () => favorites.slice(0, MAX_FAVORITE_ITEMS),
-    [favorites]
-  )
+  const visibleFavorites = useMemo(() => favorites.slice(0, MAX_FAVORITE_ITEMS), [favorites])
 
   const handleItemClick = useCallback(
     (url: string) => {
@@ -110,8 +115,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             Type to search {selectedTypes?.length ? 'your selected metadata types' : 'Salesforce metadata'}
           </div>
           <div className="home-tips">
-            <span className="home-tip">Type <kbd>:</kbd> for commands</span>
-            <span className="home-tip">Press <kbd>Tab</kbd> to autocomplete</span>
+            <span className="home-tip">
+              Type <kbd>:</kbd> for commands
+            </span>
+            <span className="home-tip">
+              Press <kbd>Tab</kbd> to autocomplete
+            </span>
           </div>
         </div>
       </div>
@@ -125,7 +134,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="home-section-header">
             <span className="home-section-icon">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </span>
             Favorites
@@ -144,16 +153,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   {getTypeIcon(item.type)}
                 </span>
                 <span className="home-item-name">{item.name}</span>
-                {item.description && (
-                  <span className="home-item-desc">{item.description}</span>
-                )}
+                {item.description && <span className="home-item-desc">{item.description}</span>}
                 <button
                   className="home-item-action home-item-unpin"
                   onClick={(e) => handleFavoriteToggle(e, item)}
                   title="Unpin"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 </button>
               </div>
@@ -167,8 +174,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="home-section-header">
             <span className="home-section-icon">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
             </span>
             Recent
@@ -193,11 +200,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   onClick={(e) => handleFavoriteToggle(e, item)}
                   title={isFavorite(item.id) ? 'Unpin' : 'Pin to favorites'}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24"
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
                     fill={isFavorite(item.id) ? 'currentColor' : 'none'}
-                    stroke="currentColor" strokeWidth="2"
+                    stroke="currentColor"
+                    strokeWidth="2"
                   >
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                 </button>
                 <button
@@ -206,8 +217,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   title="Remove from history"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>

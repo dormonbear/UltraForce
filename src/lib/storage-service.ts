@@ -1,7 +1,7 @@
 // Centralized storage service - single typed gateway for chrome.storage.local
 
-import type { NavigationMode, CustomCommand } from '~types'
 import { logger } from './logger'
+import { normalizeHost } from './domain-utils'
 
 // --- Storage key constants ---
 
@@ -27,28 +27,15 @@ export function metadataCacheKey(orgId: string, metadataType: string): string {
 
 /** Builds the per-org history persistence key. Host (sfHost) is preferred over orgId since it is known earlier. */
 export function historyKey(host: string): string {
-  return `ultraforce_history__${host}`
+  return `ultraforce_history__${normalizeHost(host)}`
 }
 
 /** Builds the per-org favorites persistence key. */
 export function favoritesKey(host: string): string {
-  return `ultraforce_favorites__${host}`
+  return `ultraforce_favorites__${normalizeHost(host)}`
 }
 
 // --- Value interfaces ---
-
-export interface SearchSettings {
-  selectedTypes?: string[]
-  shortcutKey?: string
-  closeOnNavigate?: boolean
-  navigationMode?: NavigationMode
-  fuzzySearch?: boolean
-  maxResults?: number
-  maxResultsPerType?: number
-  hideManagedPackage?: boolean
-  customCommands?: Record<string, CustomCommand>
-  autoLoadFields?: boolean
-}
 
 export interface UnsupportedTypesState {
   [host: string]: {
@@ -76,12 +63,6 @@ export interface ErrorLogEntry {
   url: string
   userAgent: string
   timestamp?: number
-}
-
-export interface LegacySettings {
-  searchLimit: number
-  autoSearch: boolean
-  showDebug: boolean
 }
 
 // --- Storage operations ---
@@ -123,17 +104,11 @@ export async function storageGetAll(): Promise<Record<string, unknown>> {
 
 // --- Change listeners ---
 
-type StorageChangeCallback = (
-  changes: { [key: string]: chrome.storage.StorageChange },
-  areaName: string
-) => void
+type StorageChangeCallback = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => void
 
 /** Adds a listener for chrome.storage.local changes. Filters to local area only. */
 export function onStorageChanged(callback: StorageChangeCallback): void {
-  const wrappedCallback = (
-    changes: { [key: string]: chrome.storage.StorageChange },
-    areaName: string
-  ) => {
+  const wrappedCallback = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
     if (areaName === 'local') {
       callback(changes, areaName)
     }

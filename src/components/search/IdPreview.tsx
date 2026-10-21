@@ -94,10 +94,7 @@ export default function IdPreview({ recordId, sfHost, onNavigate }: IdPreviewPro
 
       <div className="id-preview-action">
         Press{' '}
-        <kbd
-          className="id-preview-kbd"
-          onClick={onNavigate}
-        >
+        <kbd className="id-preview-kbd" onClick={onNavigate}>
           Enter
         </kbd>{' '}
         to open{state.status === 'error' ? ' anyway' : ''}

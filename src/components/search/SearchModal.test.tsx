@@ -6,6 +6,8 @@ import type { SearchResult } from '~types'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
+import { useFavoritesStore, setFavoritesOrgScope, _resetFavoritesOrgScope } from '~stores/favorites-store'
+import { usePersistErrorStore, _resetPersistErrors, reportPersistError } from '~stores/persist-error-store'
 
 // jsdom doesn't implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn()
@@ -78,6 +80,8 @@ describe('SearchModal', () => {
 
     // Reset stores to defaults
     useSettingsStore.setState(SETTINGS_DEFAULTS)
+    _resetPersistErrors()
+    _resetFavoritesOrgScope()
     useSessionStore.getState().setSession('test.my.salesforce.com', true)
     useSearchStore.setState({
       isVisible: true,
@@ -101,6 +105,42 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('storage warning banner', () => {
+    it('is absent when no persist write has failed', () => {
+      renderModal()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('renders a warning when a persist write failed', () => {
+      reportPersistError(
+        'favorites',
+        'Pin could not be saved to browser storage (browser storage may be full). It will be gone after reload.'
+      )
+      renderModal()
+      expect(screen.getByRole('alert')).toHaveTextContent(/Pin could not be saved/i)
+    })
+
+    it('dismisses the warning via its dismiss button', () => {
+      reportPersistError(
+        'history',
+        'Recent items could not be saved to browser storage (browser storage may be full). History may be missing after reload.'
+      )
+      renderModal()
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss storage warning' }))
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(usePersistErrorStore.getState().errors).toEqual({})
+    })
+
+    it('appears end-to-end when a quota-exceeded pin write fails', async () => {
+      await setFavoritesOrgScope('orgA.my.salesforce.com')
+      chrome.storage.local.set.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      useFavoritesStore.getState().addFavorite({ id: 'pin-1', name: 'Pinned', type: 'User', url: 'u' })
+
+      renderModal()
+      expect(await screen.findByRole('alert')).toHaveTextContent(/Pin could not be saved/i)
+    })
+  })
+
   describe('accessibility', () => {
     it('exposes the modal as a dialog with an accessible name', () => {
       renderModal()
@@ -112,7 +152,7 @@ describe('SearchModal', () => {
 
     it('labels the search input', () => {
       renderModal()
-      expect(screen.getByRole('textbox', { name: /search/i })).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: /search/i })).toBeInTheDocument()
     })
 
     it('labels the settings button', () => {
@@ -136,10 +176,158 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('focus reclaim', () => {
+    it('pulls focus back when the host page steals it after open', async () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      expect(document.activeElement).toBe(input)
+
+      const stealer = document.createElement('input')
+      document.body.appendChild(stealer)
+      stealer.focus()
+      expect(document.activeElement).toBe(stealer)
+
+      await waitFor(() => expect(document.activeElement).toBe(input))
+      document.body.removeChild(stealer)
+    })
+
+    it('does not fight focus that moves to another control inside the modal', async () => {
+      renderModal()
+      const settingsButton = screen.getByRole('button', { name: 'Settings' })
+      settingsButton.focus()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(document.activeElement).toBe(settingsButton)
+    })
+
+    it('does not reclaim focus once the modal is closed', async () => {
+      const trigger = document.createElement('button')
+      document.body.appendChild(trigger)
+      trigger.focus()
+      const { unmount } = renderModal()
+      unmount()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(document.activeElement).toBe(trigger)
+      document.body.removeChild(trigger)
+    })
+
+    it('tells the user to click when the page itself has no focus', async () => {
+      const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+      renderModal()
+      expect(await screen.findByPlaceholderText('Click here to focus, then type to search')).toBeInTheDocument()
+
+      hasFocus.mockReturnValue(true)
+      fireEvent(window, new Event('focus'))
+      expect(await screen.findByPlaceholderText('Search test metadata...')).toBeInTheDocument()
+      hasFocus.mockRestore()
+    })
+  })
+
+  describe('combobox and listbox wiring', () => {
+    it('exposes the search input as a collapsed combobox before a search runs', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      expect(input).toHaveAttribute('role', 'combobox')
+      expect(input).toHaveAttribute('aria-expanded', 'false')
+      expect(input).toHaveAttribute('aria-controls', 'ultraforce-results-listbox')
+      expect(input).not.toHaveAttribute('aria-activedescendant')
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    })
+
+    it('links the combobox to the listbox and tracks the highlighted option', async () => {
+      useSearchStore.setState({
+        searchResults: {
+          ApexClass: [
+            { id: '001', name: 'ClassA', type: 'ApexClass' },
+            { id: '002', name: 'ClassB', type: 'ApexClass' }
+          ]
+        }
+      })
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'test')
+
+      const listbox = screen.getByRole('listbox')
+      expect(listbox).toHaveAttribute('id', 'ultraforce-results-listbox')
+      expect(input).toHaveAttribute('aria-controls', 'ultraforce-results-listbox')
+      expect(input).toHaveAttribute('aria-expanded', 'true')
+      expect(input).toHaveAttribute('aria-activedescendant', 'ultraforce-option-0')
+
+      const firstOption = document.getElementById('ultraforce-option-0')
+      expect(firstOption).toHaveAttribute('role', 'option')
+      expect(firstOption).toHaveAttribute('aria-selected', 'true')
+
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      expect(input).toHaveAttribute('aria-activedescendant', 'ultraforce-option-1')
+      expect(document.getElementById('ultraforce-option-1')).toHaveAttribute('aria-selected', 'true')
+      expect(document.getElementById('ultraforce-option-0')).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('collapses the combobox and announces no results when the search is empty', async () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'zzz')
+      expect(input).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(screen.getByRole('status').textContent).toBe('No results')
+    })
+
+    it('announces the result count in the live region', async () => {
+      useSearchStore.setState({
+        searchResults: {
+          ApexClass: [
+            { id: '001', name: 'ClassA', type: 'ApexClass' },
+            { id: '002', name: 'ClassB', type: 'ApexClass' }
+          ]
+        }
+      })
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'test')
+      expect(screen.getByRole('status').textContent).toBe('2 results')
+    })
+
+    it('keeps focus inside the dialog when Tab is pressed without a highlighted result', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      const modal = screen.getByRole('dialog')
+      input.focus()
+
+      fireEvent.keyDown(input, { key: 'Tab' })
+      expect(modal.contains(document.activeElement)).toBe(true)
+      expect(document.activeElement).not.toBe(input)
+
+      // Tabbing cycles through the modal's focusable controls and wraps back to the input
+      let wrappedToInput = false
+      for (let i = 0; i < 8; i++) {
+        fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' })
+        expect(modal.contains(document.activeElement)).toBe(true)
+        if (document.activeElement === input) {
+          wrappedToInput = true
+          break
+        }
+      }
+      expect(wrappedToInput).toBe(true)
+
+      // Shift+Tab from the input wraps to the last focusable control
+      fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })
+      expect(modal.contains(document.activeElement)).toBe(true)
+      expect(document.activeElement).not.toBe(input)
+    })
+
+    it('traps Tab focus inside the settings panel', async () => {
+      renderModal()
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      const modal = screen.getByRole('dialog')
+
+      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' })
+      expect(modal.contains(document.activeElement)).toBe(true)
+    })
+  })
+
   describe('visibility', () => {
     it('should render search input when store isVisible is true', () => {
       renderModal()
-      expect(screen.getByRole('textbox')).toBeInTheDocument()
+      expect(screen.getByRole('combobox')).toBeInTheDocument()
     })
 
     it('should not render when store isVisible is false', () => {
@@ -152,28 +340,29 @@ describe('SearchModal', () => {
   describe('search input', () => {
     it('should call onSearch when user types in input', async () => {
       const { props } = renderModal()
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
 
       await userEvent.type(input, 'Account')
 
-      await waitFor(() => {
-        expect(props.onSearch).toHaveBeenCalled()
-      }, { timeout: 500 })
+      await waitFor(
+        () => {
+          expect(props.onSearch).toHaveBeenCalled()
+        },
+        { timeout: 500 }
+      )
     })
   })
 
   describe('search results', () => {
     it('should display search results from store', async () => {
       const mockResults: Record<string, SearchResult[]> = {
-        ApexClass: [
-          { id: '001', name: 'WeatherService', type: 'ApexClass', description: 'Weather API' }
-        ]
+        ApexClass: [{ id: '001', name: 'WeatherService', type: 'ApexClass', description: 'Weather API' }]
       }
 
       useSearchStore.setState({ searchResults: mockResults })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'Weather')
 
       await waitFor(() => {
@@ -191,7 +380,7 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchResults: { ApexClass: [mockResult] } })
       const { props } = renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'Weather')
 
       await waitFor(() => {
@@ -200,16 +389,14 @@ describe('SearchModal', () => {
 
       await userEvent.click(screen.getByText('WeatherService'))
 
-      expect(props.onResultClick).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '001', name: 'WeatherService' })
-      )
+      expect(props.onResultClick).toHaveBeenCalledWith(expect.objectContaining({ id: '001', name: 'WeatherService' }))
     })
   })
 
   describe('keyboard navigation', () => {
     it('should call onClose when Escape key is pressed', async () => {
       const { props } = renderModal()
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
 
       fireEvent.keyDown(input, { key: 'Escape' })
 
@@ -227,7 +414,7 @@ describe('SearchModal', () => {
       })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'ArrowDown' })
@@ -247,7 +434,7 @@ describe('SearchModal', () => {
       })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'ArrowDown' })
@@ -265,14 +452,12 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchResults: { ApexClass: [mockResult] } })
       const { props } = renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       fireEvent.keyDown(input, { key: 'Enter' })
 
-      expect(props.onResultClick).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '001', name: 'ClassA' })
-      )
+      expect(props.onResultClick).toHaveBeenCalledWith(expect.objectContaining({ id: '001', name: 'ClassA' }))
     })
   })
 
@@ -290,7 +475,7 @@ describe('SearchModal', () => {
       useSearchStore.setState({ searchError: 'API Error: Connection failed' })
       renderModal()
 
-      const input = screen.getByRole('textbox')
+      const input = screen.getByRole('combobox')
       await userEvent.type(input, 'test')
 
       expect(screen.getByText(/API Error|Connection failed/)).toBeInTheDocument()
@@ -332,7 +517,7 @@ describe('SearchModal', () => {
       fireEvent.keyDown(modal!, { key: 'Escape' })
 
       await waitFor(() => {
-        expect(screen.getByRole('textbox')).toBeInTheDocument()
+        expect(screen.getByRole('combobox')).toBeInTheDocument()
       })
     })
   })

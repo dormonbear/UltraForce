@@ -2,12 +2,34 @@ import type { SearchCommand, BuiltinCommand, CustomCommand } from '~types'
 
 export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
-  c: { key: 'c', types: ['ApexClass', 'ApexTrigger', 'ApexPage', 'ApexComponent', 'AuraDefinitionBundle', 'LightningComponentBundle'], description: 'Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)', isBuiltin: true },
+  c: {
+    key: 'c',
+    types: [
+      'ApexClass',
+      'ApexTrigger',
+      'ApexPage',
+      'ApexComponent',
+      'AuraDefinitionBundle',
+      'LightningComponentBundle'
+    ],
+    description: 'Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)',
+    isBuiltin: true
+  },
   f: { key: 'f', types: ['Flow'], description: 'Flows', isBuiltin: true },
   u: { key: 'u', types: ['User'], description: 'Users', isBuiltin: true },
-  p: { key: 'p', types: ['Profile', 'PermissionSet', 'PermissionSetGroup', 'CustomPermission'], description: 'Profiles & Permissions', isBuiltin: true },
+  p: {
+    key: 'p',
+    types: ['Profile', 'PermissionSet', 'PermissionSetGroup', 'CustomPermission'],
+    description: 'Profiles & Permissions',
+    isBuiltin: true
+  },
   l: { key: 'l', types: ['CustomLabel'], description: 'Custom Labels', isBuiltin: true },
-  m: { key: 'm', types: ['CustomMetadataType', 'CustomSetting'], description: 'Custom Metadata & Settings', isBuiltin: true },
+  m: {
+    key: 'm',
+    types: ['CustomMetadataType', 'CustomSetting'],
+    description: 'Custom Metadata & Settings',
+    isBuiltin: true
+  },
   q: { key: 'q', types: ['Queue', 'Group'], description: 'Queues & Public Groups', isBuiltin: true },
   r: { key: 'r', types: ['Report', 'Dashboard'], description: 'Reports & Dashboards', isBuiltin: true },
   g: { key: 'g', types: [], description: 'Go to Setup', isBuiltin: true }
@@ -23,10 +45,7 @@ export interface ParsedCommand {
   command: SearchCommand | null
 }
 
-export function parseCommand(
-  input: string,
-  commands: Record<string, SearchCommand> = DEFAULT_COMMANDS
-): ParsedCommand {
+export function parseCommand(input: string, commands: Record<string, SearchCommand> = DEFAULT_COMMANDS): ParsedCommand {
   const trimmed = input.trim()
 
   if (!trimmed.startsWith(':')) {
@@ -81,7 +100,7 @@ export function getMatchingCommands(
     // Commands with no types (like :g) or custom commands are always shown
     if (!('types' in cmd) || cmd.types.length === 0) return true
     // Check if at least one type is supported
-    return cmd.types.some(type => !unsupportedTypes.includes(type))
+    return cmd.types.some((type) => !unsupportedTypes.includes(type))
   })
 
   if (!partial) {
@@ -89,17 +108,11 @@ export function getMatchingCommands(
   }
 
   return filteredCommands.filter(
-    (cmd) =>
-      cmd.key.toLowerCase().startsWith(partial) ||
-      cmd.description.toLowerCase().includes(partial)
+    (cmd) => cmd.key.toLowerCase().startsWith(partial) || cmd.description.toLowerCase().includes(partial)
   )
 }
 
-export function isKeyUnique(
-  key: string,
-  commands: Record<string, SearchCommand>,
-  excludeKey?: string
-): boolean {
+export function isKeyUnique(key: string, commands: Record<string, SearchCommand>, excludeKey?: string): boolean {
   const normalizedKey = key.toLowerCase()
   if (excludeKey && normalizedKey === excludeKey.toLowerCase()) {
     return true
@@ -127,9 +140,7 @@ export function getCommandPrefix(parsed: ParsedCommand): string {
   return ''
 }
 
-export function mergeCommands(
-  customCommands: Record<string, CustomCommand>
-): Record<string, SearchCommand> {
+export function mergeCommands(customCommands: Record<string, CustomCommand>): Record<string, SearchCommand> {
   return { ...BUILTIN_COMMANDS, ...customCommands }
 }
 
@@ -149,7 +160,7 @@ export function filterCommandsBySupported(
       continue
     }
     // Check if at least one type is supported
-    const hasSupported = cmd.types.some(type => !unsupportedTypes.includes(type))
+    const hasSupported = cmd.types.some((type) => !unsupportedTypes.includes(type))
     if (hasSupported) {
       filtered[key] = cmd
     }

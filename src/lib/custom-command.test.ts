@@ -49,9 +49,7 @@ describe('executeCustomCommand', () => {
   })
 
   it('maps records to CustomQuery SearchResult using nameField', async () => {
-    mockFetchAllPages.mockResolvedValue([
-      { Id: '001x', Name: 'Acme Inc', Industry: 'Tech' }
-    ])
+    mockFetchAllPages.mockResolvedValue([{ Id: '001x', Name: 'Acme Inc', Industry: 'Tech' }])
     const result = await executeCustomCommand(baseOpts, HOST)
     expect(result).toHaveLength(1)
     expect(result[0]).toMatchObject({ id: '001x', name: 'Acme Inc', type: 'CustomQuery' })
@@ -66,13 +64,8 @@ describe('executeCustomCommand', () => {
   })
 
   it('uses descriptionFields (dot-notation) when provided', async () => {
-    mockFetchAllPages.mockResolvedValue([
-      { Id: '001x', Name: 'Acme', Owner: { Name: 'Dormon' }, Phone: '123' }
-    ])
-    const result = await executeCustomCommand(
-      { ...baseOpts, descriptionFields: ['Owner.Name', 'Phone'] },
-      HOST
-    )
+    mockFetchAllPages.mockResolvedValue([{ Id: '001x', Name: 'Acme', Owner: { Name: 'Dormon' }, Phone: '123' }])
+    const result = await executeCustomCommand({ ...baseOpts, descriptionFields: ['Owner.Name', 'Phone'] }, HOST)
     expect(result[0].description).toBe('Dormon | 123')
   })
 
@@ -97,9 +90,7 @@ describe('executeCustomCommand', () => {
   })
 
   it('throws a formatted SOQL error when the API rejects with JSON error', async () => {
-    mockFetchAllPages.mockRejectedValue(
-      new Error('API 400: [{"message":"unexpected token: WHERE"}]')
-    )
+    mockFetchAllPages.mockRejectedValue(new Error('API 400: [{"message":"unexpected token: WHERE"}]'))
     await expect(executeCustomCommand(baseOpts, HOST)).rejects.toThrow(/SOQL Error: unexpected token: WHERE/)
   })
 

@@ -39,4 +39,3 @@ function createLogger(prefix: string = 'UltraForce'): Logger {
 }
 
 export const logger = createLogger()
-export default logger

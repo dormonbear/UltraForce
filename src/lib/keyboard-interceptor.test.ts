@@ -9,11 +9,7 @@ function createMockInput(value = '', selectionStart = 0, selectionEnd = 0): HTML
   return input
 }
 
-function createKeyEvent(
-  type: string,
-  key: string,
-  opts: Partial<KeyboardEventInit> = {}
-): KeyboardEvent {
+function createKeyEvent(type: string, key: string, opts: Partial<KeyboardEventInit> = {}): KeyboardEvent {
   const event = new KeyboardEvent(type, {
     key,
     bubbles: true,
@@ -254,16 +250,13 @@ describe('createKeyboardInterceptor', () => {
   })
 
   describe('modifier-only keys', () => {
-    it.each(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])(
-      'should NOT intercept modifier key %s',
-      (key) => {
-        const handler = createKeyboardInterceptor(getInput)
-        const event = createKeyEvent('keydown', key)
-        handler(event)
+    it.each(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'])('should NOT intercept modifier key %s', (key) => {
+      const handler = createKeyboardInterceptor(getInput)
+      const event = createKeyEvent('keydown', key)
+      handler(event)
 
-        expect(event.stopPropagation).not.toHaveBeenCalled()
-      }
-    )
+      expect(event.stopPropagation).not.toHaveBeenCalled()
+    })
   })
 
   describe('Alt+key combinations', () => {
@@ -330,6 +323,54 @@ describe('createKeyboardInterceptor', () => {
       handler(createKeyEvent('keydown', 'a'))
 
       expect(dispatchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('focus reclaim', () => {
+    function mountInShadow() {
+      const host = document.createElement('div')
+      document.body.appendChild(host)
+      const shadowRoot = host.attachShadow({ mode: 'open' })
+      const shadowInput = createMockInput()
+      shadowInput.tabIndex = 0
+      shadowRoot.appendChild(shadowInput)
+      return { host, shadowRoot, shadowInput }
+    }
+
+    it('pulls focus back to the search input when the host page stole it', () => {
+      const { host, shadowRoot, shadowInput } = mountInShadow()
+      const stealer = document.createElement('button')
+      document.body.appendChild(stealer)
+      stealer.focus()
+      expect(shadowRoot.activeElement).toBeNull()
+
+      const handler = createKeyboardInterceptor({
+        getInput: () => shadowInput,
+        getShadowRoot: () => shadowRoot
+      })
+      handler(createKeyEvent('keydown', 'a'))
+
+      expect(shadowInput.value).toBe('a')
+      expect(shadowRoot.activeElement).toBe(shadowInput)
+      document.body.removeChild(stealer)
+      document.body.removeChild(host)
+    })
+
+    it('leaves focus on another form field inside the modal', () => {
+      const { host, shadowRoot, shadowInput } = mountInShadow()
+      const settingsField = document.createElement('input')
+      shadowRoot.appendChild(settingsField)
+      settingsField.focus()
+
+      const handler = createKeyboardInterceptor({
+        getInput: () => shadowInput,
+        getShadowRoot: () => shadowRoot
+      })
+      handler(createKeyEvent('keydown', 'a'))
+
+      expect(shadowInput.value).toBe('')
+      expect(shadowRoot.activeElement).toBe(settingsField)
+      document.body.removeChild(host)
     })
   })
 })

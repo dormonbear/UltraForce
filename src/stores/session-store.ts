@@ -3,7 +3,7 @@
 
 import { create } from 'zustand'
 
-export interface SessionState {
+interface SessionState {
   sfHost: string | null
   hasSession: boolean
   userLightningPreference: boolean | null
@@ -15,7 +15,7 @@ interface SessionActions {
   reset: () => void
 }
 
-export type SessionStore = SessionState & SessionActions
+type SessionStore = SessionState & SessionActions
 
 const INITIAL_STATE: SessionState = {
   sfHost: null,

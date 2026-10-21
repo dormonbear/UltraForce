@@ -48,23 +48,15 @@ describe('extractSalesforceId', () => {
   })
 
   it('extracts ID from classic Salesforce URL', () => {
-    expect(
-      extractSalesforceId(`https://myorg.salesforce.com/${VALID_18}`)
-    ).toBe(VALID_18)
+    expect(extractSalesforceId(`https://myorg.salesforce.com/${VALID_18}`)).toBe(VALID_18)
   })
 
   it('extracts ID from Lightning record URL', () => {
-    expect(
-      extractSalesforceId(
-        `https://myorg.lightning.force.com/lightning/r/Account/${VALID_18}/view`
-      )
-    ).toBe(VALID_18)
+    expect(extractSalesforceId(`https://myorg.lightning.force.com/lightning/r/Account/${VALID_18}/view`)).toBe(VALID_18)
   })
 
   it('extracts ID from mixed text', () => {
-    expect(
-      extractSalesforceId(`check record ${VALID_18} please`)
-    ).toBe(VALID_18)
+    expect(extractSalesforceId(`check record ${VALID_18} please`)).toBe(VALID_18)
   })
 
   it('returns null for empty string', () => {
@@ -76,9 +68,7 @@ describe('extractSalesforceId', () => {
   })
 
   it('returns null for URL without ID', () => {
-    expect(
-      extractSalesforceId('https://myorg.salesforce.com/setup/home')
-    ).toBeNull()
+    expect(extractSalesforceId('https://myorg.salesforce.com/setup/home')).toBeNull()
   })
 
   it('extracts ID with whitespace padding', () => {
@@ -86,11 +76,7 @@ describe('extractSalesforceId', () => {
   })
 
   it('extracts ID from URL with query parameters', () => {
-    expect(
-      extractSalesforceId(
-        `https://myorg.salesforce.com/${VALID_18}?inline=1`
-      )
-    ).toBe(VALID_18)
+    expect(extractSalesforceId(`https://myorg.salesforce.com/${VALID_18}?inline=1`)).toBe(VALID_18)
   })
 
   it('prefers 18-char ID over 15-char in mixed content', () => {

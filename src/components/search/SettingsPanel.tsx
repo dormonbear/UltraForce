@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import type { CustomCommand, NavigationMode } from '~types'
-import { BUILTIN_COMMANDS, isKeyUnique, validateCommandKey, mergeCommands, filterCommandsBySupported } from '~lib/command-parser'
+import type { SettingsState } from '~stores/settings-store'
+import {
+  BUILTIN_COMMANDS,
+  isKeyUnique,
+  validateCommandKey,
+  mergeCommands,
+  filterCommandsBySupported
+} from '~lib/command-parser'
 import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
 import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~lib/salesforce-api'
 import { logger } from '~lib/logger'
@@ -21,6 +28,8 @@ interface SettingsPanelProps {
   onHideManagedPackageChange: (value: boolean) => void
   maxResultsPerType: number
   onMaxResultsPerTypeChange: (value: number) => void
+  /** Settings keys locked by enterprise policy; their fields render disabled */
+  managedKeys: ReadonlyArray<keyof SettingsState>
   navigationMode: NavigationMode
   onNavigationModeChange: (mode: NavigationMode) => void
   sfHost: string | null
@@ -48,6 +57,8 @@ const NAVIGATION_MODES = [
   { value: 'lightning', label: 'Lightning Experience' },
   { value: 'classic', label: 'Salesforce Classic' }
 ]
+
+const MANAGED_NOTE = 'Managed by your organization'
 
 const getAppVersion = () => {
   try {
@@ -84,6 +95,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onHideManagedPackageChange,
   maxResultsPerType,
   onMaxResultsPerTypeChange,
+  managedKeys,
   navigationMode,
   onNavigationModeChange,
   sfHost,
@@ -123,6 +135,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [formError, setFormError] = useState<string | null>(null)
 
   const allCommands = mergeCommands(customCommands)
+
+  const isManaged = (key: keyof SettingsState) => managedKeys.includes(key)
+
+  const renderManagedNote = (key: keyof SettingsState) =>
+    isManaged(key) ? (
+      <p className="managed-note">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 3.1 1.39 3.1 3.1v2z" />
+        </svg>
+        {MANAGED_NOTE}
+      </p>
+    ) : null
 
   const handleEditCommand = (cmd: CustomCommand) => {
     setEditingKey(cmd.key)
@@ -179,8 +203,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const key = formState.key.toLowerCase()
     const descFields = formState.descriptionFields
       .split(',')
-      .map(f => f.trim())
-      .filter(f => f)
+      .map((f) => f.trim())
+      .filter((f) => f)
     newCommands[key] = {
       key,
       description: formState.description,
@@ -377,7 +401,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           />
         </div>
       </div>
-      <span className="command-form-hint">Supports relationship fields (e.g., Owner.Name). Multiple fields separated by comma.</span>
+      <span className="command-form-hint">
+        Supports relationship fields (e.g., Owner.Name). Multiple fields separated by comma.
+      </span>
       <div className="command-form-row">
         <label className="command-toggle-option">
           <input
@@ -390,8 +416,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       </div>
       {formError && <div className="command-form-error">{formError}</div>}
       <div className="command-edit-actions">
-        <button className="cmd-btn cmd-btn-save" onClick={handleSaveCommand}>Save</button>
-        <button className="cmd-btn cmd-btn-cancel" onClick={resetForm}>Cancel</button>
+        <button className="cmd-btn cmd-btn-save" onClick={handleSaveCommand}>
+          Save
+        </button>
+        <button className="cmd-btn cmd-btn-cancel" onClick={resetForm}>
+          Cancel
+        </button>
       </div>
     </div>
   )
@@ -438,7 +468,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="setting-section">
           <h3 className="section-title">Keyboard Shortcut</h3>
           <p className="section-desc">
-            You can set a custom keyboard shortcut for UltraForce in Chrome Extension Keyboard Shortcuts (default: <strong>Ctrl/Cmd + B</strong>).
+            You can set a custom keyboard shortcut for UltraForce in Chrome Extension Keyboard Shortcuts (default:{' '}
+            <strong>Ctrl/Cmd + B</strong>).
             <br />
             <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
               Customize at chrome://extensions/shortcuts
@@ -459,7 +490,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   <span>+</span>
                 </>
               )}
-              <select value={shortcutKey} onChange={(e) => onShortcutChange(e.target.value)} className="shortcut-key-select">
+              <select
+                value={shortcutKey}
+                onChange={(e) => onShortcutChange(e.target.value)}
+                className="shortcut-key-select"
+              >
                 <option value="escape">ESC</option>
                 <optgroup label="Ctrl/Cmd +">
                   <option value="b">B</option>
@@ -477,34 +512,57 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
           <p className="section-hint" style={{ marginTop: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-            This shortcut may not work on some pages (e.g. Visualforce, iframes).
-            Use the global shortcut for reliable access.
+            This shortcut may not work on some pages (e.g. Visualforce, iframes). Use the global shortcut for reliable
+            access.
           </p>
         </div>
 
         <div className="setting-section">
           <h3 className="section-title">Behavior</h3>
           <label className="toggle-option">
-            <input type="checkbox" checked={closeOnNavigate} onChange={(e) => onCloseOnNavigateChange(e.target.checked)} className="toggle-checkbox" />
+            <input
+              type="checkbox"
+              checked={closeOnNavigate}
+              onChange={(e) => onCloseOnNavigateChange(e.target.checked)}
+              className="toggle-checkbox"
+            />
             <span className="toggle-label">Close modal after opening result</span>
           </label>
           <label className="toggle-option">
-            <input type="checkbox" checked={autoLoadFields} onChange={(e) => onAutoLoadFieldsChange(e.target.checked)} className="toggle-checkbox" />
+            <input
+              type="checkbox"
+              checked={autoLoadFields}
+              onChange={(e) => onAutoLoadFieldsChange(e.target.checked)}
+              className="toggle-checkbox"
+            />
             <span className="toggle-label">Auto-load all fields on Setup pages</span>
           </label>
           <label className="toggle-option">
-            <input type="checkbox" checked={fuzzySearch} onChange={(e) => onFuzzySearchChange(e.target.checked)} className="toggle-checkbox" />
+            <input
+              type="checkbox"
+              checked={fuzzySearch}
+              onChange={(e) => onFuzzySearchChange(e.target.checked)}
+              className="toggle-checkbox"
+            />
             <span className="toggle-label">Fuzzy search (typo-tolerant matching)</span>
           </label>
           <label className="toggle-option">
-            <input type="checkbox" checked={hideManagedPackage} onChange={(e) => onHideManagedPackageChange(e.target.checked)} className="toggle-checkbox" />
+            <input
+              type="checkbox"
+              checked={hideManagedPackage}
+              onChange={(e) => onHideManagedPackageChange(e.target.checked)}
+              disabled={isManaged('hideManagedPackage')}
+              className="toggle-checkbox"
+            />
             <span className="toggle-label">Hide managed package items</span>
           </label>
+          {renderManagedNote('hideManagedPackage')}
           <div className="toggle-option">
             <span className="toggle-label">Max results per type</span>
             <select
               value={maxResultsPerType}
               onChange={(e) => onMaxResultsPerTypeChange(Number(e.target.value))}
+              disabled={isManaged('maxResultsPerType')}
               className="shortcut-key-select"
               style={{ marginLeft: 'auto', width: 'auto' }}
             >
@@ -516,6 +574,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <option value={500}>500</option>
             </select>
           </div>
+          {renderManagedNote('maxResultsPerType')}
         </div>
 
         <div className="setting-section">
@@ -524,11 +583,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="type-grid">
             {NAVIGATION_MODES.map((mode) => (
               <label key={mode.value} className="type-option">
-                <input type="radio" name="navigationMode" checked={navigationMode === mode.value} onChange={() => onNavigationModeChange(mode.value as NavigationMode)} className="type-checkbox" />
+                <input
+                  type="radio"
+                  name="navigationMode"
+                  checked={navigationMode === mode.value}
+                  onChange={() => onNavigationModeChange(mode.value as NavigationMode)}
+                  disabled={isManaged('navigationMode')}
+                  className="type-checkbox"
+                />
                 <span className="type-label">{mode.label}</span>
               </label>
             ))}
           </div>
+          {renderManagedNote('navigationMode')}
         </div>
 
         <div className="setting-section">
@@ -541,7 +608,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <span className="command-desc">{cmd.description}</span>
                 <span className="command-lock">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
                   </svg>
                 </span>
               </div>
@@ -566,13 +633,31 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
                     <div className="command-actions">
                       <button className="cmd-icon-btn" onClick={() => handleEditCommand(cmd)} title="Edit">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                       </button>
-                      <button className="cmd-icon-btn cmd-icon-btn-danger" onClick={() => handleDeleteCommand(cmd.key)} title="Delete">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <button
+                        className="cmd-icon-btn cmd-icon-btn-danger"
+                        onClick={() => handleDeleteCommand(cmd.key)}
+                        title="Delete"
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        >
                           <polyline points="3 6 5 6 21 6" />
                           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                         </svg>
@@ -583,11 +668,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </div>
             ))}
 
-            {isAddingNew && (
-              <div className="command-row">
-                {renderCommandForm()}
-              </div>
-            )}
+            {isAddingNew && <div className="command-row">{renderCommandForm()}</div>}
 
             {Object.keys(customCommands).length === 0 && !isAddingNew && (
               <div className="commands-empty">No custom commands yet</div>
@@ -595,7 +676,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
           {!isAddingNew && !editingKey && (
             <div className="commands-footer">
-              <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>+ Add Command</button>
+              <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>
+                + Add Command
+              </button>
               <div className="commands-footer-right">
                 <button
                   className="cmd-btn cmd-btn-secondary"
@@ -632,11 +715,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="setting-section">
           <h3 className="section-title">Cache</h3>
           <p className="section-desc">Rebuild metadata cache for current org.</p>
-          <button
-            className="cmd-btn cmd-btn-secondary"
-            onClick={handleRebuildCache}
-            disabled={isRebuilding || !sfHost}
-          >
+          <button className="cmd-btn cmd-btn-secondary" onClick={handleRebuildCache} disabled={isRebuilding || !sfHost}>
             {isRebuilding ? 'Rebuilding...' : 'Rebuild Cache'}
           </button>
         </div>
@@ -664,20 +743,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         <div className="settings-meta">
           <span className="meta-item">UltraForce v{getAppVersion()}</span>
-          <a
-            className="meta-link"
-            href={DOCS_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a className="meta-link" href={DOCS_URL} target="_blank" rel="noreferrer">
             Documentation
           </a>
-          <a
-            className="meta-link"
-            href={PRIVACY_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
+          <a className="meta-link" href={PRIVACY_URL} target="_blank" rel="noreferrer">
             Privacy
           </a>
         </div>

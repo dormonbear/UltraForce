@@ -8,6 +8,7 @@ import {
   sortByLastVisited,
   type HistoryItem
 } from './history-store'
+import { usePersistErrorStore, _resetPersistErrors } from '~stores/persist-error-store'
 
 const fakeStore = new Map<string, unknown>()
 const storageGetMock = vi.fn(async (key: string) => fakeStore.get(key))
@@ -53,6 +54,7 @@ describe('history-store', () => {
     storageSetMock.mockClear()
     storageRemoveMock.mockClear()
     _resetHistoryOrgScope()
+    _resetPersistErrors()
   })
 
   describe('recordVisit', () => {
@@ -211,8 +213,24 @@ describe('history-store', () => {
       const now = Date.now()
       useHistoryStore.setState({
         items: [
-          { id: 'stale', name: 'Stale', type: 'ApexClass', url: 'u1', visitCount: 10, lastVisitedAt: now - 30 * 864e5, firstVisitedAt: now - 60 * 864e5 },
-          { id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2', visitCount: 1, lastVisitedAt: now - 20 * 864e5, firstVisitedAt: now - 20 * 864e5 }
+          {
+            id: 'stale',
+            name: 'Stale',
+            type: 'ApexClass',
+            url: 'u1',
+            visitCount: 10,
+            lastVisitedAt: now - 30 * 864e5,
+            firstVisitedAt: now - 60 * 864e5
+          },
+          {
+            id: 'fresh',
+            name: 'Fresh',
+            type: 'ApexClass',
+            url: 'u2',
+            visitCount: 1,
+            lastVisitedAt: now - 20 * 864e5,
+            firstVisitedAt: now - 20 * 864e5
+          }
         ]
       })
       store.recordVisit({ id: 'fresh', name: 'Fresh', type: 'ApexClass', url: 'u2' })
@@ -255,6 +273,83 @@ describe('history-store', () => {
       _resetHistoryOrgScope()
       await setHistoryOrgScope('orgB.my.salesforce.com')
       expect(useHistoryStore.getState().items).toEqual([])
+    })
+  })
+
+  describe('storage quota failure', () => {
+    const HOST = 'orgA.my.salesforce.com'
+    const scopedKey = `ultraforce_history__${HOST}`
+
+    it('surfaces a quota-rejected visit: memory shows it, storage misses it, error is reported', async () => {
+      await setHistoryOrgScope(HOST)
+
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+
+      const writePromise = useHistoryStore.getState().recordVisit({
+        id: '001xxx',
+        name: 'Acme',
+        type: 'Account',
+        url: `https://${HOST}/001xxx`
+      })
+
+      // zustand updated the in-memory state before the write: the UI shows the visit...
+      expect(useHistoryStore.getState().items.map((i) => i.id)).toContain('001xxx')
+      // ...the action resolves cleanly (the adapter caught the failure, no unhandled rejection)...
+      await expect(writePromise).resolves.toBeUndefined()
+      // ...nothing landed in storage...
+      expect(fakeStore.get(scopedKey)).toBeUndefined()
+      // ...and the failure is surfaced, not silent
+      expect(usePersistErrorStore.getState().errors.history).toMatch(/could not be saved/i)
+
+      // A reload loses the visit - the banner warning is the user's only signal
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST)
+      expect(useHistoryStore.getState().items).toEqual([])
+    })
+
+    it('surfaces a quota-rejected removal: memory hides it, storage keeps it, error is reported', async () => {
+      await setHistoryOrgScope(HOST)
+      useHistoryStore.getState().recordVisit({
+        id: '001xxx',
+        name: 'Acme',
+        type: 'Account',
+        url: `https://${HOST}/001xxx`
+      })
+      await new Promise((r) => setTimeout(r, 0))
+      expect(fakeStore.get(scopedKey)).toBeDefined()
+
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      const writePromise = useHistoryStore.getState().removeItem('001xxx')
+
+      // In-memory state says it was removed...
+      expect(useHistoryStore.getState().items).toEqual([])
+      await expect(writePromise).resolves.toBeUndefined()
+      // ...the persisted copy survives (entry returns after reload), and the user is warned
+      expect(usePersistErrorStore.getState().errors.history).toMatch(/could not be saved/i)
+      _resetHistoryOrgScope()
+      await setHistoryOrgScope(HOST)
+      expect(useHistoryStore.getState().items.map((i) => i.id)).toContain('001xxx')
+    })
+
+    it('clears the reported error once a later write succeeds', async () => {
+      await setHistoryOrgScope(HOST)
+      storageSetMock.mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'))
+      await useHistoryStore.getState().recordVisit({
+        id: '001xxx',
+        name: 'Acme',
+        type: 'Account',
+        url: `https://${HOST}/001xxx`
+      })
+      expect(usePersistErrorStore.getState().errors.history).toBeDefined()
+
+      await useHistoryStore.getState().recordVisit({
+        id: '002yyy',
+        name: 'Beta',
+        type: 'Account',
+        url: `https://${HOST}/002yyy`
+      })
+      expect(usePersistErrorStore.getState().errors.history).toBeUndefined()
+      expect(fakeStore.get(scopedKey)).toBeDefined()
     })
   })
 })
@@ -321,10 +416,7 @@ describe('frecency', () => {
     })
 
     it('should not mutate the input array', () => {
-      const items = [
-        makeItem({ id: 'a', lastVisitedAt: 1 }),
-        makeItem({ id: 'b', lastVisitedAt: 2 })
-      ]
+      const items = [makeItem({ id: 'a', lastVisitedAt: 1 }), makeItem({ id: 'b', lastVisitedAt: 2 })]
       sortByLastVisited(items)
       expect(items[0].id).toBe('a')
     })

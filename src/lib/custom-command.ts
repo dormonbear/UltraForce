@@ -19,10 +19,7 @@ export interface CustomCommandOptions {
  * Executes a user-defined SOQL query template, substituting {query} with the search term.
  * Results are optionally filtered by exact match or secondary filter term.
  */
-export async function executeCustomCommand(
-  options: CustomCommandOptions,
-  sfHost: string
-): Promise<SearchResult[]> {
+export async function executeCustomCommand(options: CustomCommandOptions, sfHost: string): Promise<SearchResult[]> {
   const { soqlTemplate, searchQuery, useToolingApi, nameField, descriptionFields } = options
 
   if (!sfHost) {
@@ -110,11 +107,13 @@ function getFieldValue(record: Record<string, unknown>, fieldPath: string): stri
   return value != null ? String(value) : ''
 }
 
-function buildDescriptionFromFields(record: Record<string, unknown>, descriptionFields?: string[], nameField?: string): string {
+function buildDescriptionFromFields(
+  record: Record<string, unknown>,
+  descriptionFields?: string[],
+  nameField?: string
+): string {
   if (descriptionFields && descriptionFields.length > 0) {
-    const values = descriptionFields
-      .map((field) => getFieldValue(record, field.trim()))
-      .filter((v) => v)
+    const values = descriptionFields.map((field) => getFieldValue(record, field.trim())).filter((v) => v)
     if (values.length > 0) {
       return values.join(' | ')
     }

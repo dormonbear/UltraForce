@@ -105,10 +105,7 @@ class UltraForceContentScript {
         }
       }
 
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === shortcutKey.toLowerCase()
-      ) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
         event.preventDefault()
         event.stopPropagation()
         this.toggleModal()
@@ -193,9 +190,7 @@ class UltraForceContentScript {
       const isValid = await validateSalesforceSession(sfHost)
       if (isValid) {
         setTimeout(() => {
-          warmupMetadataCache(sfHost).catch((error: any) =>
-            logger.warn('Cache warmup failed:', error)
-          )
+          warmupMetadataCache(sfHost).catch((error: any) => logger.warn('Cache warmup failed:', error))
         }, 2000)
       } else {
         checkMetadataPermissions(sfHost).catch((error: any) =>
@@ -210,10 +205,7 @@ class UltraForceContentScript {
   private setupMinimalFallback(): void {
     const fallbackHandler = (event: KeyboardEvent) => {
       const shortcutKey = this.getShortcutKey()
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        event.key.toLowerCase() === shortcutKey.toLowerCase()
-      ) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
         event.preventDefault()
         logger.warn('WindowManager not available, please reload the page')
       }

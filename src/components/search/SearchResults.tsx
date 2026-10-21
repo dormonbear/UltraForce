@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react"
-import type { SearchResult } from "~types"
-import type { FavoriteItem } from "~stores/favorites-store"
-import ResultItem, { type ObjectAction } from "./ResultItem"
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import type { SearchResult } from '~types'
+import type { FavoriteItem } from '~stores/favorites-store'
+import ResultItem, { type ObjectAction } from './ResultItem'
 
 interface ResultRowProps {
   result: SearchResult
   isSelected: boolean
   isFavorite?: boolean
+  optionId?: string
   onResultClick: (result: SearchResult) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
@@ -16,7 +17,7 @@ interface ResultRowProps {
 // callback, so ResultItem's `onClick: () => void` interface stays intact while
 // avoiding a fresh closure each render.
 const ResultRow: React.FC<ResultRowProps> = React.memo(
-  ({ result, isSelected, isFavorite, onResultClick, onActionClick, onToggleFavorite }) => {
+  ({ result, isSelected, isFavorite, optionId, onResultClick, onActionClick, onToggleFavorite }) => {
     const handleClick = useCallback(() => onResultClick(result), [onResultClick, result])
     return (
       <ResultItem
@@ -26,6 +27,7 @@ const ResultRow: React.FC<ResultRowProps> = React.memo(
         onActionClick={onActionClick}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
+        optionId={optionId}
       />
     )
   }
@@ -41,16 +43,18 @@ interface SearchResultsProps {
   onToggleCollapse?: (type: string) => void
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
   isFavorite?: (id: string) => boolean
+  /** id referenced by the combobox input's aria-controls. */
+  listboxId?: string
 }
 
 const METADATA_LABELS: Record<string, string> = {
-  "ApexClass": "Apex Classes",
-  "ApexTrigger": "Apex Triggers",
-  "CustomObject": "Custom Objects",
-  "CustomField": "Custom Fields",
-  "Flow": "Flows",
-  "PermissionSet": "Permission Sets",
-  "Profile": "Profiles"
+  ApexClass: 'Apex Classes',
+  ApexTrigger: 'Apex Triggers',
+  CustomObject: 'Custom Objects',
+  CustomField: 'Custom Fields',
+  Flow: 'Flows',
+  PermissionSet: 'Permission Sets',
+  Profile: 'Profiles'
 }
 
 const SearchResults: React.FC<SearchResultsProps> = ({
@@ -62,7 +66,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   collapsedGroups: externalCollapsedGroups,
   onToggleCollapse,
   onToggleFavorite,
-  isFavorite
+  isFavorite,
+  listboxId
 }) => {
   const [internalCollapsedGroups, setInternalCollapsedGroups] = useState<Record<string, boolean>>({})
 
@@ -72,7 +77,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     if (onToggleCollapse) {
       onToggleCollapse(type)
     } else {
-      setInternalCollapsedGroups(prev => ({
+      setInternalCollapsedGroups((prev) => ({
         ...prev,
         [type]: !prev[type]
       }))
@@ -84,7 +89,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     Object.entries(results).forEach(([type, typeResults]) => {
       if (typeResults.length === 0) return
       if (!collapsedGroups[type]) {
-        typeResults.forEach(result => {
+        typeResults.forEach((result) => {
           items.push({ result, type })
         })
       }
@@ -99,34 +104,34 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   let currentIndex = 0
 
   return (
-    <div className="search-results" data-ultraforce-results role="listbox" aria-label="Search results">
+    <div className="search-results" data-ultraforce-results id={listboxId} role="listbox" aria-label="Search results">
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 
         const isCollapsed = collapsedGroups[type] || false
         const label = METADATA_LABELS[type] || type
 
-        const groupItems = isCollapsed ? null : typeResults.map((result) => {
-          const globalIndex = currentIndex++
-          return (
-            <ResultRow
-              key={result.id}
-              result={result}
-              isSelected={globalIndex === selectedIndex}
-              isFavorite={isFavorite?.(result.id)}
-              onResultClick={onResultClick}
-              onActionClick={onActionClick}
-              onToggleFavorite={onToggleFavorite}
-            />
-          )
-        })
+        const groupItems = isCollapsed
+          ? null
+          : typeResults.map((result) => {
+              const globalIndex = currentIndex++
+              return (
+                <ResultRow
+                  key={result.id}
+                  result={result}
+                  isSelected={globalIndex === selectedIndex}
+                  isFavorite={isFavorite?.(result.id)}
+                  optionId={`ultraforce-option-${globalIndex}`}
+                  onResultClick={onResultClick}
+                  onActionClick={onActionClick}
+                  onToggleFavorite={onToggleFavorite}
+                />
+              )
+            })
 
         return (
           <div key={type} className="result-group">
-            <div
-              className="result-group-header"
-              onClick={() => toggleGroupCollapse(type)}
-            >
+            <div className="result-group-header" onClick={() => toggleGroupCollapse(type)}>
               <span className={`group-chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
               <span className="group-title">{label}</span>
               <span className="group-count">{typeResults.length}</span>

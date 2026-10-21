@@ -50,11 +50,9 @@ export async function resolveObjectType(
   if (cached) return cached
 
   try {
-    const response = await sfRest<GlobalDescribeResponse>(
-      sfHost,
-      `/services/data/v${API_VERSION}/sobjects/`,
-      { signal }
-    )
+    const response = await sfRest<GlobalDescribeResponse>(sfHost, `/services/data/v${API_VERSION}/sobjects/`, {
+      signal
+    })
 
     if (response?.sobjects) {
       for (const obj of response.sobjects) {

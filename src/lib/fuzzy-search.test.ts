@@ -112,9 +112,7 @@ describe('buildSearchIndex and hasSearchIndex', () => {
   })
 
   it('should index Flow records', () => {
-    const records = [
-      { Id: '301001', MasterLabel: 'Create Case', VersionNumber: 1, Status: 'Active' }
-    ]
+    const records = [{ Id: '301001', MasterLabel: 'Create Case', VersionNumber: 1, Status: 'Active' }]
     buildSearchIndex('Flow', records, SF_HOST)
     const results = searchIndex('', 'Flow', SF_HOST)
     expect(results).toHaveLength(1)
@@ -122,18 +120,14 @@ describe('buildSearchIndex and hasSearchIndex', () => {
   })
 
   it('should index User records with email and username', () => {
-    const records = [
-      { Id: '005001', Name: 'John Doe', Email: 'john@test.com', Username: 'john@test.com.dev' }
-    ]
+    const records = [{ Id: '005001', Name: 'John Doe', Email: 'john@test.com', Username: 'john@test.com.dev' }]
     buildSearchIndex('User', records, SF_HOST)
     const results = searchIndex('john', 'User', SF_HOST)
     expect(results.length).toBeGreaterThan(0)
   })
 
   it('should index PermissionSet records', () => {
-    const records = [
-      { Id: '0PS001', Label: 'Admin Access', Name: 'Admin_Access' }
-    ]
+    const records = [{ Id: '0PS001', Label: 'Admin Access', Name: 'Admin_Access' }]
     buildSearchIndex('PermissionSet', records, SF_HOST)
     const results = searchIndex('admin', 'PermissionSet', SF_HOST)
     expect(results.length).toBeGreaterThan(0)
@@ -147,18 +141,14 @@ describe('buildSearchIndex and hasSearchIndex', () => {
   })
 
   it('should index CustomLabel records', () => {
-    const records = [
-      { Id: '101001', MasterLabel: 'Error Message', Name: 'Error_Msg', Value: 'Something went wrong' }
-    ]
+    const records = [{ Id: '101001', MasterLabel: 'Error Message', Name: 'Error_Msg', Value: 'Something went wrong' }]
     buildSearchIndex('CustomLabel', records, SF_HOST)
     const results = searchIndex('error', 'CustomLabel', SF_HOST)
     expect(results.length).toBeGreaterThan(0)
   })
 
   it('should index LightningComponentBundle records', () => {
-    const records = [
-      { Id: 'lcb001', MasterLabel: 'MyComponent', DeveloperName: 'myComponent' }
-    ]
+    const records = [{ Id: 'lcb001', MasterLabel: 'MyComponent', DeveloperName: 'myComponent' }]
     buildSearchIndex('LightningComponentBundle', records, SF_HOST)
     const results = searchIndex('component', 'LightningComponentBundle', SF_HOST)
     expect(results.length).toBeGreaterThan(0)
@@ -176,7 +166,12 @@ describe('buildSearchIndex and hasSearchIndex', () => {
 
   it('should index CMDTRecord records', () => {
     const records = [
-      { DeveloperName: 'MyRecord', MasterLabel: 'My Record', _parentLabel: 'My_Setting__mdt', _parentType: 'My_Setting__mdt' }
+      {
+        DeveloperName: 'MyRecord',
+        MasterLabel: 'My Record',
+        _parentLabel: 'My_Setting__mdt',
+        _parentType: 'My_Setting__mdt'
+      }
     ]
     buildSearchIndex('CMDTRecord:My_Setting__mdt', records, SF_HOST)
     const results = searchIndex('', 'CMDTRecord:My_Setting__mdt', SF_HOST)
@@ -185,9 +180,7 @@ describe('buildSearchIndex and hasSearchIndex', () => {
   })
 
   it('should index CustomSettingRecord records', () => {
-    const records = [
-      { Id: 'a00001', Name: 'TestSetting', _parentLabel: 'My_Setting__c', _parentType: 'My_Setting__c' }
-    ]
+    const records = [{ Id: 'a00001', Name: 'TestSetting', _parentLabel: 'My_Setting__c', _parentType: 'My_Setting__c' }]
     buildSearchIndex('CustomSettingRecord:My_Setting__c', records, SF_HOST)
     const results = searchIndex('', 'CustomSettingRecord:My_Setting__c', SF_HOST)
     expect(results).toHaveLength(1)
@@ -204,9 +197,7 @@ describe('buildSearchIndex and hasSearchIndex', () => {
   })
 
   it('should index CustomSetting definition records', () => {
-    const records = [
-      { Label: 'My Setting', QualifiedApiName: 'My_Setting__c', DeveloperName: 'My_Setting' }
-    ]
+    const records = [{ Label: 'My Setting', QualifiedApiName: 'My_Setting__c', DeveloperName: 'My_Setting' }]
     buildSearchIndex('CustomSetting', records, SF_HOST)
     const results = searchIndex('', 'CustomSetting', SF_HOST)
     expect(results).toHaveLength(1)
@@ -265,8 +256,8 @@ describe('searchIndex', () => {
   it('should find records with fuzzy search', () => {
     const results = searchIndex('account', 'ApexClass', SF_HOST)
     expect(results.length).toBeGreaterThanOrEqual(2)
-    expect(results.some(r => r.name === 'AccountService')).toBe(true)
-    expect(results.some(r => r.name === 'AccountController')).toBe(true)
+    expect(results.some((r) => r.name === 'AccountService')).toBe(true)
+    expect(results.some((r) => r.name === 'AccountController')).toBe(true)
   })
 
   it('should work with exact match query', () => {
@@ -292,17 +283,17 @@ describe('searchIndex', () => {
 
   it('should apply post-filter with pipe', () => {
     const results = searchIndex('Account | service', 'ApexClass', SF_HOST)
-    expect(results.every(r => r.name.toLowerCase().includes('service'))).toBe(true)
+    expect(results.every((r) => r.name.toLowerCase().includes('service'))).toBe(true)
   })
 
   it('should apply filter on empty search term', () => {
     const results = searchIndex(' | controller', 'ApexClass', SF_HOST)
-    expect(results.every(r => r.name.toLowerCase().includes('controller'))).toBe(true)
+    expect(results.every((r) => r.name.toLowerCase().includes('controller'))).toBe(true)
   })
 
   it('should hide managed packages by default', () => {
     const results = searchIndex('', 'ApexClass', SF_HOST)
-    expect(results.some(r => r.namespace === 'ns1')).toBe(false)
+    expect(results.some((r) => r.namespace === 'ns1')).toBe(false)
   })
 })
 
@@ -329,15 +320,17 @@ describe('toSearchResult formatting', () => {
   afterEach(() => clearAllSearchIndexes())
 
   it('should format User result with profile and role', () => {
-    const records = [{
-      Id: '005001',
-      Name: 'John Doe',
-      Email: 'john@test.com',
-      Username: 'john@test.com.dev',
-      Profile: { Name: 'System Administrator' },
-      UserRole: { Name: 'CEO' },
-      IsActive: true
-    }]
+    const records = [
+      {
+        Id: '005001',
+        Name: 'John Doe',
+        Email: 'john@test.com',
+        Username: 'john@test.com.dev',
+        Profile: { Name: 'System Administrator' },
+        UserRole: { Name: 'CEO' },
+        IsActive: true
+      }
+    ]
     buildSearchIndex('User', records, SF_HOST)
     const results = searchIndex('john', 'User', SF_HOST)
     expect(results[0].description).toContain('john@test.com.dev')
@@ -346,12 +339,14 @@ describe('toSearchResult formatting', () => {
   })
 
   it('should mark inactive users', () => {
-    const records = [{
-      Id: '005001',
-      Name: 'Old User',
-      Username: 'old@test.com.dev',
-      IsActive: false
-    }]
+    const records = [
+      {
+        Id: '005001',
+        Name: 'Old User',
+        Username: 'old@test.com.dev',
+        IsActive: false
+      }
+    ]
     buildSearchIndex('User', records, SF_HOST)
     const results = searchIndex('old', 'User', SF_HOST)
     expect(results[0].description).toContain('Inactive')
@@ -367,13 +362,15 @@ describe('toSearchResult formatting', () => {
   })
 
   it('should format Report with folder and modifier', () => {
-    const records = [{
-      Id: '00O001',
-      Name: 'Revenue Report',
-      DeveloperName: 'Rev',
-      FolderName: 'Finance',
-      LastModifiedBy: { Name: 'Admin' }
-    }]
+    const records = [
+      {
+        Id: '00O001',
+        Name: 'Revenue Report',
+        DeveloperName: 'Rev',
+        FolderName: 'Finance',
+        LastModifiedBy: { Name: 'Admin' }
+      }
+    ]
     buildSearchIndex('Report', records, SF_HOST)
     const results = searchIndex('', 'Report', SF_HOST)
     expect(results[0].description).toContain('Finance')

@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  getRecordSuggestions,
-  getSetupSuggestions,
-  isSetupPage
-} from './contextual-suggestions'
+import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from './contextual-suggestions'
 import type { SetupShortcut } from './setup-shortcuts'
 
 const TEST_HOST = 'myorg.lightning.force.com'
@@ -66,8 +62,18 @@ describe('getRecordSuggestions', () => {
 describe('getSetupSuggestions', () => {
   const shortcuts: SetupShortcut[] = [
     { id: 'flows', name: 'Flows', description: 'Process Automation', path: '/lightning/setup/Flows/home' },
-    { id: 'workflow-rules', name: 'Workflow Rules', description: 'Process Automation', path: '/lightning/setup/WorkflowRules/home' },
-    { id: 'approval-processes', name: 'Approval Processes', description: 'Process Automation', path: '/lightning/setup/ApprovalProcesses/home' },
+    {
+      id: 'workflow-rules',
+      name: 'Workflow Rules',
+      description: 'Process Automation',
+      path: '/lightning/setup/WorkflowRules/home'
+    },
+    {
+      id: 'approval-processes',
+      name: 'Approval Processes',
+      description: 'Process Automation',
+      path: '/lightning/setup/ApprovalProcesses/home'
+    },
     { id: 'users', name: 'Users', description: 'User Management', path: '/lightning/setup/ManageUsers/home' },
     { id: 'profiles', name: 'Profiles', description: 'User Management', path: '/lightning/setup/EnhancedProfiles/home' }
   ]

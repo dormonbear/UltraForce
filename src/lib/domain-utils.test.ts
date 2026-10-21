@@ -19,6 +19,26 @@ describe('normalizeHost', () => {
     expect(normalizeHost('example.lightning.force.com')).toBe('example.my.salesforce.com')
   })
 
+  it('should convert US setup domains to my.salesforce.com', () => {
+    expect(normalizeHost('acme.my.salesforce-setup.com')).toBe('acme.my.salesforce.com')
+  })
+
+  it('should resolve every US host form of one org to the same my-domain', () => {
+    expect(normalizeHost('acme.my.salesforce-setup.com')).toBe('acme.my.salesforce.com')
+    expect(normalizeHost('acme.lightning.force.com')).toBe('acme.my.salesforce.com')
+    expect(normalizeHost('acme.my.salesforce.com')).toBe('acme.my.salesforce.com')
+  })
+
+  it('should resolve every China host form of one org to the same my-domain (regression cover)', () => {
+    expect(normalizeHost('acme.setup.sfcrmproducts.cn')).toBe('acme.my.sfcrmproducts.cn')
+    expect(normalizeHost('acme.lightning.sfcrmproducts.cn')).toBe('acme.my.sfcrmproducts.cn')
+    expect(normalizeHost('acme.my.sfcrmproducts.cn')).toBe('acme.my.sfcrmproducts.cn')
+    expect(normalizeHost('acme.sandbox.setup.sfcrmproducts.cn')).toBe('acme.sandbox.my.sfcrmproducts.cn')
+    expect(normalizeHost('acme.setup.sfcrmapps.cn')).toBe('acme.my.sfcrmapps.cn')
+    expect(normalizeHost('acme.lightning.sfcrmapps.cn')).toBe('acme.my.sfcrmapps.cn')
+    expect(normalizeHost('acme.my.sfcrmapps.cn')).toBe('acme.my.sfcrmapps.cn')
+  })
+
   it('should convert China sandbox setup domains (sfcrmproducts)', () => {
     expect(normalizeHost('org.sandbox.setup.sfcrmproducts.cn')).toBe('org.sandbox.my.sfcrmproducts.cn')
     expect(normalizeHost('org.sandbox.lightning.sfcrmproducts.cn')).toBe('org.sandbox.my.sfcrmproducts.cn')

@@ -25,10 +25,8 @@ vi.mock('~stores/history-store', () => {
     }
   ]
   return {
-    useHistoryStore: (selector: (s: { items: typeof items }) => unknown) =>
-      selector({ items }),
-    sortByLastVisited: (arr: typeof items) =>
-      [...arr].sort((a, b) => b.lastVisitedAt - a.lastVisitedAt)
+    useHistoryStore: (selector: (s: { items: typeof items }) => unknown) => selector({ items }),
+    sortByLastVisited: (arr: typeof items) => [...arr].sort((a, b) => b.lastVisitedAt - a.lastVisitedAt)
   }
 })
 
@@ -77,9 +75,7 @@ describe('HomeScreen', () => {
 
   it('should order recent items by last visit time, most recent first', () => {
     render(<HomeScreen {...defaultProps} />)
-    const names = screen
-      .getAllByText(/AccountService|CreateCase/)
-      .map((el) => el.textContent)
+    const names = screen.getAllByText(/AccountService|CreateCase/).map((el) => el.textContent)
     // AccountService visited 1m ago, CreateCase 1h ago
     expect(names).toEqual(['AccountService', 'CreateCase'])
   })
@@ -87,17 +83,13 @@ describe('HomeScreen', () => {
   it('should call onNavigate when clicking a favorite', () => {
     render(<HomeScreen {...defaultProps} />)
     fireEvent.click(screen.getByText('Account'))
-    expect(defaultProps.onNavigate).toHaveBeenCalledWith(
-      '/lightning/setup/ObjectManager/Account/Details/view'
-    )
+    expect(defaultProps.onNavigate).toHaveBeenCalledWith('/lightning/setup/ObjectManager/Account/Details/view')
   })
 
   it('should call onNavigate when clicking a recent item', () => {
     render(<HomeScreen {...defaultProps} />)
     fireEvent.click(screen.getByText('AccountService'))
-    expect(defaultProps.onNavigate).toHaveBeenCalledWith(
-      '/lightning/setup/ApexClasses/page?address=%2F01p000000000001'
-    )
+    expect(defaultProps.onNavigate).toHaveBeenCalledWith('/lightning/setup/ApexClasses/page?address=%2F01p000000000001')
   })
 
   it('should show visit count in title for history items', () => {
@@ -126,8 +118,7 @@ describe('HomeScreen empty state', () => {
 
   it('should render empty state when no items', async () => {
     vi.doMock('~stores/history-store', () => ({
-      useHistoryStore: (selector: (s: { items: never[] }) => unknown) =>
-        selector({ items: [] }),
+      useHistoryStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
       sortByLastVisited: (arr: never[]) => arr
     }))
 
@@ -138,13 +129,7 @@ describe('HomeScreen empty state', () => {
 
     const { default: HomeScreenEmpty } = await import('./HomeScreen')
 
-    render(
-      <HomeScreenEmpty
-        onNavigate={vi.fn()}
-        onToggleFavorite={vi.fn()}
-        onRemoveHistoryItem={vi.fn()}
-      />
-    )
+    render(<HomeScreenEmpty onNavigate={vi.fn()} onToggleFavorite={vi.fn()} onRemoveHistoryItem={vi.fn()} />)
 
     expect(screen.getByText('Start searching')).toBeTruthy()
   })

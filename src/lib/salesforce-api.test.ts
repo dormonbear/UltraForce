@@ -63,7 +63,9 @@ vi.mock('./unsupported-types', () => ({
   getUnsupportedTypes: vi.fn().mockResolvedValue([]),
   markTypesChecked: vi.fn(),
   needsPermissionCheck: vi.fn().mockResolvedValue(false),
-  clearUnsupportedTypesCache: vi.fn()
+  clearUnsupportedTypesCache: vi.fn(),
+  // identity hash: same key -> same value, different key -> different value
+  hashSession: vi.fn((key: string) => key)
 }))
 
 vi.mock('./domain-utils', () => ({
@@ -100,14 +102,8 @@ import {
 } from './salesforce-api'
 import { getSession, sfRest } from './auth'
 import { MetadataCache } from './metadata-cache'
-import {
-  buildSearchIndex,
-  searchIndex,
-  hasSearchIndex,
-  clearSearchIndex,
-  clearAllSearchIndexes
-} from './fuzzy-search'
-import { needsPermissionCheck } from './unsupported-types'
+import { buildSearchIndex, searchIndex, hasSearchIndex, clearSearchIndex, clearAllSearchIndexes } from './fuzzy-search'
+import { needsPermissionCheck, markTypesChecked } from './unsupported-types'
 
 const mockGetSession = vi.mocked(getSession)
 const mockSfRest = vi.mocked(sfRest)
@@ -151,11 +147,13 @@ describe('salesforce-api', () => {
     it('should use cached results on cache hit with existing search index', async () => {
       vi.mocked(mockCache.get).mockResolvedValue(apexClassFixtures)
       mockHasSearchIndex.mockReturnValue(true)
-      const mockResults: SearchResult[] = [{
-        id: '01pDn00000abcde',
-        name: 'WeatherService',
-        type: 'ApexClass'
-      }]
+      const mockResults: SearchResult[] = [
+        {
+          id: '01pDn00000abcde',
+          name: 'WeatherService',
+          type: 'ApexClass'
+        }
+      ]
       mockSearchIndex.mockReturnValue(mockResults)
 
       const result = await searchSalesforceMetadata('weather', ['ApexClass'], TEST_HOST)
@@ -178,11 +176,7 @@ describe('salesforce-api', () => {
 
       const result = await searchSalesforceMetadata('weather', ['ApexClass'], TEST_HOST)
 
-      expect(mockBuildSearchIndex).toHaveBeenCalledWith(
-        'ApexClass',
-        apexClassFixtures,
-        TEST_HOST
-      )
+      expect(mockBuildSearchIndex).toHaveBeenCalledWith('ApexClass', apexClassFixtures, TEST_HOST)
       expect(result).toHaveProperty('ApexClass')
     })
 
@@ -222,21 +216,21 @@ describe('salesforce-api', () => {
     it('should delegate to fuzzy search when index exists', async () => {
       vi.mocked(mockCache.get).mockResolvedValue(apexClassFixtures)
       mockHasSearchIndex.mockReturnValue(true)
-      const mockResults: SearchResult[] = [{
-        id: '01pDn00000abcde',
-        name: 'WeatherService',
-        type: 'ApexClass'
-      }]
+      const mockResults: SearchResult[] = [
+        {
+          id: '01pDn00000abcde',
+          name: 'WeatherService',
+          type: 'ApexClass'
+        }
+      ]
       mockSearchIndex.mockReturnValue(mockResults)
 
       await searchSalesforceMetadata('weather', ['ApexClass'], TEST_HOST, { useFuzzy: true })
 
-      expect(mockSearchIndex).toHaveBeenCalledWith(
-        'weather',
-        'ApexClass',
-        TEST_HOST,
-        { useFuzzy: true, hideManagedPackage: true }
-      )
+      expect(mockSearchIndex).toHaveBeenCalledWith('weather', 'ApexClass', TEST_HOST, {
+        useFuzzy: true,
+        hideManagedPackage: true
+      })
     })
 
     it('should pass hideManagedPackage option correctly', async () => {
@@ -249,12 +243,10 @@ describe('salesforce-api', () => {
         hideManagedPackage: false
       })
 
-      expect(mockSearchIndex).toHaveBeenCalledWith(
-        'test',
-        'ApexClass',
-        TEST_HOST,
-        { useFuzzy: false, hideManagedPackage: false }
-      )
+      expect(mockSearchIndex).toHaveBeenCalledWith('test', 'ApexClass', TEST_HOST, {
+        useFuzzy: false,
+        hideManagedPackage: false
+      })
     })
 
     it('should handle User type with real-time SOQL search', async () => {
@@ -275,13 +267,15 @@ describe('salesforce-api', () => {
       mockSfRest.mockResolvedValue({
         totalSize: 1,
         done: true,
-        records: [{
-          attributes: { type: 'Group' },
-          Id: '00GDn000001abcde',
-          Name: 'Support Queue',
-          DeveloperName: 'Support_Queue',
-          Email: 'support@test.example.com'
-        }]
+        records: [
+          {
+            attributes: { type: 'Group' },
+            Id: '00GDn000001abcde',
+            Name: 'Support Queue',
+            DeveloperName: 'Support_Queue',
+            Email: 'support@test.example.com'
+          }
+        ]
       })
 
       const result = await searchSalesforceMetadata('Support', ['Queue'], TEST_HOST)
@@ -293,12 +287,14 @@ describe('salesforce-api', () => {
       mockSfRest.mockResolvedValue({
         totalSize: 1,
         done: true,
-        records: [{
-          attributes: { type: 'Group' },
-          Id: '00GDn000002fghij',
-          Name: 'All Employees',
-          DeveloperName: 'All_Employees'
-        }]
+        records: [
+          {
+            attributes: { type: 'Group' },
+            Id: '00GDn000002fghij',
+            Name: 'All Employees',
+            DeveloperName: 'All_Employees'
+          }
+        ]
       })
 
       const result = await searchSalesforceMetadata('All', ['Group'], TEST_HOST)
@@ -377,12 +373,15 @@ describe('salesforce-api', () => {
         records: [userFixtures[0]]
       })
 
-      const results = await executeCustomCommand({
-        ...baseOptions,
-        soqlTemplate: "SELECT Id, Name, Email, Username FROM User WHERE Name LIKE '%{query}%'",
-        nameField: 'Name',
-        descriptionFields: ['Email', 'Username']
-      }, TEST_HOST)
+      const results = await executeCustomCommand(
+        {
+          ...baseOptions,
+          soqlTemplate: "SELECT Id, Name, Email, Username FROM User WHERE Name LIKE '%{query}%'",
+          nameField: 'Name',
+          descriptionFields: ['Email', 'Username']
+        },
+        TEST_HOST
+      )
 
       expect(results[0].description).toContain('admin@test.example.com')
     })
@@ -404,8 +403,7 @@ describe('salesforce-api', () => {
     it('should throw formatted error on API error', async () => {
       mockSfRest.mockRejectedValue(new Error('API Error 400: [{"message":"INVALID_FIELD: No such column Name"}]'))
 
-      await expect(executeCustomCommand(baseOptions, TEST_HOST))
-        .rejects.toThrow('SOQL Error')
+      await expect(executeCustomCommand(baseOptions, TEST_HOST)).rejects.toThrow('SOQL Error')
     })
 
     it('should handle empty result set', async () => {
@@ -427,12 +425,15 @@ describe('salesforce-api', () => {
         records: [userFixtures[0]]
       })
 
-      const results = await executeCustomCommand({
-        ...baseOptions,
-        soqlTemplate: "SELECT Id, Name, Profile.Name FROM User LIMIT 1",
-        nameField: 'Name',
-        descriptionFields: ['Profile.Name']
-      }, TEST_HOST)
+      const results = await executeCustomCommand(
+        {
+          ...baseOptions,
+          soqlTemplate: 'SELECT Id, Name, Profile.Name FROM User LIMIT 1',
+          nameField: 'Name',
+          descriptionFields: ['Profile.Name']
+        },
+        TEST_HOST
+      )
 
       expect(results[0].description).toBe('System Administrator')
     })
@@ -444,10 +445,13 @@ describe('salesforce-api', () => {
         records: []
       })
 
-      await executeCustomCommand({
-        ...baseOptions,
-        searchQuery: 'TestSearch'
-      }, TEST_HOST)
+      await executeCustomCommand(
+        {
+          ...baseOptions,
+          searchQuery: 'TestSearch'
+        },
+        TEST_HOST
+      )
 
       // Verify sfRest was called with the interpolated query path
       expect(mockSfRest).toHaveBeenCalled()
@@ -539,7 +543,7 @@ describe('salesforce-api', () => {
 
       // ApexClass and Flow should be skipped, but others should still process
       const buildCalls = mockBuildSearchIndex.mock.calls
-      const warmedTypes = buildCalls.map(call => call[0])
+      const warmedTypes = buildCalls.map((call) => call[0])
       expect(warmedTypes).not.toContain('ApexClass')
       expect(warmedTypes).not.toContain('Flow')
     })
@@ -711,25 +715,37 @@ describe('salesforce-api', () => {
 
   describe('formatCustomCommandError (tested indirectly)', () => {
     it('should include error message and suggestion for API errors', async () => {
-      mockSfRest.mockRejectedValue(new Error('API Error 400: [{"message":"INVALID_FIELD: SELECT Invalid FROM Account"}]'))
+      mockSfRest.mockRejectedValue(
+        new Error('API Error 400: [{"message":"INVALID_FIELD: SELECT Invalid FROM Account"}]')
+      )
 
-      await expect(executeCustomCommand({
-        soqlTemplate: 'SELECT Invalid FROM Account',
-        searchQuery: '',
-        useToolingApi: false,
-        nameField: 'Name'
-      }, TEST_HOST)).rejects.toThrow('SOQL Error')
+      await expect(
+        executeCustomCommand(
+          {
+            soqlTemplate: 'SELECT Invalid FROM Account',
+            searchQuery: '',
+            useToolingApi: false,
+            nameField: 'Name'
+          },
+          TEST_HOST
+        )
+      ).rejects.toThrow('SOQL Error')
     })
 
     it('should handle non-JSON error responses', async () => {
       mockSfRest.mockRejectedValue(new Error('API Error 500: Internal Server Error'))
 
-      await expect(executeCustomCommand({
-        soqlTemplate: 'SELECT Id FROM Account',
-        searchQuery: '',
-        useToolingApi: false,
-        nameField: 'Name'
-      }, TEST_HOST)).rejects.toThrow('check your custom command configuration')
+      await expect(
+        executeCustomCommand(
+          {
+            soqlTemplate: 'SELECT Id FROM Account',
+            searchQuery: '',
+            useToolingApi: false,
+            nameField: 'Name'
+          },
+          TEST_HOST
+        )
+      ).rejects.toThrow('check your custom command configuration')
     })
   })
 
@@ -738,21 +754,26 @@ describe('salesforce-api', () => {
       mockSfRest.mockResolvedValue({
         totalSize: 1,
         done: true,
-        records: [{
-          Id: '001abc',
-          Name: 'Test Account',
-          Industry: 'Technology',
-          Phone: '555-1234',
-          attributes: { type: 'Account' }
-        }]
+        records: [
+          {
+            Id: '001abc',
+            Name: 'Test Account',
+            Industry: 'Technology',
+            Phone: '555-1234',
+            attributes: { type: 'Account' }
+          }
+        ]
       })
 
-      const results = await executeCustomCommand({
-        soqlTemplate: 'SELECT Id, Name, Industry, Phone FROM Account LIMIT 1',
-        searchQuery: '',
-        useToolingApi: false,
-        nameField: 'Name'
-      }, TEST_HOST)
+      const results = await executeCustomCommand(
+        {
+          soqlTemplate: 'SELECT Id, Name, Industry, Phone FROM Account LIMIT 1',
+          searchQuery: '',
+          useToolingApi: false,
+          nameField: 'Name'
+        },
+        TEST_HOST
+      )
 
       // Description should include non-excluded fields joined by ' | '
       expect(results[0].description).toContain('Industry: Technology')
@@ -763,20 +784,25 @@ describe('salesforce-api', () => {
       mockSfRest.mockResolvedValue({
         totalSize: 1,
         done: true,
-        records: [{
-          Id: '301abc',
-          MasterLabel: 'My Flow',
-          Status: 'Active',
-          attributes: { type: 'Flow' }
-        }]
+        records: [
+          {
+            Id: '301abc',
+            MasterLabel: 'My Flow',
+            Status: 'Active',
+            attributes: { type: 'Flow' }
+          }
+        ]
       })
 
-      const results = await executeCustomCommand({
-        soqlTemplate: 'SELECT Id, MasterLabel, Status FROM Flow LIMIT 1',
-        searchQuery: '',
-        useToolingApi: true,
-        nameField: 'MasterLabel'
-      }, TEST_HOST)
+      const results = await executeCustomCommand(
+        {
+          soqlTemplate: 'SELECT Id, MasterLabel, Status FROM Flow LIMIT 1',
+          searchQuery: '',
+          useToolingApi: true,
+          nameField: 'MasterLabel'
+        },
+        TEST_HOST
+      )
 
       expect(results[0].name).toBe('My Flow')
     })
@@ -790,13 +816,16 @@ describe('salesforce-api', () => {
         records: [userFixtures[0]]
       })
 
-      const results = await executeCustomCommand({
-        soqlTemplate: 'SELECT Id, Name, Profile.Name, UserRole.Name FROM User LIMIT 1',
-        searchQuery: '',
-        useToolingApi: false,
-        nameField: 'Profile.Name',
-        descriptionFields: ['UserRole.Name']
-      }, TEST_HOST)
+      const results = await executeCustomCommand(
+        {
+          soqlTemplate: 'SELECT Id, Name, Profile.Name, UserRole.Name FROM User LIMIT 1',
+          searchQuery: '',
+          useToolingApi: false,
+          nameField: 'Profile.Name',
+          descriptionFields: ['UserRole.Name']
+        },
+        TEST_HOST
+      )
 
       expect(results[0].name).toBe('System Administrator')
       expect(results[0].description).toBe('CEO')
@@ -809,13 +838,16 @@ describe('salesforce-api', () => {
         records: [userFixtures[1]] // Integration User has null UserRole
       })
 
-      const results = await executeCustomCommand({
-        soqlTemplate: 'SELECT Id, Name, UserRole.Name FROM User LIMIT 1',
-        searchQuery: '',
-        useToolingApi: false,
-        nameField: 'Name',
-        descriptionFields: ['UserRole.Name']
-      }, TEST_HOST)
+      const results = await executeCustomCommand(
+        {
+          soqlTemplate: 'SELECT Id, Name, UserRole.Name FROM User LIMIT 1',
+          searchQuery: '',
+          useToolingApi: false,
+          nameField: 'Name',
+          descriptionFields: ['UserRole.Name']
+        },
+        TEST_HOST
+      )
 
       // UserRole is null, so description should not contain it
       expect(results[0].description).not.toContain('null')
@@ -844,15 +876,59 @@ describe('salesforce-api', () => {
       expect(Array.isArray(result)).toBe(true)
     })
 
-    it('should skip tooling API types when no ViewSetup permission', async () => {
-      // ViewSetup check fails
-      mockFetch.mockResolvedValue({ ok: false })
+    it('should skip tooling API types when no ViewSetup permission (403 persists)', async () => {
+      // ViewSetup check fails with a real permission denial
+      mockFetch.mockResolvedValue({ ok: false, status: 403, text: async () => '[]' })
 
       const result = await checkMetadataPermissions(TEST_HOST)
 
       // Should return tooling API types as unsupported
       expect(result).toContain('ApexClass')
       expect(result).toContain('Flow')
+      expect(markTypesChecked).toHaveBeenCalledWith(TEST_HOST, expect.arrayContaining(['ApexClass']), TEST_SESSION.key)
+    })
+
+    it('does not persist a verdict when the ViewSetup probe gets a 401 (session expired)', async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 401, text: async () => '[]' })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).not.toHaveBeenCalled()
+    })
+
+    it('does not persist partial verdicts when a per-type probe gets a 401', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true }) // ViewSetup probe passes
+      mockFetch.mockResolvedValue({ ok: false, status: 401, text: async () => '[]' })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).not.toHaveBeenCalled()
+    })
+
+    it('defaults to supported on ambiguous 5xx failures instead of hiding types', async () => {
+      mockFetch
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => '[]' })
+        .mockResolvedValueOnce({ ok: false, status: 500, text: async () => '[]' })
+        .mockResolvedValue({ ok: true })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).toHaveBeenCalledWith(TEST_HOST, [], TEST_SESSION.key)
+    })
+
+    it('defaults to supported when the probe hits a network error instead of hiding types', async () => {
+      mockFetch
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockResolvedValue({ ok: true })
+
+      const result = await checkMetadataPermissions(TEST_HOST)
+
+      expect(result).toEqual([])
+      expect(markTypesChecked).toHaveBeenCalledWith(TEST_HOST, [], TEST_SESSION.key)
     })
   })
 

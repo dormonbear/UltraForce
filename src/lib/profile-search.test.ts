@@ -194,9 +194,7 @@ describe('queryProfileUsers', () => {
 
   it('should return SearchResult[] with type User', async () => {
     mockSfRest.mockResolvedValueOnce({
-      records: [
-        { Id: '005001', Name: 'John Doe', Username: 'john@test.com', IsActive: true }
-      ],
+      records: [{ Id: '005001', Name: 'John Doe', Username: 'john@test.com', IsActive: true }],
       done: true
     })
 
@@ -272,16 +270,18 @@ describe('queryProfileObjectPermissions', () => {
   it('should use DurableId for custom objects in objectRef', async () => {
     mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
     mockSfRest.mockResolvedValueOnce({
-      records: [{
-        Id: 'op002',
-        SobjectType: 'MyObj__c',
-        PermissionsCreate: true,
-        PermissionsRead: true,
-        PermissionsEdit: false,
-        PermissionsDelete: false,
-        PermissionsViewAllRecords: false,
-        PermissionsModifyAllRecords: false
-      }],
+      records: [
+        {
+          Id: 'op002',
+          SobjectType: 'MyObj__c',
+          PermissionsCreate: true,
+          PermissionsRead: true,
+          PermissionsEdit: false,
+          PermissionsDelete: false,
+          PermissionsViewAllRecords: false,
+          PermissionsModifyAllRecords: false
+        }
+      ],
       done: true
     })
     mockSfRest.mockResolvedValueOnce({
@@ -297,16 +297,18 @@ describe('queryProfileObjectPermissions', () => {
   it('should use API name for standard objects in objectRef', async () => {
     mockSfRest.mockResolvedValueOnce({ records: [{ Id: '0PS001' }], done: true })
     mockSfRest.mockResolvedValueOnce({
-      records: [{
-        Id: 'op001',
-        SobjectType: 'Account',
-        PermissionsCreate: true,
-        PermissionsRead: true,
-        PermissionsEdit: true,
-        PermissionsDelete: false,
-        PermissionsViewAllRecords: false,
-        PermissionsModifyAllRecords: false
-      }],
+      records: [
+        {
+          Id: 'op001',
+          SobjectType: 'Account',
+          PermissionsCreate: true,
+          PermissionsRead: true,
+          PermissionsEdit: true,
+          PermissionsDelete: false,
+          PermissionsViewAllRecords: false,
+          PermissionsModifyAllRecords: false
+        }
+      ],
       done: true
     })
 
@@ -366,9 +368,7 @@ describe('queryProfileCustomPermissions', () => {
   })
 
   it('should return SearchResult[] with type CustomPermissionAccess', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'cp001', DeveloperName: 'CanAccessFeatureX', Description: 'Access Feature X' }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'cp001', DeveloperName: 'CanAccessFeatureX', Description: 'Access Feature X' }])
 
     const results = await queryProfileCustomPermissions('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toHaveLength(1)
@@ -400,9 +400,7 @@ describe('queryProfileApexClassAccess', () => {
   })
 
   it('should return SearchResult[] with type ApexClassAccess', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'ac001', Name: 'WeatherService', NamespacePrefix: null }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'ac001', Name: 'WeatherService', NamespacePrefix: null }])
 
     const results = await queryProfileApexClassAccess('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toHaveLength(1)
@@ -411,9 +409,7 @@ describe('queryProfileApexClassAccess', () => {
   })
 
   it('should include namespace prefix in name', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'ac002', Name: 'SomeClass', NamespacePrefix: 'myns' }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'ac002', Name: 'SomeClass', NamespacePrefix: 'myns' }])
 
     const results = await queryProfileApexClassAccess('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results[0].name).toBe('myns.SomeClass')
@@ -441,9 +437,7 @@ describe('queryProfileVFPageAccess', () => {
   })
 
   it('should return SearchResult[] with type VFPageAccess', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'vf001', Name: 'MyVisualforcePage', NamespacePrefix: null }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'vf001', Name: 'MyVisualforcePage', NamespacePrefix: null }])
 
     const results = await queryProfileVFPageAccess('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toHaveLength(1)
@@ -466,9 +460,7 @@ describe('queryProfileConnectedApps', () => {
   })
 
   it('should return SearchResult[] with type ConnectedAppAccess', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'ca001', Name: 'My Connected App' }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'ca001', Name: 'My Connected App' }])
 
     const results = await queryProfileConnectedApps('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toHaveLength(1)
@@ -491,9 +483,7 @@ describe('queryProfileAssignedApps', () => {
   })
 
   it('should return SearchResult[] with type AssignedAppAccess', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'aa001', Label: 'Sales Console', Name: 'SalesConsole', Type: 'Standard' }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'aa001', Label: 'Sales Console', Name: 'SalesConsole', Type: 'Standard' }])
 
     const results = await queryProfileAssignedApps('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results).toHaveLength(1)
@@ -503,9 +493,7 @@ describe('queryProfileAssignedApps', () => {
   })
 
   it('should use Name when Label is missing', async () => {
-    mockSetupEntityAccessFlow([
-      { Id: 'aa002', Label: null, Name: 'FallbackName', Type: 'Custom' }
-    ])
+    mockSetupEntityAccessFlow([{ Id: 'aa002', Label: null, Name: 'FallbackName', Type: 'Custom' }])
 
     const results = await queryProfileAssignedApps('00e000000000001', 'test.my.salesforce.com', 'session-key')
     expect(results[0].name).toBe('FallbackName')
