@@ -466,6 +466,7 @@ class UltraForceWindowManager {
   }
 
   private async handleSetupShortcutSearch(query: string): Promise<void> {
+    const currentNonce = ++this.searchNonce
     const { sfHost } = useSessionStore.getState()
     const { navigationMode } = useSettingsStore.getState()
     const { userLightningPreference } = useSessionStore.getState()
@@ -493,6 +494,8 @@ class UltraForceWindowManager {
     const results: SearchResult[] = []
 
     const currentLayout = await this.getCurrentRecordLayoutUrl()
+    if (currentNonce !== this.searchNonce) return
+
     if (currentLayout) {
       const name = `${currentLayout.objectApiName} Page Layout`
       const desc = 'Open page layout used by current record'
