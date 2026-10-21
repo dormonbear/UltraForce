@@ -20,7 +20,59 @@ jobs:
     env:
       CWS_PUBLISH: ${{ secrets.CWS_PUBLISH_ENABLED }}
     steps:
+      # Bootstrap only the Git graph. Inline guards remain available even when
+      # a manually selected older tag predates the guards themselves.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Release Target
+        id: target
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            TAG="$REQUESTED_TAG"
+          elif [[ "$EVENT_NAME" == push && "$EVENT_REF" == refs/tags/* ]]; then
+            TAG="${EVENT_REF#refs/tags/}"
+          else
+            echo 'Unsupported release event' >&2
+            exit 1
+          fi
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Expected an existing vMAJOR.MINOR.PATCH release tag' >&2
+            exit 1
+          fi
+          SHA=$(git rev-parse --verify "refs/tags/$TAG^{commit}")
+          if [[ "$EVENT_NAME" == push && "$SHA" != "$EVENT_SHA" ]]; then
+            echo 'Tag no longer points to the triggering commit' >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Release Commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+
+      - name: Verify Release Source
+        env:
+          RELEASE_SHA: ${{ steps.target.outputs.sha }}
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+          if (pkg.version !== process.env.RELEASE_VERSION) {
+            throw new Error('Release tag and package version differ')
+          }
+          NODE
 
       - uses: pnpm/action-setup@v4
         with:
@@ -35,7 +87,6 @@ jobs:
 
       - name: Lint
         run: pnpm lint
-        continue-on-error: true
 
       - name: Type Check
         run: pnpm type-check
@@ -45,6 +96,18 @@ jobs:
 
       - name: Build Extension
         run: pnpm build
+
+      - name: Verify Built Version
+        env:
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          const manifest = JSON.parse(readFileSync('build/chrome-mv3-prod/manifest.json', 'utf8'))
+          if (manifest.version !== process.env.RELEASE_VERSION) {
+            throw new Error('Release tag and built manifest version differ')
+          }
+          NODE
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install chromium --with-deps
@@ -62,28 +125,38 @@ jobs:
       - name: Identify Package
         id: pkg
         run: |
-          ZIP=$(find build -name '*.zip' | head -1)
+          ZIP=build/chrome-mv3-prod.zip
+          test -s "$ZIP"
           echo "zip_path=$ZIP" >> "$GITHUB_OUTPUT"
-          echo "zip_name=$(basename $ZIP)" >> "$GITHUB_OUTPUT"
-          echo "Found package: $ZIP"
+
+      - name: Verify Packaged Version
+        env:
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
+          ZIP_PATH: ${{ steps.pkg.outputs.zip_path }}
+        run: |
+          unzip -p "$ZIP_PATH" manifest.json > "$RUNNER_TEMP/release-manifest.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          const manifest = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, 'release-manifest.json'), 'utf8'))
+          if (manifest.version !== process.env.RELEASE_VERSION) {
+            throw new Error('Release tag and packaged manifest version differ')
+          }
+          NODE
 
       - name: Extract Release Notes
-        id: notes
+        env:
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.tag }}"
-            VERSION="${VERSION#v}"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          node scripts/extract-release-notes.mjs "$VERSION" > /tmp/release-body.md
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          node scripts/extract-release-notes.mjs "$RELEASE_VERSION" > "$RUNNER_TEMP/release-body.md"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ steps.notes.outputs.version }}
-          body_path: /tmp/release-body.md
+          tag_name: ${{ steps.target.outputs.tag }}
+          target_commitish: ${{ steps.target.outputs.sha }}
+          name: ${{ steps.target.outputs.tag }}
+          body_path: ${{ runner.temp }}/release-body.md
           files: ${{ steps.pkg.outputs.zip_path }}
           draft: false
           prerelease: false
