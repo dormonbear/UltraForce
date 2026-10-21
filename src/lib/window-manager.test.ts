@@ -61,10 +61,6 @@ vi.mock('./logger', () => ({
   }
 }))
 
-vi.mock('./api-stats', () => ({
-  trackApiRequest: vi.fn()
-}))
-
 vi.mock('./profile-search', () => ({
   parseProfileDotNotation: vi.fn(),
   buildProfileSubMenu: vi.fn(),

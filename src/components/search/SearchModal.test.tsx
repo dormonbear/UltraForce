@@ -36,11 +36,6 @@ vi.mock('~lib/command-parser', () => ({
   BUILTIN_COMMANDS: {}
 }))
 
-vi.mock('~lib/api-stats', () => ({
-  getApiStats: vi.fn().mockResolvedValue({ totalRequests: 0, sessionRequests: 0 }),
-  resetAllStats: vi.fn()
-}))
-
 vi.mock('./styles', () => ({
   SEARCH_MODAL_STYLES: ''
 }))

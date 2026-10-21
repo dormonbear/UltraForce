@@ -381,9 +381,8 @@ UltraForce is a Chrome extension that provides fast metadata search and navigati
 - Contains:
 - Depends on: `command-parser`, `salesforce-api` (for unsupported type list), `version-check`, types
 - Used by: `window-manager.ts` (React root render)
-- `src/lib/logger.ts` — thin wrapper; silences logs in production
-- `src/lib/api-stats.ts` — counts API requests for debug display
-- `src/lib/version-check.ts` — compares installed version against latest release
+- `src/lib/logger.ts` — suppresses detailed logs in every build; errors emit a fixed generic label
+- `src/lib/version-check.ts` — compares packaged version against the locally stored version
 - `src/lib/keyboard-interceptor.ts` — reusable keyboard event filter used inside Shadow DOM context
 - `src/components/ErrorBoundary.tsx` — class component wrapping React tree in Shadow DOM
 ## Data Flow

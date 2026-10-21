@@ -1,41 +1,19 @@
-const IS_PRODUCTION = process.env.NODE_ENV === 'production'
-
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-
 interface Logger {
-  debug: (...args: any[]) => void
-  info: (...args: any[]) => void
-  warn: (...args: any[]) => void
-  error: (...args: any[]) => void
+  debug: (...args: unknown[]) => void
+  info: (...args: unknown[]) => void
+  warn: (...args: unknown[]) => void
+  error: (...args: unknown[]) => void
 }
 
-function createLogger(prefix: string = 'UltraForce'): Logger {
-  const format = (level: LogLevel, args: any[]) => {
-    const timestamp = new Date().toISOString().split('T')[1].slice(0, 8)
-    return [`[${prefix}][${timestamp}]`, ...args]
-  }
+// Arguments can contain session values, SOQL, org hosts or record content.
+// Apply the same privacy boundary to development and production builds.
+const ignore = (..._args: unknown[]): void => {}
 
-  return {
-    debug: (...args: any[]) => {
-      if (!IS_PRODUCTION) {
-        console.log(...format('debug', args))
-      }
-    },
-    info: (...args: any[]) => {
-      if (!IS_PRODUCTION) {
-        console.log(...format('info', args))
-      }
-    },
-    warn: (...args: any[]) => {
-      if (!IS_PRODUCTION) {
-        console.warn(...format('warn', args))
-      }
-    },
-    error: (...args: any[]) => {
-      // Errors are always logged
-      console.error(...format('error', args))
-    }
+export const logger: Logger = {
+  debug: ignore,
+  info: ignore,
+  warn: ignore,
+  error: (..._args: unknown[]) => {
+    console.error('[UltraForce] An operation failed.')
   }
 }
-
-export const logger = createLogger()
