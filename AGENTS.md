@@ -8,7 +8,7 @@ This file is the cross-tool summary; `CLAUDE.md` is the source of truth where th
 
 UltraForce for Salesforce - a Manifest V3 Chrome extension that injects a Spotlight/Raycast-style
 fuzzy search modal into Salesforce pages (via Shadow DOM) for fast metadata search and navigation.
-Built with React 18 + TypeScript on the Plasmo framework.
+Built with React 19 + TypeScript on the Plasmo framework.
 
 ## Setup and commands
 
@@ -16,7 +16,7 @@ Built with React 18 + TypeScript on the Plasmo framework.
 pnpm install           # install dependencies (pnpm is required; lockfile: pnpm-lock.yaml)
 pnpm dev               # dev build with hot reload
 pnpm build             # production build
-pnpm lint              # ESLint
+pnpm lint              # oxlint
 pnpm type-check        # tsc --noEmit
 pnpm test:run          # Vitest unit tests (one-shot; `pnpm test` is watch mode)
 pnpm test:e2e          # E2E (builds with E2E flag, then Playwright; headed)
@@ -33,7 +33,7 @@ Always run `pnpm lint` and `pnpm type-check` before committing.
 - `src/types/index.ts` - the single types barrel
 - `docs/` - VitePress site. Every `.md` under `docs/` is published; keep internal notes out of it.
 
-## Code style (Prettier-enforced, do not deviate)
+## Code style (oxfmt-enforced, do not deviate)
 
 - No semicolons, single quotes, no trailing commas, print width 120, 2-space indent
 - `interface` for object shapes, `type` for unions/primitives
