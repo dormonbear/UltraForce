@@ -111,6 +111,8 @@ Type `ObjectName.FieldName` (e.g., `Account.Name` or `account.`) to search field
 - `src/lib/metadata-cache.ts`: Chrome storage cache with TTL and background refresh
 
 ## Development Notes
+
+- Before changing networking, logging, storage, dependencies or error handling, read [PRIVACY.md](PRIVACY.md). Its no-collection contract applies to production and development builds.
 - Always run `pnpm lint`, `pnpm format:check` and `pnpm type-check` before committing
 - Formatting is owned by oxfmt (`.oxfmtrc.json`): no semicolons, single quotes, no trailing commas, printWidth 120
 - Git hooks via Husky run `oxlint --fix` then `oxfmt` on staged files
