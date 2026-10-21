@@ -112,13 +112,6 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install chromium --with-deps
 
-      # Gate the release on the packed extension actually working in a real
-      # browser: content script executes without module errors and the
-      # keyboard shortcut opens the modal. Catches broken bundles that unit
-      # tests cannot see (e.g. externalized dependencies).
-      - name: Smoke Test Extension
-        run: xvfb-run --auto-servernum node scripts/smoke-test.mjs
-
       - name: Package Extension
         run: pnpm package
 
@@ -143,6 +136,15 @@ jobs:
             throw new Error('Release tag and packaged manifest version differ')
           }
           NODE
+
+      - name: Verify Packaged UI / 验证打包后的界面
+        env:
+          ZIP_PATH: ${{ steps.pkg.outputs.zip_path }}
+        run: |
+          ARTIFACT_DIR=$(mktemp -d "$RUNNER_TEMP/ultraforce-package.XXXXXX")
+          trap 'rm -rf "$ARTIFACT_DIR"' EXIT
+          unzip -q "$ZIP_PATH" -d "$ARTIFACT_DIR"
+          EXTENSION_PATH="$ARTIFACT_DIR" node scripts/smoke-test.mjs
 
       - name: Extract Release Notes
         env:

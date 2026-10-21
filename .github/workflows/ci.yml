@@ -130,6 +130,12 @@ jobs:
       - name: Verify Bundled Fonts Shipped
         run: node scripts/verify-fonts.mjs
 
+      - name: Install Production Browser / 安装正式产物测试浏览器
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify Production UI / 验证正式产物界面
+        run: node scripts/smoke-test.mjs
+
       - name: Package Extension
         run: pnpm package
 

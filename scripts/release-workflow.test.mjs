@@ -313,3 +313,18 @@ test('all version guards precede publication and inputs are not interpolated int
   }
   assert.ok(!steps.find((step) => step.id === 'target').run.includes('${{'))
 })
+
+test('packed production UI gates publication / 打包后正式界面验证阻止无效发布', () => {
+  const index = (name) => steps.findIndex((step) => step.name === name)
+  const smokeIndex = index('Verify Packaged UI / 验证打包后的界面')
+  assert.ok(smokeIndex > index('Verify Packaged Version'))
+  for (const publication of ['Create GitHub Release', 'Upload to Chrome Web Store', 'Publish to Chrome Web Store']) {
+    assert.ok(smokeIndex < index(publication))
+  }
+  const smoke = steps[smokeIndex]
+  assert.notEqual(smoke['continue-on-error'], true)
+  assert.doesNotMatch(smoke.if || '', /always\(|failure\(|cancelled\(/)
+  assert.match(smoke.run, /unzip -q/)
+  assert.match(smoke.run, /EXTENSION_PATH=.*node scripts\/smoke-test\.mjs/)
+  assert.equal(smoke.env.ZIP_PATH, '${{ steps.pkg.outputs.zip_path }}')
+})
