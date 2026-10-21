@@ -1,5 +1,23 @@
 # Release Notes
 
+## v0.4.1
+
+Release Date: 2026-10-21
+
+### Privacy
+
+- Removed automatic render-error diagnostics and API usage statistics. Application and React error reporters discard private details in both production and development builds.
+- Updates remove old diagnostic records while preserving functional settings, history, favorites and metadata caches. See the [privacy policy](https://github.com/dormonbear/UltraForce/blob/main/PRIVACY.md) for local storage and network behavior.
+- Session requests are bound to the requesting Salesforce document and its organization. Supported Setup, Lightning, Visualforce, sandbox and China domain mappings remain available. Unverifiable legacy mappings stay on the current host; open the organization's MyDomain or Lightning page if an older Visualforce page cannot authenticate.
+
+### Bug Fixes
+
+- Switching between Setup shortcuts and metadata searches no longer lets a delayed response replace newer results or clear the current loading state.
+
+### Improvements
+
+- Updated the UI runtime and verified search, keyboard navigation, focus return and settings against the built extension.
+
 ## v0.4.0
 
 Release Date: 2026-09-10

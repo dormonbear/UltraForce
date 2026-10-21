@@ -1,112 +1,107 @@
 # Privacy
 
-UltraForce for Salesforce is a Manifest V3 Chrome extension that provides fuzzy metadata
-search and navigation inside Salesforce pages. It authenticates to your Salesforce org
-with your existing browser session cookie and makes no other network requests.
+UltraForce for Salesforce does not collect analytics, usage events, API request
+statistics, or automatic error reports. It has no vendor telemetry service and
+does not upload diagnostic data. Search and navigation run in your browser using
+your existing Salesforce session. Functional workspace data stays in this
+extension's `chrome.storage.local` in your browser profile.
 
-This document describes what leaves your machine, what stays, and what is cached where.
-Every claim is verified against source at the cited `file:line`. Anything that could not
-be verified is flagged explicitly.
+## Network and session access
 
-## Outbound network requests (complete list)
+The extension's four `fetch` call sites (`src/lib/auth.ts` and
+`src/lib/salesforce-api.ts`) call Salesforce APIs for session validation,
+permission checks, metadata search, record previews, and user-configured SOQL
+commands. These requests go to the Salesforce host resolved from your session.
+Your queries and the requested record or metadata identifiers are sent to
+Salesforce to perform these functions; they are not sent to UltraForce.
 
-Every `fetch()` in the extension targets your own Salesforce org:
-`https://<your-org-host>/services/data/v62.0/...` (`API_VERSION` is `62.0`,
-`src/lib/auth.ts:9`). There are exactly four fetch call sites in the entire source tree:
+The background worker reads the Salesforce `sid` cookie and supplies it to
+content scripts through extension messaging. The session value is held in
+memory and attached to Salesforce requests as `Authorization: Bearer` or
+`X-SFDC-Session`. UltraForce does not persist the session value. The accessibility
+cache stores a short, non-cryptographic session fingerprint to invalidate stale
+permission results after login changes; it is not an authentication credential.
 
-| Request | Where | When |
-| --- | --- | --- |
-| `GET /services/data/v62.0/sobjects/` (session validation) | `src/lib/salesforce-api.ts:53` | Modal open / warmup |
-| `GET .../tooling/query?q=SELECT Id FROM ApexClass LIMIT 1` (permission probe) | `src/lib/salesforce-api.ts:113` | First search per org/session |
-| `GET .../{query,tooling/query}?q=SELECT Id FROM <object> LIMIT 1` (per-type probes) | `src/lib/salesforce-api.ts:160` | First search per org/session |
-| `GET/POST <path>` (search, record preview, custom commands, record context) | `src/lib/auth.ts:94` (`sfRest`) | On user search, navigation, warmup |
+The cookie bridge accepts only this extension's content-script messages from
+supported HTTPS Salesforce document origins. Host resolution and session
+requests are bound to that document, including supported Setup, Lightning,
+Visualforce and China domain mappings. Discovery for unknown legacy instance
+domains requires an exact match with the document's own session cookie, rather
+than just an organization ID prefix. If this cannot be established, the bridge
+keeps the current host; open the organization's MyDomain or Lightning page if
+an older Visualforce page cannot authenticate. An unrelated hostname in a
+message cannot choose another organization's session.
 
-Metadata search issues SOQL against org metadata tables (`EntityDefinition`,
-`FieldDefinition`, custom settings/metadata; `src/lib/metadata-fetcher.ts:138-266`).
-Record preview fetches `GET /sobjects/<type>/<id>?fields=Name` (`src/lib/record-preview.ts:96-98`).
-Custom commands run user-configured SOQL against the org (`src/lib/custom-command.ts`).
+There is no analytics SDK, beacon, WebSocket, EventSource, or XMLHttpRequest in
+the application source. Fonts are bundled with the extension and loaded from
+`chrome-extension://` URLs. Version notifications compare packaged and locally
+stored version numbers without contacting an update server. Chrome's own
+extension update service and the host Salesforce page operate independently of
+UltraForce's application requests.
 
-No other hosts are ever contacted. Specifically:
+Documentation, release notes, and the privacy policy are links opened when you
+click them. The destination website receives a normal browser navigation and
+is governed by its own hosting policy. The extension does not automatically
+open these links or append organization, session, query, or record data.
 
-- **No telemetry, analytics, or beaconing.** The only network primitives in `src/` are the
-  four `fetch` sites above. There is no `XMLHttpRequest`, `sendBeacon`, `WebSocket`, or
-  `EventSource` anywhere in the extension.
-- **No remote fonts and no remote assets.** `src/lib/font-loader.ts` generates
-  `@font-face` rules whose URLs are built with `chrome.runtime.getURL` pointing at
-  bundled files (`assets/fonts/inter-latin.woff2`,
-  `assets/fonts/inter-latin-ext.woff2`; `src/lib/font-loader.ts:5-26`). These resolve to
-  `chrome-extension://<id>/assets/fonts/...` — the extension's own origin, never a
-  network host. `src/components/search/styles.css:2` contains no `@import` of any remote
-  origin. The extension does not fetch from jsdelivr, Google Fonts, or any CDN.
-- **No remote update check.** `checkForUpdate()` compares the packaged manifest version
-  with a value stored locally and performs no network request
-  (`src/lib/version-check.ts:14-29`).
-- **The only non-org URLs in the source are user-clicked links**: release notes
-  (`src/lib/version-check.ts:3`, opened as an `<a href target="_blank">` at
-  `src/components/search/UpdateNotification.tsx:54`), project docs and a privacy gist
-  (`src/components/search/SettingsPanel.tsx:65-66`, opened as anchors at
-  `src/components/search/SettingsPanel.tsx:722,725`). Opening them is a user action, not
-  an automatic request.
+## Functional data on your device
 
-## The session cookie (sid)
+These are local features for your work, not telemetry or data collected by the
+developer. They can still contain organization information and personal content.
 
-- The background service worker reads the `sid` cookie from the browser cookie jar with
-  `chrome.cookies.get` (`src/background/index.ts:243`) and hands its value to the content
-  script over `chrome.runtime` messaging (`src/background/index.ts:246`).
-- The value is held in memory in the content script and attached as
-  `Authorization: Bearer <sid>` (or `X-SFDC-Session` for Bulk API) on requests to your
-  org (`src/lib/auth.ts:85-87`).
-- It is **never** written to `chrome.storage`, never logged (the logger only emits error
-  objects; `src/lib/logger.ts:21-36`), and never sent to any host other than your org.
-- A 32-bit FNV-1a digest of the sid value (hex, 8 characters) is stored in
-  `chrome.storage.local` as a session-change fingerprint
-  (`src/lib/unsupported-types.ts:7-28`, persisted at
-  `src/lib/unsupported-types.ts:58`). The sid is `<orgId>!<token>`; the digest is
-  session-specific (the token rotates on every login) and cannot be reversed into
-  the sid or the org ID. It is not enough to impersonate a session.
+| Storage | Contents and purpose |
+| --- | --- |
+| `settings`, `ultraforce_search_settings` | Preferences and user-configured commands, including SOQL templates |
+| `ultraforce_history__<host>` | Up to 200 recent items per organization, including names, URLs, descriptions, visit counts, and timestamps |
+| `ultraforce_favorites__<host>` | Items you pin, including names, URLs, and descriptions, scoped to an organization |
+| `metadata_<orgId>_<type>` | Metadata names, labels, namespaces and related catalog information, with a 24-hour TTL and a 5 MiB cache cap |
+| `ultraforce_unsupported_types` | Inaccessible metadata types, check timestamps and a session-change fingerprint |
+| `ultraforce_version_check` | The locally seen extension version and notification status |
 
-## What is stored locally (chrome.storage.local)
+The extension uses neither `chrome.storage.sync` nor `chrome.storage.session`.
+Search result lists are held in memory. Record previews use an in-memory cache
+of up to 50 entries for five minutes. History and favorites may retain displayed
+names or descriptions from items you visit or pin; this means record-related
+content can be present locally in those features even though query result
+lists are not automatically persisted.
 
-All keys are defined in `src/lib/storage-service.ts:7-16`. Storage is device-local to
-your browser profile and never leaves the browser.
+Use the clear controls for history and favorites to clear the current
+organization's items. Rebuilding metadata cache replaces the current
+organization's metadata catalog. Uninstalling the extension removes its local
+extension storage. Browser profiles, backups, and device access are managed by
+you or your organization.
 
-| Key | Contents | Notes |
-| --- | --- | --- |
-| `settings`, `ultraforce_search_settings` | User preferences (search limit, types, behavior) | — |
-| `ultraforce_history__<host>` | Up to 200 recently visited items: name, type, URL, description, visit counts and timestamps (`src/stores/history-store.ts:15-25`) | Keyed per org host |
-| `ultraforce_favorites__<host>` | Same shape, items you pinned | Keyed per org host |
-| `metadata_<orgId>_<type>` | Cached org metadata catalog: API names, labels, namespaces, custom-setting and custom-metadata names (`src/lib/metadata-fetcher.ts:138-266`) | 24 h TTL, 5 MiB cap - half of the 10 MiB storage quota (`src/lib/metadata-cache.ts:8-25`) |
-| `ultraforce_unsupported_types` | Per-org list of inaccessible metadata types, checked timestamp, sid fingerprint | — |
-| `ultraforce_api_stats` | API request count and timestamps, 30-day window only (`src/lib/api-stats.ts`) | No URLs, no payloads |
-| `ultraforce_version_check` | Last seen extension version | — |
-| `ultraforce_error_logs` | Last 10 render errors: message, stack, page URL, user-agent (`src/components/ErrorBoundary.tsx:74-86`) | Never uploaded |
+## Errors and deprecated diagnostics
 
-What is **not** stored: record field values. Record previews (one record's `Name`) live
-only in memory with a 50-entry, 5-minute cache (`src/lib/record-preview.ts:17,25,33-35`).
-Search results are never persisted (`src/stores/search-store.ts:2`). The sid is never
-persisted. The extension does not use `chrome.storage.session` or `chrome.storage.sync`.
+Render errors display a local recovery screen and retry controls. Error
+messages and technical details may appear in that screen while it is open;
+they are not saved or uploaded by the error boundary. Application
+logging in both development and production emits only a static generic failure
+message and never forwards caller arguments, queries, response bodies, URLs, or
+session values. Debug, info and warning logger calls are silent in all builds.
+React root caught, uncaught, and recoverable error reporters also discard raw
+errors and component stacks and use the same fixed message.
+Browser-generated exception messages are outside the application's control.
 
-## How to clear stored data
+Older releases saved render diagnostics (`ultraforce_error_logs`) and API
+request counts/timestamps (`ultraforce_api_stats`) locally. The current worker
+removes exactly these two legacy keys on activation, browser startup, and
+install/update. It removes them by name without reading their contents and
+preserves functional settings, history, favorites, and metadata caches.
+The former API Statistics UI and request tracking have been removed.
 
-- **History and favorites**: use the clear controls in the modal's settings panel, or
-  remove the matching `ultraforce_history__<host>` / `ultraforce_favorites__<host>` keys.
-  Clearing in settings affects the org you are currently logged into.
-- **Everything**: uninstalling the extension removes its `chrome.storage.local` data.
-  While installed, the data lives in your browser profile; nothing is uploaded anywhere.
+## Permissions and verification limits
 
-## Permissions
+The extension requests `storage`, `activeTab`, `tabs`, `cookies`, and host
+permissions for Salesforce-family domains. Cookies support existing-session
+authentication; tabs and activeTab support navigation and the search shortcut.
+See the manifest configuration in `package.json` for the exact domain list.
 
-`storage`, `activeTab`, `tabs`, `cookies`, plus host permissions limited to
-Salesforce-family domains (`.salesforce.com`, `.force.com`, `.visualforce.com`,
-`.sfcrmapps.cn`, `.sfcrmproducts.cn`, and related) plus `login.salesforce.com` and
-`test.salesforce.com` (`package.json`, `manifest` section). The `cookies` permission
-exists solely to read the `sid` cookie described above.
-
-## Claims not verified at runtime
-
-- The docs/privacy links in the settings panel are plain anchors and were not clicked
-  during this audit.
-- Whether the bundled Inter typeface visually renders for a human user: an E2E
-  test (`tests/e2e/fonts.spec.ts`) confirms in a real browser that opening the modal
-  makes the renderer fetch the bundled woff2 files with HTTP 200 (and fails without
-  `web_accessible_resources`), but no pixel-level visual check was performed.
+Regression tests cover error handling without storage writes, request handling
+without statistics, static production logging, and key-only migration. A
+controlled Chromium test loads the built extension with synthetic Salesforce
+responses, checks startup migration preserves workspace data, runs successful
+and failed searches, and checks storage and outgoing request destinations.
+This is a scoped verification, not proof of behavior in every live organization
+or of the privacy practices of Salesforce, Chrome, linked websites, or browser
+extensions installed alongside UltraForce.

@@ -8,7 +8,6 @@ import {
   mergeCommands,
   filterCommandsBySupported
 } from '~lib/command-parser'
-import { getApiStats, resetAllStats, type ApiStatsDisplay } from '~lib/api-stats'
 import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~lib/salesforce-api'
 import { logger } from '~lib/logger'
 
@@ -67,7 +66,7 @@ const getAppVersion = () => {
     return 'unknown'
   }
 }
-const PRIVACY_URL = 'https://gist.github.com/dormonbear/14242e4e5effbf0c7159c0e2bc14bbda'
+const PRIVACY_URL = 'https://github.com/dormonbear/UltraForce/blob/main/PRIVACY.md'
 const DOCS_URL = 'https://ultraforce.dormon.net/'
 
 interface CommandFormState {
@@ -105,14 +104,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const displayName = sfHost ? sfHost.split('.')[0] : null
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
-  const [apiStats, setApiStats] = useState<ApiStatsDisplay>({ total: 0, last24h: 0, lastMonth: 0 })
   const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
   const [isRebuilding, setIsRebuilding] = useState(false)
 
   useEffect(() => {
-    getApiStats()
-      .then(setApiStats)
-      .catch((error) => logger.warn('getApiStats failed', { error }))
     if (sfHost) {
       getUnsupportedTypes(sfHost)
         .then(setUnsupportedTypes)
@@ -322,14 +317,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       descriptionFields: ''
     })
     setFormError(null)
-  }
-
-  const handleResetStats = async () => {
-    if (!confirm('Reset all API statistics?')) {
-      return
-    }
-    await resetAllStats()
-    setApiStats(await getApiStats())
   }
 
   const handleRebuildCache = async () => {
@@ -717,27 +704,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <p className="section-desc">Rebuild metadata cache for current org.</p>
           <button className="cmd-btn cmd-btn-secondary" onClick={handleRebuildCache} disabled={isRebuilding || !sfHost}>
             {isRebuilding ? 'Rebuilding...' : 'Rebuild Cache'}
-          </button>
-        </div>
-
-        <div className="setting-section">
-          <h3 className="section-title">API Statistics</h3>
-          <div className="stats-list">
-            <div className="stats-row">
-              <span>Last 24 hours</span>
-              <span className="stats-value">{apiStats.last24h}</span>
-            </div>
-            <div className="stats-row">
-              <span>Last 30 days</span>
-              <span className="stats-value">{apiStats.lastMonth}</span>
-            </div>
-            <div className="stats-row">
-              <span>Total</span>
-              <span className="stats-value">{apiStats.total}</span>
-            </div>
-          </div>
-          <button className="cmd-btn cmd-btn-secondary" onClick={handleResetStats} style={{ marginTop: '12px' }}>
-            Reset
           </button>
         </div>
 

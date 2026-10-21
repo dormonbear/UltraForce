@@ -1,12 +1,8 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import type { CustomCommand } from '~types'
 
-vi.mock('~lib/api-stats', () => ({
-  getApiStats: vi.fn().mockResolvedValue({ total: 0, last24h: 0, lastMonth: 0 }),
-  resetAllStats: vi.fn().mockResolvedValue(undefined)
-}))
 vi.mock('~lib/salesforce-api', () => ({
   getUnsupportedTypes: vi.fn().mockResolvedValue([]),
   clearMetadataCache: vi.fn().mockResolvedValue(undefined),
@@ -16,9 +12,6 @@ vi.mock('~lib/logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }))
 
-import { waitFor } from '@testing-library/react'
-import { getApiStats } from '~lib/api-stats'
-import { logger } from '~lib/logger'
 import SettingsPanel from './SettingsPanel'
 
 function renderPanel(overrides: Partial<React.ComponentProps<typeof SettingsPanel>> = {}) {
@@ -57,21 +50,12 @@ async function openAddForm() {
   await screen.findByPlaceholderText('e.g. log')
 }
 
-describe('SettingsPanel error logging', () => {
-  beforeEach(() => {
-    cleanup()
-    vi.clearAllMocks()
-  })
-
-  it('logs a warning when getApiStats rejects', async () => {
-    vi.mocked(getApiStats).mockRejectedValueOnce(new Error('boom'))
-    renderPanel()
-    await waitFor(() => {
-      expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-        'getApiStats failed',
-        expect.objectContaining({ error: expect.any(Error) })
-      )
+describe('SettingsPanel privacy', () => {
+  it('does not offer automatic API request statistics', async () => {
+    await act(async () => {
+      renderPanel()
     })
+    expect(screen.queryByText('API Statistics')).not.toBeInTheDocument()
   })
 })
 

@@ -82,10 +82,6 @@ vi.mock('./logger', () => ({
   }
 }))
 
-vi.mock('./api-stats', () => ({
-  trackApiRequest: vi.fn()
-}))
-
 // Import after mocks
 import {
   searchSalesforceMetadata,

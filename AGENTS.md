@@ -44,6 +44,8 @@ Always run `pnpm lint` and `pnpm type-check` before committing.
 
 ## Conventions
 
+- For changes to networking, logging, storage, dependencies or error handling, read [PRIVACY.md](PRIVACY.md) and preserve its no-collection contract in every build, including development.
+
 - Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`); never commit to `main` directly
 - After a feature or fix, add and pass both unit (Vitest) and E2E (Playwright) tests
 - When adding a Salesforce domain, update both `package.json` manifest config and the relevant service files

@@ -4,7 +4,6 @@
  * Uses browser session cookie (sid) for authentication
  */
 
-import { trackApiRequest } from './api-stats'
 import { normalizeHost } from './domain-utils'
 import { logger } from './logger'
 
@@ -100,7 +99,6 @@ export async function sfRest<T = unknown>(
 
   if (!response.ok) {
     const errorText = await response.text()
-    trackApiRequest()
 
     if (response.status === 401) {
       throw new Error('Session expired. Please refresh the page and try again.')
@@ -111,6 +109,5 @@ export async function sfRest<T = unknown>(
     throw error
   }
 
-  trackApiRequest()
   return response.json() as Promise<T>
 }

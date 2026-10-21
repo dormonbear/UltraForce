@@ -31,10 +31,6 @@ vi.mock('./logger', () => ({
   }
 }))
 
-vi.mock('./api-stats', () => ({
-  trackApiRequest: vi.fn()
-}))
-
 vi.mock('./unsupported-types', () => ({
   markTypeUnsupported: vi.fn()
 }))

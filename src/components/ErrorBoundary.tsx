@@ -1,6 +1,5 @@
 import React, { Component, ErrorInfo } from 'react'
 import { logger } from '~lib/logger'
-import { STORAGE_KEYS, storageGet, storageSet, type ErrorLogEntry } from '~lib/storage-service'
 
 interface ErrorBoundaryState {
   hasError: boolean
@@ -62,31 +61,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       this.props.onError(error, errorInfo)
     }
 
-    // Log to Chrome storage for debugging
-    this.logErrorToStorage(error, errorInfo)
-
     // Auto-retry after 5 seconds
     this.scheduleRetry()
-  }
-
-  private async logErrorToStorage(error: Error, errorInfo: ErrorInfo): Promise<void> {
-    try {
-      const errorLog = {
-        timestamp: new Date().toISOString(),
-        errorId: this.state.errorId,
-        message: error.message,
-        stack: error.stack,
-        componentStack: errorInfo.componentStack,
-        url: window.location.href,
-        userAgent: navigator.userAgent
-      }
-
-      const existingLogs = (await storageGet<ErrorLogEntry[]>(STORAGE_KEYS.ERROR_LOGS)) || []
-      const updatedLogs = [...existingLogs, errorLog].slice(-10)
-      await storageSet(STORAGE_KEYS.ERROR_LOGS, updatedLogs)
-    } catch (storageError) {
-      logger.error('Failed to log error to storage:', storageError)
-    }
   }
 
   private scheduleRetry(): void {

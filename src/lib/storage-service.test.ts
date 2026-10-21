@@ -24,9 +24,7 @@ describe('storage-service', () => {
     it('should export all expected key constants', () => {
       expect(STORAGE_KEYS.SEARCH_SETTINGS).toBe('ultraforce_search_settings')
       expect(STORAGE_KEYS.UNSUPPORTED_TYPES).toBe('ultraforce_unsupported_types')
-      expect(STORAGE_KEYS.API_STATS).toBe('ultraforce_api_stats')
       expect(STORAGE_KEYS.VERSION_CHECK).toBe('ultraforce_version_check')
-      expect(STORAGE_KEYS.ERROR_LOGS).toBe('ultraforce_error_logs')
       expect(STORAGE_KEYS.LEGACY_SETTINGS).toBe('settings')
     })
   })
@@ -70,13 +68,13 @@ describe('storage-service', () => {
   describe('storageGet', () => {
     it('should return value for existing key', async () => {
       chrome.storage.local.get.mockResolvedValue({
-        ultraforce_api_stats: { totalRequests: 42, requestLog: [] }
+        fixture_key: { count: 42, items: [] }
       })
 
-      const result = await storageGet<{ totalRequests: number }>('ultraforce_api_stats')
+      const result = await storageGet<{ count: number }>('fixture_key')
 
-      expect(chrome.storage.local.get).toHaveBeenCalledWith(['ultraforce_api_stats'])
-      expect(result).toEqual({ totalRequests: 42, requestLog: [] })
+      expect(chrome.storage.local.get).toHaveBeenCalledWith(['fixture_key'])
+      expect(result).toEqual({ count: 42, items: [] })
     })
 
     it('should return undefined for missing key', async () => {
@@ -98,10 +96,10 @@ describe('storage-service', () => {
 
   describe('storageSet', () => {
     it('should write value to chrome.storage.local', async () => {
-      await storageSet('ultraforce_api_stats', { totalRequests: 1, requestLog: [] })
+      await storageSet('fixture_key', { count: 1, items: [] })
 
       expect(chrome.storage.local.set).toHaveBeenCalledWith({
-        ultraforce_api_stats: { totalRequests: 1, requestLog: [] }
+        fixture_key: { count: 1, items: [] }
       })
     })
 
@@ -114,9 +112,9 @@ describe('storage-service', () => {
 
   describe('storageRemove', () => {
     it('should remove single key', async () => {
-      await storageRemove('ultraforce_api_stats')
+      await storageRemove('fixture_key')
 
-      expect(chrome.storage.local.remove).toHaveBeenCalledWith('ultraforce_api_stats')
+      expect(chrome.storage.local.remove).toHaveBeenCalledWith('fixture_key')
     })
 
     it('should remove multiple keys', async () => {
