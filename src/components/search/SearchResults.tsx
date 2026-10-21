@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import type { SearchResult } from '~types'
 import type { FavoriteItem } from '~stores/favorites-store'
@@ -104,12 +105,18 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   let currentIndex = 0
 
   return (
-    <div className="search-results" data-ultraforce-results id={listboxId} role="listbox" aria-label="Search results">
+    <div
+      className="search-results"
+      data-ultraforce-results
+      id={listboxId}
+      role="listbox"
+      aria-label={t('Search results')}
+    >
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 
         const isCollapsed = collapsedGroups[type] || false
-        const label = METADATA_LABELS[type] || type
+        const label = t(METADATA_LABELS[type] || type)
 
         const groupItems = isCollapsed
           ? null

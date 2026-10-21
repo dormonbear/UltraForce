@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 // HomeScreen - Replaces the empty state when query is empty.
 // Shows pinned favorites and recent history ordered by last visit time.
 
@@ -49,13 +50,13 @@ function getTypeIcon(type: string): string {
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 1) return t('just now')
+  if (minutes < 60) return t('{count}m ago', { count: minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
+  if (hours < 24) return t('{count}h ago', { count: hours })
   const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-  return `${Math.floor(days / 30)}mo ago`
+  if (days < 30) return t('{count}d ago', { count: days })
+  return t('{count}mo ago', { count: Math.floor(days / 30) })
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -110,16 +111,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     return (
       <div className="home-screen">
         <div className="home-empty">
-          <div className="home-empty-title">Start searching</div>
+          <div className="home-empty-title">{t('Start searching')}</div>
           <div className="home-empty-desc">
-            Type to search {selectedTypes?.length ? 'your selected metadata types' : 'Salesforce metadata'}
+            {t('Type to search {types}', {
+              types: selectedTypes?.length ? t('your selected metadata types') : t('Salesforce metadata')
+            })}
           </div>
           <div className="home-tips">
             <span className="home-tip">
-              Type <kbd>:</kbd> for commands
+              {t('Type')} <kbd>:</kbd> {t('for commands')}
             </span>
             <span className="home-tip">
-              Press <kbd>Tab</kbd> to autocomplete
+              {t('Press')} <kbd>Tab</kbd> {t('to autocomplete')}
             </span>
           </div>
         </div>
@@ -137,7 +140,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </span>
-            Favorites
+            {t('Favorites')}
           </div>
           <div className="home-items">
             {visibleFavorites.map((item) => (
@@ -152,12 +155,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <span className="home-item-badge" data-type={item.type}>
                   {getTypeIcon(item.type)}
                 </span>
-                <span className="home-item-name">{item.name}</span>
-                {item.description && <span className="home-item-desc">{item.description}</span>}
+                <span className="home-item-name">
+                  {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
+                    ? t(item.name)
+                    : item.name}
+                </span>
+                {item.description && (
+                  <span className="home-item-desc">
+                    {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
+                      ? t(item.description)
+                      : item.description}
+                  </span>
+                )}
                 <button
                   className="home-item-action home-item-unpin"
                   onClick={(e) => handleFavoriteToggle(e, item)}
-                  title="Unpin"
+                  title={t('Unpin')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -178,7 +191,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <polyline points="12 6 12 12 16 14" />
               </svg>
             </span>
-            Recent
+            {t('Recent')}
           </div>
           <div className="home-items">
             {recentItems.map((item) => (
@@ -188,17 +201,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={() => handleItemClick(item.url)}
                 role="button"
                 tabIndex={0}
-                title={`${item.name} (${item.type}) - visited ${item.visitCount}x`}
+                title={t('{name} ({type}) - visited {count}x', {
+                  name: item.name,
+                  type: item.type,
+                  count: item.visitCount
+                })}
               >
                 <span className="home-item-badge" data-type={item.type}>
                   {getTypeIcon(item.type)}
                 </span>
-                <span className="home-item-name">{item.name}</span>
+                <span className="home-item-name">
+                  {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
+                    ? t(item.name)
+                    : item.name}
+                </span>
                 <span className="home-item-time">{formatRelativeTime(item.lastVisitedAt)}</span>
                 <button
                   className={`home-item-action home-item-pin${isFavorite(item.id) ? ' home-item-pinned' : ''}`}
                   onClick={(e) => handleFavoriteToggle(e, item)}
-                  title={isFavorite(item.id) ? 'Unpin' : 'Pin to favorites'}
+                  title={isFavorite(item.id) ? t('Unpin') : t('Pin to favorites')}
                 >
                   <svg
                     width="14"
@@ -214,7 +235,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 <button
                   className="home-item-action home-item-remove"
                   onClick={(e) => handleRemoveHistory(e, item.id)}
-                  title="Remove from history"
+                  title={t('Remove from history')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" />

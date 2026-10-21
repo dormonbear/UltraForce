@@ -3,6 +3,7 @@
 import type { SearchResult } from '~types'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
+import { t } from './i18n'
 import { normalizeHost, escapeSoql } from './domain-utils'
 import { parseSearchQuery } from './fuzzy-search'
 import { fetchAllPages } from './metadata-fetcher'
@@ -86,13 +87,13 @@ function formatCustomCommandError(errorMessage: string): string {
       const errorData = JSON.parse(apiMatch[1])
       if (Array.isArray(errorData) && errorData[0]?.message) {
         const sfError = errorData[0].message
-        return `SOQL Error: ${sfError}\n\nPlease check your custom command configuration in Settings.`
+        return `${t('SOQL Error: {message}', { message: String(sfError) })}\n\n${t('Please check your custom command configuration in Settings.')}`
       }
     } catch {
       // Not JSON, use as-is
     }
   }
-  return `${errorMessage}\n\nPlease check your custom command configuration in Settings.`
+  return `${errorMessage}\n\n${t('Please check your custom command configuration in Settings.')}`
 }
 
 /** Traverses dot-notation field paths like "Profile.Name" on a record. */

@@ -1,4 +1,5 @@
 import type { SearchCommand, BuiltinCommand, CustomCommand } from '~types'
+import { t } from '~lib/i18n'
 
 export const BUILTIN_COMMANDS: Record<string, BuiltinCommand> = {
   o: { key: 'o', types: ['CustomObject', 'CustomField'], description: 'Objects & Fields', isBuiltin: true },
@@ -108,7 +109,10 @@ export function getMatchingCommands(
   }
 
   return filteredCommands.filter(
-    (cmd) => cmd.key.toLowerCase().startsWith(partial) || cmd.description.toLowerCase().includes(partial)
+    (cmd) =>
+      cmd.key.toLowerCase().startsWith(partial) ||
+      cmd.description.toLowerCase().includes(partial) ||
+      (cmd.isBuiltin && t(cmd.description).toLowerCase().includes(partial))
   )
 }
 

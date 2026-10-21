@@ -11,6 +11,7 @@ import { sfRest, API_VERSION } from '~lib/auth'
 import type { SfRestError } from '~lib/auth'
 import { getKeyPrefix } from '~lib/id-utils'
 import { logger } from '~lib/logger'
+import { t } from './i18n'
 
 export interface RecordPreview {
   id: string
@@ -90,7 +91,7 @@ export async function fetchRecordPreview(
   try {
     const objectType = await resolveObjectType(sfHost, prefix, signal)
     if (!objectType) {
-      return makePreview(recordId, 'Unknown', 'Unknown object type')
+      return makePreview(recordId, 'Unknown', t('Unknown object type'))
     }
 
     const record = await sfRest<Record<string, unknown>>(
@@ -106,10 +107,10 @@ export async function fetchRecordPreview(
 
     const status = (error as SfRestError).status
     if (status === 404) {
-      return cachePreview(makePreview(recordId, 'Unknown', 'Record not found'))
+      return cachePreview(makePreview(recordId, 'Unknown', t('Record not found')))
     }
     if (status === 403) {
-      return cachePreview(makePreview(recordId, 'Unknown', 'No access'))
+      return cachePreview(makePreview(recordId, 'Unknown', t('No access')))
     }
 
     logger.error('Failed to fetch record preview', { recordId, error })

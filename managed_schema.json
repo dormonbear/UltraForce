@@ -5,20 +5,20 @@
     "navigationMode": {
       "type": "string",
       "enum": ["auto", "lightning", "classic"],
-      "title": "Navigation Mode",
-      "description": "Forces how UltraForce opens Salesforce pages. Values: auto (follow user preference), lightning (always Lightning Experience), classic (always Salesforce Classic)."
+      "title": "Navigation Mode / 导航模式",
+      "description": "Forces how UltraForce opens Salesforce pages. Values: auto (follow user preference), lightning (always Lightning Experience), classic (always Salesforce Classic). / 强制指定 Salesforce 页面打开方式：auto 跟随用户偏好，lightning 始终使用 Lightning 体验，classic 始终使用 Salesforce 经典版。"
     },
     "hideManagedPackage": {
       "type": "boolean",
-      "title": "Hide Managed Package Items",
-      "description": "When true, managed package metadata items are hidden from search results; when false, they are always shown."
+      "title": "Hide Managed Package Items / 隐藏托管软件包项目",
+      "description": "When true, managed package metadata items are hidden from search results; when false, they are always shown. / 为 true 时从搜索结果中隐藏托管软件包元数据，为 false 时始终展示。"
     },
     "maxResultsPerType": {
       "type": "integer",
       "minimum": 10,
       "maximum": 500,
-      "title": "Max Results Per Type",
-      "description": "Maximum number of search results returned per metadata type. Capped between 10 and 500 to bound API usage."
+      "title": "Max Results Per Type / 每种类型的结果上限",
+      "description": "Maximum number of search results returned per metadata type. Capped between 10 and 500 to bound API usage. / 每种元数据类型返回的搜索结果上限，范围为 10 至 500，以限制 API 使用量。"
     }
   }
 }

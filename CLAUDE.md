@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Collaboration policy / 协作规则
+
+- Write all new human-readable content in English first, followed by Simplified Chinese: comments, documentation, commits, PRs, issues, reviews and release notes. Keep identifiers, file names and log/error codes in English.
+  所有新增的人类可读内容均先写英文，再写简体中文，包括注释、文档、提交、PR、议题、评审及发布说明；标识符、文件名及日志／错误代码保留英文。
+- UI localization is pre-approved: provide English and Simplified Chinese for labels, messages, settings and errors; default to the browser/OS locale, use a minimal implementation and test it. Add a heavy dependency only with clear justification.
+  UI 本地化已获批准：标签、消息、设置及错误均提供英文和简体中文，默认采用浏览器／操作系统语言，保持实现精简并添加测试；仅在理由充分时引入大型依赖。
+- Before implementing any other new user-facing feature, command, panel, setting or integration, submit a short proposal covering the problem, design and scope for user review. Proceed autonomously with bug fixes, refactors, tests, privacy removal, dependency upgrades, triage, merges and releases.
+  实现其他面向用户的新功能、命令、面板、设置或集成前，先提交涵盖问题、设计及范围的简短提案供用户审查。缺陷修复、重构、测试、隐私收集移除、依赖升级、分流、合并及发布可自主执行。
+- Ship a regression test with every fix. Prioritize coverage reports and CI thresholds, native Tauri E2E, a Windows CI runner and real-org tests runnable against a CI scratch org. Preserve every verification command's exit code; avoid separator chaining that masks failures.
+  每项修复均附带回归测试。优先完善覆盖率报告与 CI 阈值、原生 Tauri 端到端测试、Windows CI 运行器，以及可在 CI 临时组织上执行的真实组织测试。保留每个验证命令的退出码，避免用分隔符串联掩盖失败。
+
 ## Project Overview
 
 UltraForce for Salesforce - Chrome extension providing fast metadata search and navigation for Salesforce orgs. Users press a keyboard shortcut to open a search modal injected into the page via Shadow DOM, then navigate directly to Apex classes, custom objects, flows, Setup pages, and more.
@@ -50,7 +61,7 @@ pnpm exec playwright test --debug     # Debug mode
 
 ### Key Technologies
 - **Build**: Plasmo (wraps Parcel)
-- **UI**: React 18 + TypeScript
+- **UI**: React 19 + TypeScript
 - **Styling**: plain CSS in `src/components/search/styles.css`, injected into Shadow DOM via Plasmo's `data-text:` import
 - **State**: Zustand (with `persist` to chrome.storage for settings/history/favorites)
 - **Search**: MiniSearch
@@ -163,26 +174,22 @@ Releases are automated via GitHub Actions. Pushing a `v*` tag triggers the relea
 ```bash
 # Releases are cut from and tagged on `main`.
 
-# 1. Bring main up to date with develop
-git checkout main
-git merge --ff-only develop
+# 1. Branch from verified develop; prepare version metadata without a tag
+#    Pick patch/minor/major, then fill docs/guide/release-notes.md.
+git switch -c release/vX.Y.Z develop
+node scripts/bump-version.mjs patch --no-tag
 
-# 2. Bump version + release-notes placeholder, commit, and tag on main (pick one)
-pnpm release:patch   # 0.1.1 -> 0.1.2
-pnpm release:minor   # 0.1.1 -> 0.2.0
-pnpm release:major   # 0.1.1 -> 1.0.0
+# 2. Commit metadata and notes; merge the release PR into main after checks pass.
 
-# 3. Edit the generated placeholder in docs/guide/release-notes.md, then re-point the tag
-git commit --amend --no-edit
-git tag -f vX.Y.Z
+# 3. Tag the reviewed merged commit once; push the new tag to trigger release
+git tag vX.Y.Z <verified-main-commit>
+git push origin vX.Y.Z
 
-# 4. Push main + tag to trigger the release workflow
-git push origin main
-git push origin vX.Y.Z --force
-
-# 5. Fast-forward develop so it keeps the release commit
+# 4. Fast-forward develop so it keeps the release commit
+git fetch origin main
 git checkout develop
-git merge --ff-only main
+git merge --ff-only origin/main
+git push origin develop
 ```
 
 The release workflow (`.github/workflows/release.yml`) will:
@@ -211,7 +218,7 @@ Every push to `develop`/`main` and every PR triggers the CI workflow (`.github/w
 
 **UltraForce for Salesforce - Architecture & Quality Milestone**
 
-UltraForce is a Chrome extension that provides fast metadata search and navigation for Salesforce orgs. Users press a keyboard shortcut to open a search modal overlay (injected via Shadow DOM), type queries with fuzzy matching, and navigate directly to Salesforce Setup pages, Apex classes, custom objects, flows, and more. Built with React 18 + TypeScript on the Plasmo framework.
+UltraForce is a Chrome extension that provides fast metadata search and navigation for Salesforce orgs. Users press a keyboard shortcut to open a search modal overlay (injected via Shadow DOM), type queries with fuzzy matching, and navigate directly to Salesforce Setup pages, Apex classes, custom objects, flows, and more. Built with React 19 + TypeScript on the Plasmo framework.
 
 **Core Value:** Fast, reliable metadata search and navigation that works across all Salesforce domains -- the extension must never break the host Salesforce page or lose the user's session context.
 
@@ -248,7 +255,7 @@ UltraForce is a Chrome extension that provides fast metadata search and navigati
 ## Key Dependencies
 - `plasmo` 0.90.5 - Framework for building and packaging the Chrome extension
 - `minisearch` 7.2.0 - Powers all fuzzy search; defined indexes in `src/lib/fuzzy-search.ts`
-- `react` / `react-dom` 18.3.1 - UI layer for search modal and content script overlay
+- `react` / `react-dom` - UI layer (versions: `package.json`) for search modal and content script overlay
 - `@types/chrome` 0.1.4 - TypeScript types for Chrome Extension API
 - `jsdom` 28.0.0 - DOM emulation for unit tests
 ## Configuration
@@ -327,9 +334,10 @@ UltraForce is a Chrome extension that provides fast metadata search and navigati
 - `ErrorBoundary` class component (`src/components/ErrorBoundary.tsx`) wraps component trees to catch render errors
 ## Logging
 - Use `logger.debug/info/warn/error` everywhere; **never `console.*` directly in production code**
-- `debug`/`info`/`warn` are suppressed in production (`NODE_ENV === 'production'`)
-- `error` is always logged regardless of environment
-- Log context as second argument object: `logger.error('search failed', { host, error })`
+- `debug`/`info`/`warn` are silent in every build.
+- `error` emits only a fixed generic failure label and discards all caller arguments.
+- Preserve this behavior in development and production; errors, sessions, queries,
+  URLs and response bodies must not become logs or saved diagnostics. See `PRIVACY.md`.
 ## Comments
 - Complex business logic and non-obvious algorithms
 - JSDoc-style block comments for classes only (seen on `ErrorBoundary`)

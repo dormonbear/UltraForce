@@ -22,7 +22,7 @@
     "declarationMap": false,
     "noUncheckedIndexedAccess": false,
     "jsx": "react-jsx",
-    "baseUrl": ".",
+    "types": ["chrome"],
     "paths": {
       "~*": [
         "./src/*"

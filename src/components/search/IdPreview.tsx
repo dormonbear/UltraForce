@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { useState, useEffect, useRef } from 'react'
 import { fetchRecordPreview, type RecordPreview } from '~lib/record-preview'
 
@@ -48,12 +49,12 @@ export default function IdPreview({ recordId, sfHost, onNavigate }: IdPreviewPro
         if (preview) {
           setState({ status: 'resolved', preview })
         } else {
-          setState({ status: 'error', message: 'Could not resolve record' })
+          setState({ status: 'error', message: t('Could not resolve record') })
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setState({ status: 'error', message: 'Could not resolve record' })
+          setState({ status: 'error', message: t('Could not resolve record') })
         }
       })
 
@@ -63,11 +64,11 @@ export default function IdPreview({ recordId, sfHost, onNavigate }: IdPreviewPro
   }, [recordId, sfHost])
 
   return (
-    <div className="id-preview" role="region" aria-label="Record preview">
+    <div className="id-preview" role="region" aria-label={t('Record preview')}>
       {state.status === 'loading' && (
         <div className="id-preview-loading" role="status" aria-live="polite">
           <div className="id-preview-id">{recordId}</div>
-          <div className="id-preview-hint">Resolving record...</div>
+          <div className="id-preview-hint">{t('Resolving record...')}</div>
         </div>
       )}
 
@@ -93,11 +94,11 @@ export default function IdPreview({ recordId, sfHost, onNavigate }: IdPreviewPro
       )}
 
       <div className="id-preview-action">
-        Press{' '}
+        {t('Press')}{' '}
         <kbd className="id-preview-kbd" onClick={onNavigate}>
           Enter
         </kbd>{' '}
-        to open{state.status === 'error' ? ' anyway' : ''}
+        {t(state.status === 'error' ? 'to open anyway' : 'to open')}
       </div>
     </div>
   )

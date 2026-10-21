@@ -4,11 +4,14 @@ Guidance for AI coding agents (Codex, Cursor, Copilot, Gemini CLI, Aider, Zed, a
 working in this repository. Claude Code users: see `CLAUDE.md` for the full, richer guide.
 This file is the cross-tool summary; `CLAUDE.md` is the source of truth where the two overlap.
 
+Before any task, read the collaboration policy in [CLAUDE.md](CLAUDE.md), including bilingual writing, pre-approved UI localization, feature review and regression requirements.
+开展任何任务前，请阅读 [CLAUDE.md](CLAUDE.md) 中的协作规则，包括双语写作、已获批准的 UI 本地化、功能审查及回归测试要求。
+
 ## What this is
 
 UltraForce for Salesforce - a Manifest V3 Chrome extension that injects a Spotlight/Raycast-style
 fuzzy search modal into Salesforce pages (via Shadow DOM) for fast metadata search and navigation.
-Built with React 18 + TypeScript on the Plasmo framework.
+Built with React 19 + TypeScript on the Plasmo framework.
 
 ## Setup and commands
 
@@ -16,7 +19,7 @@ Built with React 18 + TypeScript on the Plasmo framework.
 pnpm install           # install dependencies (pnpm is required; lockfile: pnpm-lock.yaml)
 pnpm dev               # dev build with hot reload
 pnpm build             # production build
-pnpm lint              # ESLint
+pnpm lint              # oxlint
 pnpm type-check        # tsc --noEmit
 pnpm test:run          # Vitest unit tests (one-shot; `pnpm test` is watch mode)
 pnpm test:e2e          # E2E (builds with E2E flag, then Playwright; headed)
@@ -33,14 +36,15 @@ Always run `pnpm lint` and `pnpm type-check` before committing.
 - `src/types/index.ts` - the single types barrel
 - `docs/` - VitePress site. Every `.md` under `docs/` is published; keep internal notes out of it.
 
-## Code style (Prettier-enforced, do not deviate)
+## Code style (oxfmt-enforced, do not deviate)
 
 - No semicolons, single quotes, no trailing commas, print width 120, 2-space indent
 - `interface` for object shapes, `type` for unions/primitives
 - Named exports for utilities; default export only for React components
 - Async utilities never throw: log via the `logger` module and return `null`/`[]`/`{}`
 - Never use `console.*` in production code - use `src/lib/logger.ts`
-- No emoji anywhere (code, logs, UI, docs); keep text ASCII-friendly
+- Use English and Simplified Chinese as required by the collaboration policy; omit emoji in code, logs, UI and docs.
+  按协作规则使用英文和简体中文；代码、日志、UI 及文档中不使用表情符号。
 
 ## Conventions
 
