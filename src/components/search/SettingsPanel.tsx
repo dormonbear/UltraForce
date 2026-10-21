@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { useState, useEffect, useMemo } from 'react'
 import type { CustomCommand, NavigationMode } from '~types'
 import type { SettingsState } from '~stores/settings-store'
@@ -63,7 +64,7 @@ const getAppVersion = () => {
   try {
     return chrome.runtime.getManifest().version
   } catch {
-    return 'unknown'
+    return t('unknown')
   }
 }
 const PRIVACY_URL = 'https://github.com/dormonbear/UltraForce/blob/main/PRIVACY.md'
@@ -139,7 +140,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 3.1 1.39 3.1 3.1v2z" />
         </svg>
-        {MANAGED_NOTE}
+        {t(MANAGED_NOTE)}
       </p>
     ) : null
 
@@ -160,32 +161,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleSaveCommand = () => {
     const keyValidation = validateCommandKey(formState.key)
     if (!keyValidation.valid) {
-      setFormError(keyValidation.error || 'Invalid command')
+      setFormError(t(keyValidation.error || 'Invalid command'))
       return
     }
 
     if (!isKeyUnique(formState.key, allCommands, editingKey || undefined)) {
-      setFormError('This command is already in use')
+      setFormError(t('This command is already in use'))
       return
     }
 
     if (!formState.description.trim()) {
-      setFormError('Description is required')
+      setFormError(t('Description is required'))
       return
     }
 
     if (!formState.soql.trim()) {
-      setFormError('SOQL query is required')
+      setFormError(t('SOQL query is required'))
       return
     }
 
     if (!formState.soql.toLowerCase().includes('{query}')) {
-      setFormError('SOQL must contain {query} placeholder')
+      setFormError(t('SOQL must contain {query} placeholder'))
       return
     }
 
     if (!formState.nameField.trim()) {
-      setFormError('Name field is required')
+      setFormError(t('Name field is required'))
       return
     }
 
@@ -215,7 +216,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   }
 
   const handleDeleteCommand = (key: string) => {
-    if (!confirm(`Delete command ":${key}"?`)) {
+    if (!confirm(t('Delete command ":{key}"?', { key }))) {
       return
     }
     const newCommands = { ...customCommands }
@@ -292,14 +293,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           }
         }
         if (Object.keys(validCommands).length === 0) {
-          alert('No valid commands found in file')
+          alert(t('No valid commands found in file'))
           return
         }
         const merged = { ...customCommands, ...validCommands }
         onCustomCommandsChange(merged)
-        alert(`Imported ${Object.keys(validCommands).length} command(s)`)
+        alert(t('Imported {count} command(s)', { count: Object.keys(validCommands).length }))
       } catch {
-        alert('Failed to parse file. Please ensure it is a valid JSON file.')
+        alert(t('Failed to parse file. Please ensure it is a valid JSON file.'))
       }
     }
     input.click()
@@ -335,28 +336,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const renderCommandForm = () => (
     <div className="command-edit-form">
       <div className="command-form-row">
-        <label className="command-form-label">Command</label>
+        <label className="command-form-label">{t('Command')}</label>
         <input
           type="text"
           value={formState.key}
           onChange={(e) => setFormState({ ...formState, key: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') })}
-          placeholder="e.g. log"
+          placeholder={t('e.g. log')}
           className="command-input"
           maxLength={10}
         />
       </div>
       <div className="command-form-row">
-        <label className="command-form-label">Description</label>
+        <label className="command-form-label">{t('Description')}</label>
         <input
           type="text"
           value={formState.description}
           onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-          placeholder="e.g. My Logs"
+          placeholder={t('e.g. My Logs')}
           className="command-input"
         />
       </div>
       <div className="command-form-row">
-        <label className="command-form-label">SOQL Query</label>
+        <label className="command-form-label">{t('SOQL Query')}</label>
         <textarea
           value={formState.soql}
           onChange={(e) => setFormState({ ...formState, soql: e.target.value })}
@@ -364,11 +365,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           className="command-textarea"
           rows={3}
         />
-        <span className="command-form-hint">Use {'{query}'} as search placeholder</span>
+        <span className="command-form-hint">
+          {t('Use')} {'{query}'} {t('as search placeholder')}
+        </span>
       </div>
       <div className="command-form-row-inline">
         <div className="command-form-row">
-          <label className="command-form-label">Name Field</label>
+          <label className="command-form-label">{t('Name Field')}</label>
           <input
             type="text"
             value={formState.nameField}
@@ -378,7 +381,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           />
         </div>
         <div className="command-form-row">
-          <label className="command-form-label">Description Fields</label>
+          <label className="command-form-label">{t('Description Fields')}</label>
           <input
             type="text"
             value={formState.descriptionFields}
@@ -389,7 +392,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </div>
       <span className="command-form-hint">
-        Supports relationship fields (e.g., Owner.Name). Multiple fields separated by comma.
+        {t('Supports relationship fields (e.g., Owner.Name). Multiple fields separated by comma.')}
       </span>
       <div className="command-form-row">
         <label className="command-toggle-option">
@@ -398,16 +401,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             checked={formState.useToolingApi}
             onChange={(e) => setFormState({ ...formState, useToolingApi: e.target.checked })}
           />
-          <span>Use Tooling API</span>
+          <span>{t('Use Tooling API')}</span>
         </label>
       </div>
       {formError && <div className="command-form-error">{formError}</div>}
       <div className="command-edit-actions">
         <button className="cmd-btn cmd-btn-save" onClick={handleSaveCommand}>
-          Save
+          {t('Save')}
         </button>
         <button className="cmd-btn cmd-btn-cancel" onClick={resetForm}>
-          Cancel
+          {t('Cancel')}
         </button>
       </div>
     </div>
@@ -416,18 +419,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div data-ultraforce-settings>
       <div className="settings-header">
-        <button className="back-button" onClick={onClose}>
+        <button className="back-button" onClick={onClose} aria-label={t('Back')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H6m0 0l6 6m-6-6l6-6" />
           </svg>
         </button>
-        <h2 className="settings-title">Settings</h2>
+        <h2 className="settings-title">{t('Settings')}</h2>
       </div>
 
       <div className="settings-content">
         <div className="setting-section">
-          <h3 className="section-title">Search Types</h3>
-          <p className="section-desc">Select metadata types to include in search.</p>
+          <h3 className="section-title">{t('Search Types')}</h3>
+          <p className="section-desc">{t('Select metadata types to include in search.')}</p>
           <div className="type-grid">
             {METADATA_TYPES.map((type) => {
               const types = type.value.split(',')
@@ -445,7 +448,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               return (
                 <label key={type.value} className="type-option">
                   <input type="checkbox" checked={isChecked} onChange={handleToggle} className="type-checkbox" />
-                  <span className="type-label">{type.label}</span>
+                  <span className="type-label">{t(type.label)}</span>
                 </label>
               )
             })}
@@ -453,13 +456,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="setting-section">
-          <h3 className="section-title">Keyboard Shortcut</h3>
+          <h3 className="section-title">{t('Keyboard Shortcut')}</h3>
           <p className="section-desc">
-            You can set a custom keyboard shortcut for UltraForce in Chrome Extension Keyboard Shortcuts (default:{' '}
+            {t(
+              'You can set a custom keyboard shortcut for UltraForce in Chrome Extension Keyboard Shortcuts (default:'
+            )}{' '}
             <strong>Ctrl/Cmd + B</strong>).
             <br />
             <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
-              Customize at chrome://extensions/shortcuts
+              {t('Customize at chrome://extensions/shortcuts')}
             </span>
           </p>
           <div className="shortcut-config">
@@ -499,13 +504,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
           </div>
           <p className="section-hint" style={{ marginTop: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-            This shortcut may not work on some pages (e.g. Visualforce, iframes). Use the global shortcut for reliable
-            access.
+            {t(
+              'This shortcut may not work on some pages (e.g. Visualforce, iframes). Use the global shortcut for reliable access.'
+            )}
           </p>
         </div>
 
         <div className="setting-section">
-          <h3 className="section-title">Behavior</h3>
+          <h3 className="section-title">{t('Behavior')}</h3>
           <label className="toggle-option">
             <input
               type="checkbox"
@@ -513,7 +519,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onChange={(e) => onCloseOnNavigateChange(e.target.checked)}
               className="toggle-checkbox"
             />
-            <span className="toggle-label">Close modal after opening result</span>
+            <span className="toggle-label">{t('Close modal after opening result')}</span>
           </label>
           <label className="toggle-option">
             <input
@@ -522,7 +528,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onChange={(e) => onAutoLoadFieldsChange(e.target.checked)}
               className="toggle-checkbox"
             />
-            <span className="toggle-label">Auto-load all fields on Setup pages</span>
+            <span className="toggle-label">{t('Auto-load all fields on Setup pages')}</span>
           </label>
           <label className="toggle-option">
             <input
@@ -531,7 +537,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               onChange={(e) => onFuzzySearchChange(e.target.checked)}
               className="toggle-checkbox"
             />
-            <span className="toggle-label">Fuzzy search (typo-tolerant matching)</span>
+            <span className="toggle-label">{t('Fuzzy search (typo-tolerant matching)')}</span>
           </label>
           <label className="toggle-option">
             <input
@@ -541,11 +547,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               disabled={isManaged('hideManagedPackage')}
               className="toggle-checkbox"
             />
-            <span className="toggle-label">Hide managed package items</span>
+            <span className="toggle-label">{t('Hide managed package items')}</span>
           </label>
           {renderManagedNote('hideManagedPackage')}
           <div className="toggle-option">
-            <span className="toggle-label">Max results per type</span>
+            <span className="toggle-label">{t('Max results per type')}</span>
             <select
               value={maxResultsPerType}
               onChange={(e) => onMaxResultsPerTypeChange(Number(e.target.value))}
@@ -565,8 +571,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="setting-section">
-          <h3 className="section-title">Navigation Mode</h3>
-          <p className="section-desc">Choose how to open Salesforce pages.</p>
+          <h3 className="section-title">{t('Navigation Mode')}</h3>
+          <p className="section-desc">{t('Choose how to open Salesforce pages.')}</p>
           <div className="type-grid">
             {NAVIGATION_MODES.map((mode) => (
               <label key={mode.value} className="type-option">
@@ -578,7 +584,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   disabled={isManaged('navigationMode')}
                   className="type-checkbox"
                 />
-                <span className="type-label">{mode.label}</span>
+                <span className="type-label">{t(mode.label)}</span>
               </label>
             ))}
           </div>
@@ -586,13 +592,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="setting-section">
-          <h3 className="section-title">Built-in Commands</h3>
-          <p className="section-desc">Type : followed by a command to filter search.</p>
+          <h3 className="section-title">{t('Built-in Commands')}</h3>
+          <p className="section-desc">{t('Type : followed by a command to filter search.')}</p>
           <div className="commands-list">
             {Object.values(supportedBuiltinCommands).map((cmd) => (
               <div key={cmd.key} className="command-row command-row-builtin">
                 <span className="command-key">:{cmd.key}</span>
-                <span className="command-desc">{cmd.description}</span>
+                <span className="command-desc">{t(cmd.description)}</span>
                 <span className="command-lock">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z" />
@@ -604,8 +610,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="setting-section">
-          <h3 className="section-title">Custom Commands</h3>
-          <p className="section-desc">Create your own commands with custom SOQL queries.</p>
+          <h3 className="section-title">{t('Custom Commands')}</h3>
+          <p className="section-desc">{t('Create your own commands with custom SOQL queries.')}</p>
           <div className="commands-list">
             {Object.values(customCommands).map((cmd) => (
               <div key={cmd.key} className="command-row">
@@ -619,7 +625,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <span className="command-api-tag">{cmd.useToolingApi ? 'Tooling' : 'REST'}</span>
                     </div>
                     <div className="command-actions">
-                      <button className="cmd-icon-btn" onClick={() => handleEditCommand(cmd)} title="Edit">
+                      <button className="cmd-icon-btn" onClick={() => handleEditCommand(cmd)} title={t('Edit')}>
                         <svg
                           width="14"
                           height="14"
@@ -635,7 +641,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <button
                         className="cmd-icon-btn cmd-icon-btn-danger"
                         onClick={() => handleDeleteCommand(cmd.key)}
-                        title="Delete"
+                        title={t('Delete')}
                       >
                         <svg
                           width="14"
@@ -658,29 +664,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             {isAddingNew && <div className="command-row">{renderCommandForm()}</div>}
 
             {Object.keys(customCommands).length === 0 && !isAddingNew && (
-              <div className="commands-empty">No custom commands yet</div>
+              <div className="commands-empty">{t('No custom commands yet')}</div>
             )}
           </div>
           {!isAddingNew && !editingKey && (
             <div className="commands-footer">
               <button className="cmd-btn cmd-btn-add" onClick={startAddNew}>
-                + Add Command
+                {t('+ Add Command')}
               </button>
               <div className="commands-footer-right">
                 <button
                   className="cmd-btn cmd-btn-secondary"
                   onClick={handleImportCommands}
-                  title="Import commands from JSON file"
+                  title={t('Import commands from JSON file')}
                 >
-                  Import
+                  {t('Import')}
                 </button>
                 <button
                   className="cmd-btn cmd-btn-secondary"
                   onClick={handleExportCommands}
                   disabled={Object.keys(customCommands).length === 0}
-                  title="Export commands to JSON file"
+                  title={t('Export commands to JSON file')}
                 >
-                  Export
+                  {t('Export')}
                 </button>
               </div>
             </div>
@@ -689,7 +695,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {sfHost && (
           <div className="setting-section">
-            <h3 className="section-title">Organization</h3>
+            <h3 className="section-title">{t('Organization')}</h3>
             <div className="shortcut-config">
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ color: '#fff', fontWeight: 500 }}>{displayName}</div>
@@ -700,20 +706,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         )}
 
         <div className="setting-section">
-          <h3 className="section-title">Cache</h3>
-          <p className="section-desc">Rebuild metadata cache for current org.</p>
+          <h3 className="section-title">{t('Cache')}</h3>
+          <p className="section-desc">{t('Rebuild metadata cache for current org.')}</p>
           <button className="cmd-btn cmd-btn-secondary" onClick={handleRebuildCache} disabled={isRebuilding || !sfHost}>
-            {isRebuilding ? 'Rebuilding...' : 'Rebuild Cache'}
+            {isRebuilding ? t('Rebuilding...') : t('Rebuild Cache')}
           </button>
         </div>
 
         <div className="settings-meta">
           <span className="meta-item">UltraForce v{getAppVersion()}</span>
           <a className="meta-link" href={DOCS_URL} target="_blank" rel="noreferrer">
-            Documentation
+            {t('Documentation')}
           </a>
           <a className="meta-link" href={PRIVACY_URL} target="_blank" rel="noreferrer">
-            Privacy
+            {t('Privacy')}
           </a>
         </div>
       </div>

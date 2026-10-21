@@ -1,4 +1,5 @@
 import React from 'react'
+import { t } from '~lib/i18n'
 import type { SearchCommand } from '~types'
 
 interface CommandHintsProps {
@@ -13,7 +14,7 @@ const CommandHints: React.FC<CommandHintsProps> = ({ commands }) => {
       {commands.map((cmd) => (
         <span key={cmd.key} className="command-hint-tag">
           <span className="command-key">:{cmd.key}</span>
-          <span className="command-desc">{cmd.description}</span>
+          <span className="command-desc">{cmd.isBuiltin ? t(cmd.description) : cmd.description}</span>
         </span>
       ))}
     </div>

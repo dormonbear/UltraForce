@@ -1,0 +1,5 @@
+{
+  "extensionName": { "message": "UltraForce for Salesforce" },
+  "extensionDescription": { "message": "Modern Salesforce metadata search and management tool" },
+  "toggleSearch": { "message": "Toggle UltraForce Search" }
+}

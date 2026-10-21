@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { useEffect, useRef, useState } from 'react'
 import type { SearchResult } from '~types'
 import type { FavoriteItem } from '~stores/favorites-store'
@@ -72,12 +73,12 @@ const ResultItem: React.FC<ResultItemProps> = ({
     const diffMs = now.getTime() - date.getTime()
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-    if (diffDays === 0) return 'today'
-    if (diffDays === 1) return 'yesterday'
-    if (diffDays < 7) return `${diffDays}d ago`
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`
-    return `${Math.floor(diffDays / 365)}y ago`
+    if (diffDays === 0) return t('today')
+    if (diffDays === 1) return t('yesterday')
+    if (diffDays < 7) return t('{count}d ago', { count: diffDays })
+    if (diffDays < 30) return t('{count}w ago', { count: Math.floor(diffDays / 7) })
+    if (diffDays < 365) return t('{count}mo ago', { count: Math.floor(diffDays / 30) })
+    return t('{count}y ago', { count: Math.floor(diffDays / 365) })
   }
 
   const lastModifiedBy = result.metadata?.LastModifiedBy?.Name
@@ -95,15 +96,23 @@ const ResultItem: React.FC<ResultItemProps> = ({
       onClick={onClick}
     >
       <div className="result-info">
-        <div className="result-name">{result.name}</div>
-        {result.description && <div className="result-description">{result.description}</div>}
+        <div className="result-name">
+          {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(result.type) ? t(result.name) : result.name}
+        </div>
+        {result.description && (
+          <div className="result-description">
+            {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(result.type)
+              ? t(result.description)
+              : result.description}
+          </div>
+        )}
       </div>
 
       <div className="result-actions">
         {onToggleFavorite && (
           <div className="favorite-action">
             <ActionButton
-              title={isFavorite ? 'Remove from favorites' : 'Pin to favorites'}
+              title={isFavorite ? t('Remove from favorites') : t('Pin to favorites')}
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation()
                 onToggleFavorite({
@@ -140,7 +149,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
         {isApexPage && (
           <div className="object-actions">
             <ActionButton
-              title="Preview"
+              title={t('Preview')}
               onClick={handleActionClick('preview')}
               icon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -158,7 +167,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
         {isCustomField && (
           <div className="object-actions">
             <ActionButton
-              title={copied ? 'Copied!' : 'Copy API Name'}
+              title={copied ? t('Copied!') : t('Copy API Name')}
               onClick={handleCopyApiName}
               icon={
                 copied ? (
@@ -179,7 +188,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
         {isCustomObject && (
           <div className="object-actions">
             <ActionButton
-              title="Fields"
+              title={t('Fields')}
               onClick={handleActionClick('fields')}
               icon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -191,7 +200,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
               }
             />
             <ActionButton
-              title="Page Layouts"
+              title={t('Page Layouts')}
               onClick={handleActionClick('layouts')}
               icon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -202,7 +211,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
               }
             />
             <ActionButton
-              title="Record Types"
+              title={t('Record Types')}
               onClick={handleActionClick('recordtypes')}
               icon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -212,7 +221,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
               }
             />
             <ActionButton
-              title="Validation Rules"
+              title={t('Validation Rules')}
               onClick={handleActionClick('validationrules')}
               icon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -222,7 +231,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
               }
             />
             <ActionButton
-              title="Object Settings"
+              title={t('Object Settings')}
               onClick={handleActionClick('details')}
               icon={
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

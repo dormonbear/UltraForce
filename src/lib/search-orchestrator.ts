@@ -3,6 +3,7 @@
 import type { SearchResult } from '~types'
 import { getSession, API_VERSION } from './auth'
 import { logger } from './logger'
+import { t } from './i18n'
 import { normalizeHost, escapeSoql } from './domain-utils'
 import { searchIndex, hasSearchIndex } from './fuzzy-search'
 import {
@@ -314,7 +315,7 @@ async function searchUsersRealtime(searchTerm: string, sfHost: string): Promise<
       if (record.Email) parts.push(record.Email)
       if (record.Profile?.Name) parts.push(record.Profile.Name)
       if (record.UserRole?.Name) parts.push(record.UserRole.Name)
-      if (record.IsActive === false) parts.push('Inactive')
+      if (record.IsActive === false) parts.push(t('Inactive'))
 
       return {
         id: record.Id,

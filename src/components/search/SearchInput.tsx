@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { forwardRef, useEffect, useRef, useCallback } from 'react'
 
 type OrgType = 'production' | 'sandbox' | 'scratch' | 'developer' | 'unknown'
@@ -58,15 +59,15 @@ function detectOrgType(sfHost: string | null): OrgType {
 function getOrgTypeLabel(orgType: OrgType): string {
   switch (orgType) {
     case 'production':
-      return 'PROD'
+      return t('PROD')
     case 'sandbox':
-      return 'SANDBOX'
+      return t('SANDBOX')
     case 'scratch':
-      return 'SCRATCH'
+      return t('SCRATCH')
     case 'developer':
-      return 'DEV'
+      return t('DEV')
     default:
-      return 'ORG'
+      return t('ORG')
   }
 }
 
@@ -139,12 +140,12 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           }}
           placeholder={
             !pageHasFocus
-              ? 'Click here to focus, then type to search'
+              ? t('Click here to focus, then type to search')
               : displayName
-                ? `Search ${displayName} metadata...`
-                : 'Search Salesforce metadata...'
+                ? t('Search {org} metadata...', { org: displayName })
+                : t('Search Salesforce metadata...')
           }
-          aria-label="Search Salesforce metadata"
+          aria-label={t('Search Salesforce metadata')}
           role="combobox"
           aria-expanded={expanded ? 'true' : 'false'}
           aria-controls={controlsId}

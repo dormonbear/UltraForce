@@ -1,3 +1,4 @@
+import { t } from '~lib/i18n'
 import React, { useState, useEffect } from 'react'
 
 interface UpdateNotificationProps {
@@ -48,11 +49,11 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, releas
       <div className="update-celebration-content">
         <span className="update-celebration-icon">🎉</span>
         <div className="update-celebration-text">
-          <div className="update-celebration-title">Updated to v{version}</div>
-          <div className="update-celebration-desc">See what is new in this version</div>
+          <div className="update-celebration-title">{t('Updated to v{version}', { version })}</div>
+          <div className="update-celebration-desc">{t('See what is new in this version')}</div>
         </div>
         <a href={releaseNotesUrl} target="_blank" rel="noopener noreferrer" className="update-celebration-link">
-          Release Notes
+          {t('Release Notes')}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
             <polyline points="15 3 21 3 21 9" />
@@ -62,8 +63,8 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, releas
         <button
           className="update-celebration-dismiss"
           onClick={onDismiss}
-          title="Dismiss"
-          aria-label="Dismiss update notification"
+          title={t('Dismiss')}
+          aria-label={t('Dismiss update notification')}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="18" y1="6" x2="6" y2="18" />
