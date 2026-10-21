@@ -16,7 +16,9 @@ export class SettingsPage {
   async setNavigationMode(mode: NavigationMode) {
     const sw = await this.getServiceWorker()
     await sw.evaluate(async (navMode) => {
-      const stored = await chrome.storage.local.get('ultraforce_search_settings')
+      const stored = await chrome.storage.local.get<{ ultraforce_search_settings?: Record<string, unknown> }>(
+        'ultraforce_search_settings'
+      )
       const settings = stored.ultraforce_search_settings || {}
       settings.navigationMode = navMode
       await chrome.storage.local.set({ ultraforce_search_settings: settings })
@@ -26,7 +28,9 @@ export class SettingsPage {
   async setFuzzySearch(enabled: boolean) {
     const sw = await this.getServiceWorker()
     await sw.evaluate(async (fuzzy) => {
-      const stored = await chrome.storage.local.get('ultraforce_search_settings')
+      const stored = await chrome.storage.local.get<{ ultraforce_search_settings?: Record<string, unknown> }>(
+        'ultraforce_search_settings'
+      )
       const settings = stored.ultraforce_search_settings || {}
       settings.fuzzySearch = fuzzy
       await chrome.storage.local.set({ ultraforce_search_settings: settings })
@@ -36,7 +40,9 @@ export class SettingsPage {
   async setCloseOnNavigate(enabled: boolean) {
     const sw = await this.getServiceWorker()
     await sw.evaluate(async (close) => {
-      const stored = await chrome.storage.local.get('ultraforce_search_settings')
+      const stored = await chrome.storage.local.get<{ ultraforce_search_settings?: Record<string, unknown> }>(
+        'ultraforce_search_settings'
+      )
       const settings = stored.ultraforce_search_settings || {}
       settings.closeOnNavigate = close
       await chrome.storage.local.set({ ultraforce_search_settings: settings })
@@ -46,7 +52,9 @@ export class SettingsPage {
   async setCustomCommands(commands: Record<string, unknown>) {
     const sw = await this.getServiceWorker()
     await sw.evaluate(async (cmds) => {
-      const stored = await chrome.storage.local.get('ultraforce_search_settings')
+      const stored = await chrome.storage.local.get<{ ultraforce_search_settings?: Record<string, unknown> }>(
+        'ultraforce_search_settings'
+      )
       const settings = stored.ultraforce_search_settings || {}
       settings.customCommands = cmds
       await chrome.storage.local.set({ ultraforce_search_settings: settings })
@@ -87,7 +95,9 @@ export class SettingsPage {
   async getVersionCheckState(): Promise<{ lastVersion: string; hasShownNotification: boolean } | undefined> {
     const sw = await this.getServiceWorker()
     return sw.evaluate(async () => {
-      const stored = await chrome.storage.local.get('ultraforce_version_check')
+      const stored = await chrome.storage.local.get<{
+        ultraforce_version_check?: { lastVersion: string; hasShownNotification: boolean }
+      }>('ultraforce_version_check')
       return stored.ultraforce_version_check
     })
   }
