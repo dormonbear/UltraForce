@@ -50,7 +50,7 @@ pnpm exec playwright test --debug     # Debug mode
 
 ### Key Technologies
 - **Build**: Plasmo (wraps Parcel)
-- **UI**: React 18 + TypeScript
+- **UI**: React 19 + TypeScript
 - **Styling**: plain CSS in `src/components/search/styles.css`, injected into Shadow DOM via Plasmo's `data-text:` import
 - **State**: Zustand (with `persist` to chrome.storage for settings/history/favorites)
 - **Search**: MiniSearch
@@ -163,26 +163,22 @@ Releases are automated via GitHub Actions. Pushing a `v*` tag triggers the relea
 ```bash
 # Releases are cut from and tagged on `main`.
 
-# 1. Bring main up to date with develop
-git checkout main
-git merge --ff-only develop
+# 1. Branch from verified develop; prepare version metadata without a tag
+#    Pick patch/minor/major, then fill docs/guide/release-notes.md.
+git switch -c release/vX.Y.Z develop
+node scripts/bump-version.mjs patch --no-tag
 
-# 2. Bump version + release-notes placeholder, commit, and tag on main (pick one)
-pnpm release:patch   # 0.1.1 -> 0.1.2
-pnpm release:minor   # 0.1.1 -> 0.2.0
-pnpm release:major   # 0.1.1 -> 1.0.0
+# 2. Commit metadata and notes; merge the release PR into main after checks pass.
 
-# 3. Edit the generated placeholder in docs/guide/release-notes.md, then re-point the tag
-git commit --amend --no-edit
-git tag -f vX.Y.Z
+# 3. Tag the reviewed merged commit once; push the new tag to trigger release
+git tag vX.Y.Z <verified-main-commit>
+git push origin vX.Y.Z
 
-# 4. Push main + tag to trigger the release workflow
-git push origin main
-git push origin vX.Y.Z --force
-
-# 5. Fast-forward develop so it keeps the release commit
+# 4. Fast-forward develop so it keeps the release commit
+git fetch origin main
 git checkout develop
-git merge --ff-only main
+git merge --ff-only origin/main
+git push origin develop
 ```
 
 The release workflow (`.github/workflows/release.yml`) will:
@@ -211,7 +207,7 @@ Every push to `develop`/`main` and every PR triggers the CI workflow (`.github/w
 
 **UltraForce for Salesforce - Architecture & Quality Milestone**
 
-UltraForce is a Chrome extension that provides fast metadata search and navigation for Salesforce orgs. Users press a keyboard shortcut to open a search modal overlay (injected via Shadow DOM), type queries with fuzzy matching, and navigate directly to Salesforce Setup pages, Apex classes, custom objects, flows, and more. Built with React 18 + TypeScript on the Plasmo framework.
+UltraForce is a Chrome extension that provides fast metadata search and navigation for Salesforce orgs. Users press a keyboard shortcut to open a search modal overlay (injected via Shadow DOM), type queries with fuzzy matching, and navigate directly to Salesforce Setup pages, Apex classes, custom objects, flows, and more. Built with React 19 + TypeScript on the Plasmo framework.
 
 **Core Value:** Fast, reliable metadata search and navigation that works across all Salesforce domains -- the extension must never break the host Salesforce page or lose the user's session context.
 
@@ -248,7 +244,7 @@ UltraForce is a Chrome extension that provides fast metadata search and navigati
 ## Key Dependencies
 - `plasmo` 0.90.5 - Framework for building and packaging the Chrome extension
 - `minisearch` 7.2.0 - Powers all fuzzy search; defined indexes in `src/lib/fuzzy-search.ts`
-- `react` / `react-dom` 18.3.1 - UI layer for search modal and content script overlay
+- `react` / `react-dom` - UI layer (versions: `package.json`) for search modal and content script overlay
 - `@types/chrome` 0.1.4 - TypeScript types for Chrome Extension API
 - `jsdom` 28.0.0 - DOM emulation for unit tests
 ## Configuration
@@ -327,9 +323,10 @@ UltraForce is a Chrome extension that provides fast metadata search and navigati
 - `ErrorBoundary` class component (`src/components/ErrorBoundary.tsx`) wraps component trees to catch render errors
 ## Logging
 - Use `logger.debug/info/warn/error` everywhere; **never `console.*` directly in production code**
-- `debug`/`info`/`warn` are suppressed in production (`NODE_ENV === 'production'`)
-- `error` is always logged regardless of environment
-- Log context as second argument object: `logger.error('search failed', { host, error })`
+- `debug`/`info`/`warn` are silent in every build.
+- `error` emits only a fixed generic failure label and discards all caller arguments.
+- Preserve this behavior in development and production; errors, sessions, queries,
+  URLs and response bodies must not become logs or saved diagnostics. See `PRIVACY.md`.
 ## Comments
 - Complex business logic and non-obvious algorithms
 - JSDoc-style block comments for classes only (seen on `ErrorBoundary`)
