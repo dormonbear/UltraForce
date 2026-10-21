@@ -1,5 +1,27 @@
 # Release Notes
 
+## v0.5.0
+
+Release Date: 2026-10-21 / 发布日期：2026-10-21
+
+### Interface languages / 界面语言
+
+- Search, settings, recovery screens and accessibility messages now follow the browser's preferred supported language: English or Simplified Chinese, with English fallback.
+  搜索、设置、错误恢复及无障碍消息现可跟随浏览器首选的受支持语言：英文或简体中文，不支持的语言回退为英文。
+- Built-in commands can be found through either English or Chinese descriptions. Salesforce names, API identifiers and custom command descriptions keep their original text.
+  内置命令可通过英文或中文描述查找。Salesforce 名称、API 标识符及自定义命令描述保留原文。
+- Localization uses bundled dictionaries, stores no language preference and contacts no translation service.
+  本地化使用随扩展打包的词典，不存储语言偏好，也不联系翻译服务。
+
+### Reliability / 可靠性
+
+- Added an accessible label to the settings back button and bilingual administrator-facing policy descriptions.
+  为设置返回按钮补充无障碍标签，并为管理员策略说明提供中英双语。
+- Continuous checks now run packaged browser regressions for both languages, authentication, privacy boundaries and search races against synthetic organizations.
+  持续检查现可在合成组织上执行打包浏览器回归，覆盖两种语言、认证、隐私边界及搜索竞态。
+- Manual release builds resolve and verify the requested existing tag, source commit and packaged version before publication.
+  手动发布构建会在发布前解析并核验指定的已有标签、源码提交及打包版本。
+
 ## v0.4.1
 
 Release Date: 2026-10-21
