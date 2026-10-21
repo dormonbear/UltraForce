@@ -111,6 +111,7 @@ import { useSearchStore } from '~stores/search-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useHistoryStore } from '~stores/history-store'
+import type { SearchResult } from '~types'
 
 const mockGetSfHost = vi.mocked(getSfHost)
 const mockGetSession = vi.mocked(getSession)
@@ -1025,6 +1026,120 @@ describe('UltraForceWindowManager', () => {
       // State should have second search results, not first
       const state = instance.getState()
       expect(state.searchResults.ApexClass?.[0]?.name).toBe('Second')
+    })
+  })
+
+  describe('cross-mode search ownership', () => {
+    interface SearchHandlers {
+      handleSearch(query: string, types: string[], fuzzy: boolean, hideManaged: boolean): Promise<void>
+      handleCustomSearch(template: string, query: string, tooling: boolean, nameField: string): Promise<void>
+      handleSetupShortcutSearch(query: string): Promise<void>
+      getCurrentRecordLayoutUrl(): Promise<{ objectApiName: string; url: string } | null>
+    }
+
+    function deferred<T>() {
+      let resolve!: (value: T) => void
+      let reject!: (error: Error) => void
+      const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise
+        reject = rejectPromise
+      })
+      return { promise, resolve, reject }
+    }
+
+    for (const mode of ['metadata', 'custom'] as const) {
+      for (const outcome of ['success', 'error'] as const) {
+        it(`should preserve newer Setup results after stale ${mode} ${outcome}`, async () => {
+          const instance = await UltraForceWindowManager.getInstance()
+          const manager = instance as unknown as SearchHandlers
+          const pending = deferred<SearchResult[]>()
+          vi.spyOn(manager, 'getCurrentRecordLayoutUrl').mockResolvedValue(null)
+          const success = vi.fn()
+          const error = vi.fn()
+          instance.on('searchSuccess', success)
+          instance.on('searchError', error)
+
+          let oldSearch: Promise<void>
+          if (mode === 'metadata') {
+            mockSearchMetadata.mockImplementationOnce(async () => ({ ApexClass: await pending.promise }))
+            oldSearch = manager.handleSearch('old', ['ApexClass'], true, true)
+          } else {
+            vi.mocked(executeCustomCommand).mockReturnValueOnce(pending.promise)
+            oldSearch = manager.handleCustomSearch('SELECT Id FROM User', 'old', false, 'Name')
+          }
+
+          await manager.handleSetupShortcutSearch('debug')
+          const newest = instance.getState().searchResults
+          expect(newest.SetupShortcut.length).toBeGreaterThan(0)
+
+          if (outcome === 'error') pending.reject(new Error('Old search failed'))
+          else pending.resolve([])
+          await oldSearch
+
+          expect(instance.getState().searchResults).toEqual(newest)
+          expect(instance.getState().searchError).toBeNull()
+          expect(instance.getState().isLoading).toBe(false)
+          expect(success).not.toHaveBeenCalled()
+          expect(error).not.toHaveBeenCalled()
+        })
+      }
+
+      it(`should discard delayed Setup results after a newer ${mode} search`, async () => {
+        const instance = await UltraForceWindowManager.getInstance()
+        const manager = instance as unknown as SearchHandlers
+        const pending = deferred<null>()
+        vi.spyOn(manager, 'getCurrentRecordLayoutUrl').mockReturnValueOnce(pending.promise)
+        const oldSearch = manager.handleSetupShortcutSearch('debug')
+        const result = { id: 'new', name: 'Newest result', type: mode === 'metadata' ? 'ApexClass' : 'CustomQuery' }
+
+        if (mode === 'metadata') {
+          mockSearchMetadata.mockResolvedValueOnce({ ApexClass: [result] })
+          await manager.handleSearch('new', ['ApexClass'], true, true)
+        } else {
+          vi.mocked(executeCustomCommand).mockResolvedValueOnce([result])
+          await manager.handleCustomSearch('SELECT Id FROM User', 'new', false, 'Name')
+        }
+        const newest = instance.getState().searchResults
+        pending.resolve(null)
+        await oldSearch
+
+        expect(instance.getState().searchResults).toEqual(newest)
+        expect(instance.getState().isLoading).toBe(false)
+      })
+    }
+
+    it('should preserve newer Setup results after an older Setup lookup resolves', async () => {
+      const instance = await UltraForceWindowManager.getInstance()
+      const manager = instance as unknown as SearchHandlers
+      const pending = deferred<null>()
+      vi.spyOn(manager, 'getCurrentRecordLayoutUrl')
+        .mockReturnValueOnce(pending.promise)
+        .mockResolvedValueOnce(null)
+
+      const oldSearch = manager.handleSetupShortcutSearch('debug')
+      await manager.handleSetupShortcutSearch('apex')
+      const newest = instance.getState().searchResults
+      pending.resolve(null)
+      await oldSearch
+
+      expect(instance.getState().searchResults).toEqual(newest)
+    })
+
+    it('should preserve immediate no-host Setup feedback after an older metadata lookup resolves', async () => {
+      const instance = await UltraForceWindowManager.getInstance()
+      const manager = instance as unknown as SearchHandlers
+      const pending = deferred<Record<string, SearchResult[]>>()
+      mockSearchMetadata.mockReturnValueOnce(pending.promise)
+      const oldSearch = manager.handleSearch('old', ['ApexClass'], true, true)
+      useSessionStore.getState().setSession(null, false)
+
+      await manager.handleSetupShortcutSearch('debug')
+      pending.resolve({ ApexClass: [] })
+      await oldSearch
+
+      expect(instance.getState().searchResults).toEqual({ SetupShortcut: [] })
+      expect(instance.getState().searchError).toBe('Open a Salesforce tab to use setup shortcuts.')
+      expect(instance.getState().isLoading).toBe(false)
     })
   })
 
