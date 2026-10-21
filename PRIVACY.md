@@ -66,10 +66,12 @@ you or your organization.
 Render errors display a local recovery screen and retry controls. Error
 messages and technical details may appear in that screen while it is open;
 they are not saved or uploaded by the error boundary. Application
-logging in both development and production emits only a static generic failure message and never forwards caller
-arguments, queries, response bodies, URLs, or session values. Debug, info and warning logger calls are silent in all builds.
-Browser-generated exception messages are outside the
-application logger's control.
+logging in both development and production emits only a static generic failure
+message and never forwards caller arguments, queries, response bodies, URLs, or
+session values. Debug, info and warning logger calls are silent in all builds.
+React root caught, uncaught, and recoverable error reporters also discard raw
+errors and component stacks and use the same fixed message.
+Browser-generated exception messages are outside the application's control.
 
 Older releases saved render diagnostics (`ultraforce_error_logs`) and API
 request counts/timestamps (`ultraforce_api_stats`) locally. The current worker

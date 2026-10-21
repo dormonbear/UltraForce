@@ -111,9 +111,13 @@ test('built extension removes legacy diagnostics and never records request activ
     page.on('console', (message) => consoleMessages.push(message.text()))
     await page.goto(`${baseUrl}/lightning/page/home?private=PRIVATE-PAGE`)
     await expect(page.locator('[id^="ultraforce-modal"]')).toBeAttached()
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
     const input = page.locator('[data-ultraforce-input]')
-    await expect(input).toBeVisible()
+    await expect(async () => {
+      if (!(await input.isVisible())) {
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
+      }
+      await expect(input).toBeVisible({ timeout: 1000 })
+    }).toPass({ timeout: 10000 })
     await input.fill(':private success')
     await expect(page.locator('[data-ultraforce-result-item] .result-name')).toHaveText(['Synthetic privacy result'])
     await input.fill(':private fail')
