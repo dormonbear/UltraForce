@@ -1093,9 +1093,7 @@ describe('UltraForceWindowManager', () => {
       const instance = await UltraForceWindowManager.getInstance()
       const manager = instance as unknown as SearchHandlers
       const pending = deferred<null>()
-      vi.spyOn(manager, 'getCurrentRecordLayoutUrl')
-        .mockReturnValueOnce(pending.promise)
-        .mockResolvedValueOnce(null)
+      vi.spyOn(manager, 'getCurrentRecordLayoutUrl').mockReturnValueOnce(pending.promise).mockResolvedValueOnce(null)
 
       const oldSearch = manager.handleSetupShortcutSearch('debug')
       await manager.handleSetupShortcutSearch('apex')
