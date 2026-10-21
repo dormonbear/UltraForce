@@ -5,6 +5,7 @@ vi.mock('~lib/logger', () => ({
 }))
 vi.mock('~lib/storage-service', () => ({
   storageSet: vi.fn().mockResolvedValue(undefined),
+  storageRemove: vi.fn().mockResolvedValue(undefined),
   STORAGE_KEYS: { LEGACY_SETTINGS: 'settings' }
 }))
 
@@ -17,6 +18,7 @@ vi.hoisted(() => {
   chromeAny.commands = { onCommand: { addListener: () => {} } }
 })
 
+import { storageRemove, storageSet } from '~lib/storage-service'
 import './index'
 
 // vitest-chrome exposes a callListeners() helper that dispatches to every
@@ -163,5 +165,28 @@ describe('background message handlers', () => {
     })
     const res = await invoke({ message: 'getSfHost', url: 'https://acme.lightning.force.com/page' })
     expect(res).toBe('acme.my.salesforce.com')
+  })
+})
+
+describe('legacy diagnostic cleanup', () => {
+  it.each(['install', 'update'])('removes only diagnostic keys on %s without reading values', async (reason) => {
+    vi.clearAllMocks()
+    ;(chrome.runtime.onInstalled as unknown as { callListeners: (details: { reason: string }) => void }).callListeners({
+      reason
+    })
+    await vi.waitFor(() => {
+      expect(storageRemove).toHaveBeenCalledWith(['ultraforce_error_logs', 'ultraforce_api_stats'])
+    })
+    expect(chrome.storage.local.get).not.toHaveBeenCalled()
+    if (reason === 'update') expect(storageSet).not.toHaveBeenCalled()
+  })
+
+  it('cleans legacy keys on browser startup', async () => {
+    vi.clearAllMocks()
+    ;(chrome.runtime.onStartup as unknown as { callListeners: () => void }).callListeners()
+    await vi.waitFor(() => {
+      expect(storageRemove).toHaveBeenCalledWith(['ultraforce_error_logs', 'ultraforce_api_stats'])
+    })
+    expect(chrome.storage.local.get).not.toHaveBeenCalled()
   })
 })

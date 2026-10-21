@@ -32,13 +32,16 @@ Metadata is cached for 24 hours with background refresh after 2 hours.
 
 Manually clear the metadata cache to force a fresh fetch.
 
-## API Statistics
+## Privacy and Local Data
 
-View your API usage:
+UltraForce does not collect usage analytics, API request statistics, or automatic
+error reports. Settings, custom commands, history, favorites, and metadata caches
+stay in your browser profile to support your work. History and favorites can
+include item names and descriptions; use their clear controls to remove them.
 
-- **Last 24 hours** - Requests in the past day
-- **Last 30 days** - Requests in the past month
-- **Total** - All-time request count
+Older local error logs and API request statistics are removed automatically.
+See the [privacy policy](https://github.com/dormonbear/UltraForce/blob/main/PRIVACY.md)
+for storage details, Salesforce API requests, and verification limits.
 
 ## Keyboard Shortcuts
 

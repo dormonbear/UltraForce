@@ -8,9 +8,7 @@ import { normalizeHost } from './domain-utils'
 export const STORAGE_KEYS = {
   SEARCH_SETTINGS: 'ultraforce_search_settings',
   UNSUPPORTED_TYPES: 'ultraforce_unsupported_types',
-  API_STATS: 'ultraforce_api_stats',
   VERSION_CHECK: 'ultraforce_version_check',
-  ERROR_LOGS: 'ultraforce_error_logs',
   HISTORY: 'ultraforce_history',
   FAVORITES: 'ultraforce_favorites',
   LEGACY_SETTINGS: 'settings'
@@ -45,24 +43,9 @@ export interface UnsupportedTypesState {
   }
 }
 
-export interface ApiStatsData {
-  totalRequests: number
-  requestLog: number[]
-}
-
 export interface VersionCheckState {
   lastVersion: string
   hasShownNotification: boolean
-}
-
-export interface ErrorLogEntry {
-  errorId: string
-  message: string
-  stack?: string
-  componentStack?: string
-  url: string
-  userAgent: string
-  timestamp?: number
 }
 
 // --- Storage operations ---

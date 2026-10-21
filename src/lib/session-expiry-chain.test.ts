@@ -47,10 +47,6 @@ vi.mock('./logger', () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }))
 
-vi.mock('./api-stats', () => ({
-  trackApiRequest: vi.fn()
-}))
-
 vi.mock('./domain-utils', () => ({
   normalizeHost: vi.fn((host: string) => host),
   escapeSoql: vi.fn((input: string) => input)

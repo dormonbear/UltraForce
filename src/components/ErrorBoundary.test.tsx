@@ -65,7 +65,7 @@ describe('ErrorBoundary', () => {
     )
   })
 
-  it('should log error to chrome storage', async () => {
+  it('does not read or persist render error payloads', async () => {
     render(
       <ErrorBoundary>
         <ThrowingChild shouldThrow={true} />
@@ -74,7 +74,9 @@ describe('ErrorBoundary', () => {
     await act(async () => {
       await vi.runAllTimersAsync()
     })
-    expect(chrome.storage.local.set).toHaveBeenCalled()
+    expect(chrome.storage.local.get).not.toHaveBeenCalled()
+    expect(chrome.storage.local.set).not.toHaveBeenCalled()
+    expect(screen.getByText('UltraForce encountered an error')).toBeInTheDocument()
   })
 
   it('should recover when Try Again is clicked', async () => {
@@ -161,45 +163,5 @@ describe('ErrorBoundary', () => {
     // Terminal state: auto-retry note no longer shown
     expect(screen.queryByText('Auto-retry in 5 seconds...')).not.toBeInTheDocument()
     expect(screen.getByText('UltraForce encountered an error')).toBeInTheDocument()
-  })
-
-  it('should handle storage errors silently during error logging', async () => {
-    chrome.storage.local.set.mockRejectedValue(new Error('quota exceeded'))
-    render(
-      <ErrorBoundary>
-        <ThrowingChild shouldThrow={true} />
-      </ErrorBoundary>
-    )
-    await act(async () => {
-      await vi.runAllTimersAsync()
-    })
-    expect(screen.getByText('UltraForce encountered an error')).toBeInTheDocument()
-  })
-
-  it('should append to existing error logs and cap at 10', async () => {
-    const existingLogs = Array.from({ length: 9 }, (_, i) => ({
-      timestamp: new Date().toISOString(),
-      errorId: `old-${i}`,
-      message: `old error ${i}`
-    }))
-    chrome.storage.local.get.mockResolvedValue({
-      ultraforce_error_logs: existingLogs
-    })
-
-    render(
-      <ErrorBoundary>
-        <ThrowingChild shouldThrow={true} />
-      </ErrorBoundary>
-    )
-
-    await act(async () => {
-      await vi.runAllTimersAsync()
-    })
-
-    const setCall = (chrome.storage.local.set as any).mock.calls[0]
-    if (setCall) {
-      const savedLogs = setCall[0].ultraforce_error_logs
-      expect(savedLogs.length).toBeLessThanOrEqual(10)
-    }
   })
 })

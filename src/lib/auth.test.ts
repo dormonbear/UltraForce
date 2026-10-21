@@ -1,11 +1,6 @@
-import { trackApiRequest } from './api-stats'
 import { normalizeHost } from './domain-utils'
 import { logger } from './logger'
 import { API_VERSION, getSfHost, getSession, sfRest } from './auth'
-
-vi.mock('./api-stats', () => ({
-  trackApiRequest: vi.fn().mockResolvedValue(undefined)
-}))
 
 vi.mock('./domain-utils', () => ({
   normalizeHost: vi.fn((host: string) => host)
@@ -23,13 +18,11 @@ vi.mock('./logger', () => ({
 const mockFetch = vi.fn()
 
 describe('auth', () => {
-  const trackApiRequestMock = vi.mocked(trackApiRequest)
   const normalizeHostMock = vi.mocked(normalizeHost)
   const loggerErrorMock = vi.mocked(logger.error)
 
   beforeEach(() => {
     vi.clearAllMocks()
-    trackApiRequestMock.mockResolvedValue(undefined)
     normalizeHostMock.mockImplementation((h) => h)
     mockFetch.mockReset()
     globalThis.fetch = mockFetch
@@ -130,7 +123,6 @@ describe('auth', () => {
         },
         body: undefined
       })
-      expect(trackApiRequestMock).toHaveBeenCalledTimes(1)
       expect(data).toEqual({ ok: true })
     })
 
@@ -184,7 +176,6 @@ describe('auth', () => {
       } as unknown as Response)
 
       await expect(sfRest('h', '/x')).rejects.toThrow('Session expired. Please refresh the page and try again.')
-      expect(trackApiRequestMock).toHaveBeenCalledTimes(1)
     })
 
     it('throws on other error status', async () => {
@@ -196,19 +187,18 @@ describe('auth', () => {
       } as unknown as Response)
 
       await expect(sfRest('h', '/x')).rejects.toThrow('API Error 400: bad request')
-      expect(trackApiRequestMock).toHaveBeenCalledTimes(1)
     })
 
-    it('tracks API request on success and error', async () => {
+    it('does not persist usage data on successful or failed requests', async () => {
       const json = vi.fn().mockResolvedValue({})
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json
       } as unknown as Response)
 
+      chrome.storage.local.get.mockClear()
+      chrome.storage.local.set.mockClear()
       await sfRest('h', '/ok')
-
-      expect(trackApiRequestMock).toHaveBeenCalledTimes(1)
 
       const text = vi.fn().mockResolvedValue('err')
       mockFetch.mockResolvedValueOnce({
@@ -218,8 +208,9 @@ describe('auth', () => {
       } as unknown as Response)
 
       await expect(sfRest('h', '/fail')).rejects.toThrow()
-
-      expect(trackApiRequestMock).toHaveBeenCalledTimes(2)
+      await Promise.resolve()
+      expect(chrome.storage.local.get).not.toHaveBeenCalled()
+      expect(chrome.storage.local.set).not.toHaveBeenCalled()
     })
   })
 })

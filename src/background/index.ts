@@ -3,7 +3,7 @@
  * Handles cookie-based authentication for Salesforce API access
  */
 
-import { STORAGE_KEYS, storageSet } from '~lib/storage-service'
+import { STORAGE_KEYS, storageSet, storageRemove } from '~lib/storage-service'
 
 import { logger } from '~lib/logger'
 
@@ -18,8 +18,19 @@ const SF_DOMAINS = [
   'force.com'
 ]
 
+// Remove deprecated diagnostics by known key only; never load or inspect payloads.
+// Repeat on worker activation so interrupted updates and old profiles are covered.
+function removeLegacyDiagnostics(): Promise<void> {
+  return storageRemove(['ultraforce_error_logs', 'ultraforce_api_stats'])
+}
+void removeLegacyDiagnostics()
+chrome.runtime.onStartup.addListener(() => {
+  void removeLegacyDiagnostics()
+})
+
 // Initialize extension
 chrome.runtime.onInstalled.addListener(async (details) => {
+  await removeLegacyDiagnostics()
   if (details.reason === 'install') {
     await storageSet(STORAGE_KEYS.LEGACY_SETTINGS, {
       searchLimit: 1000,

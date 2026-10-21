@@ -1,5 +1,5 @@
 import React from 'react'
-import { createRoot } from 'react-dom/client'
+import { createPrivateRoot } from './react-root'
 import SearchModal from '~components/search/SearchModal'
 import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
@@ -342,7 +342,7 @@ class UltraForceWindowManager {
 
     const mountPoint = this.shadowRoot || this.containerElement
     if (!this.reactRoot) {
-      this.reactRoot = createRoot(mountPoint)
+      this.reactRoot = createPrivateRoot(mountPoint)
     }
 
     this.reactRoot.render(
