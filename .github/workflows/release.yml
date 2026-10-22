@@ -97,6 +97,9 @@ jobs:
       - name: Build Cache Regressions / 构建缓存回归
         run: node --test scripts/build-cache.test.mjs
 
+      - name: Manifest Policy Regressions / 清单策略回归
+        run: node --test scripts/manifest-policy.test.mjs scripts/manifest-policy-build.test.mjs
+
       - name: Build Extension
         run: pnpm build
 
