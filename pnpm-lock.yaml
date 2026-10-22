@@ -6,6 +6,12 @@ settings:
 
 overrides:
   lmdb@2.7.11>msgpackr: 1.11.5
+  '@plasmohq/parcel-config@0.42.0>@plasmohq/parcel-transformer-manifest': 0.21.1
+
+patchedDependencies:
+  '@plasmohq/parcel-transformer-manifest@0.21.1':
+    hash: e6tmxf34i4x6z2um7x5aiw7liu
+    path: patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch
 
 importers:
 
@@ -771,14 +777,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@lezer/common@0.15.12':
-    resolution: {integrity: sha512-edfwCxNLnzq5pBA/yaIhwJ3U3Kz8VAUOTRg0hhxaizaI1N+qxV7EXDv/kLCkLeq2RzSFvxexlaj5Mzfn2kY0Ig==}
-
   '@lezer/common@1.2.3':
     resolution: {integrity: sha512-w7ojc8ejBqr2REPsWxJjrMFsA/ysDCFICn8zEOR9mrqzOu2amhITYuLD8ag6XZf0CFXDrhKqw7+tW8cX66NaDA==}
-
-  '@lezer/lr@0.15.8':
-    resolution: {integrity: sha512-bM6oE6VQZ6hIFxDNKk8bKPa14hqFrV07J/vHGOeiAbJReIaQXmkVb6xQu4MR+JBTLa5arGRyAAjJe1qaQt3Uvg==}
 
   '@lezer/lr@1.4.2':
     resolution: {integrity: sha512-pu0K1jCIdnQ12aWNaAVU5bzi7Bd1w54J3ECgANPmYLtQKP0HBj2cE/5coBD66MT10xbtIuUr7tg0Shbsvk0mDA==}
@@ -842,10 +842,6 @@ packages:
     resolution: {integrity: sha512-BJwkHlSUgtB+Ei52Ai32M1AOMerSlzyIGA/KC4dAGL+GGwVMdwG8HGCOA2TxP3KjhbgDPMYkv7bt/NmOmRIFng==}
     cpu: [x64]
     os: [win32]
-
-  '@mischnic/json-sourcemap@0.1.0':
-    resolution: {integrity: sha512-dQb3QnfNqmQNYA4nFSN/uLaByIic58gOXq4Y4XqLOWmOrw73KmJPt/HLyG0wvn1bnR6mBKs/Uwvkh+Hns1T0XA==}
-    engines: {node: '>=12.0.0'}
 
   '@mischnic/json-sourcemap@0.1.1':
     resolution: {integrity: sha512-iA7+tyVqfrATAIsIRWQG+a7ZLLD0VaOCKV2Wd/v4mqIU3J9c4jx9p7S0nw1XH3gJCKNBOOwACOPYYSUu9pgT+w==}
@@ -1724,8 +1720,8 @@ packages:
     resolution: {integrity: sha512-EUSwEowFNSgC/F1q/V4H4NXJ23wwLzlmRI6lvIr6S0mIuG/FCga+lAV3IZ+yAuXqUM2VexX6JyYYpNVidrMSxw==}
     engines: {parcel: '>= 2.7.0'}
 
-  '@plasmohq/parcel-transformer-manifest@0.21.0':
-    resolution: {integrity: sha512-swxCJWU/tfCTbcQl2u5TpoQCcxlp3xjdPKk9RB709CWN4fsmNhFDUCAKo5kpl7+YGwCqlGr09b5sqWJrriUBrw==}
+  '@plasmohq/parcel-transformer-manifest@0.21.1':
+    resolution: {integrity: sha512-GNKqH6fyL/rEZ8/oq8lGdcTspecnPnuNwYs9pFS0lPWjbo+q4W33VfJdrFO3NEBaVEzLtiIGcGzWi8YuZxn1jg==}
     engines: {parcel: '>= 2.7.0'}
 
   '@plasmohq/parcel-transformer-svelte@0.6.0':
@@ -2588,9 +2584,9 @@ packages:
   config-chain@1.1.13:
     resolution: {integrity: sha512-qj+f8APARXHrM0hraqXYb2/bOVSV4PvJQlNZ/DVj0QrmNM2q2euizkeuVckQ57J+W0mRH6Hvi+k50M4Jul2VRQ==}
 
-  content-security-policy-parser@0.4.1:
-    resolution: {integrity: sha512-NNJS8XPnx3OKr/CUOSwDSJw+lWTrZMYnclLKj0Y9CYOfJNJTWLFGPg3u2hYgbXMXKVRkZR2fbyReNQ1mUff/Qg==}
-    engines: {node: '>=8.0.0'}
+  content-security-policy-parser@0.6.0:
+    resolution: {integrity: sha512-wejtC/p+HLNQ7uaWgg1o3CKHhE8QXC9fJ2GCY0X82L5HUNtZSq1dmUvNSHHEb6R7LS02fpmRBq/vP8i4/+9KCg==}
+    engines: {node: '>=18.0.0'}
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
@@ -4739,13 +4735,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@lezer/common@0.15.12': {}
-
   '@lezer/common@1.2.3': {}
-
-  '@lezer/lr@0.15.8':
-    dependencies:
-      '@lezer/common': 0.15.12
 
   '@lezer/lr@1.4.2':
     dependencies:
@@ -4786,12 +4776,6 @@ snapshots:
 
   '@lmdb/lmdb-win32-x64@2.7.11':
     optional: true
-
-  '@mischnic/json-sourcemap@0.1.0':
-    dependencies:
-      '@lezer/common': 0.15.12
-      '@lezer/lr': 0.15.8
-      json5: 2.2.3
 
   '@mischnic/json-sourcemap@0.1.1':
     dependencies:
@@ -5721,7 +5705,7 @@ snapshots:
       '@plasmohq/parcel-runtime': 0.25.2
       '@plasmohq/parcel-transformer-inject-env': 0.2.12
       '@plasmohq/parcel-transformer-inline-css': 0.3.11
-      '@plasmohq/parcel-transformer-manifest': 0.21.0
+      '@plasmohq/parcel-transformer-manifest': 0.21.1(patch_hash=e6tmxf34i4x6z2um7x5aiw7liu)
       '@plasmohq/parcel-transformer-svelte': 0.6.0
       '@plasmohq/parcel-transformer-vue': 0.5.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     transitivePeerDependencies:
@@ -5883,16 +5867,16 @@ snapshots:
       browserslist: 4.22.1
       lightningcss: 1.21.8
 
-  '@plasmohq/parcel-transformer-manifest@0.21.0':
+  '@plasmohq/parcel-transformer-manifest@0.21.1(patch_hash=e6tmxf34i4x6z2um7x5aiw7liu)':
     dependencies:
-      '@mischnic/json-sourcemap': 0.1.0
+      '@mischnic/json-sourcemap': 0.1.1
       '@parcel/core': 2.9.3
       '@parcel/diagnostic': 2.9.3
       '@parcel/fs': 2.9.3(@parcel/core@2.9.3)
       '@parcel/plugin': 2.9.3(@parcel/core@2.9.3)
       '@parcel/types': 2.9.3(@parcel/core@2.9.3)
       '@parcel/utils': 2.9.3
-      content-security-policy-parser: 0.4.1
+      content-security-policy-parser: 0.6.0
       json-schema-to-ts: 3.1.1
       nullthrows: 1.1.1
 
@@ -6679,7 +6663,7 @@ snapshots:
       ini: 1.3.8
       proto-list: 1.2.4
 
-  content-security-policy-parser@0.4.1: {}
+  content-security-policy-parser@0.6.0: {}
 
   convert-source-map@2.0.0: {}
 

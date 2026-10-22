@@ -117,7 +117,11 @@
   },
   "pnpm": {
     "overrides": {
-      "lmdb@2.7.11>msgpackr": "1.11.5"
+      "lmdb@2.7.11>msgpackr": "1.11.5",
+      "@plasmohq/parcel-config@0.42.0>@plasmohq/parcel-transformer-manifest": "0.21.1"
+    },
+    "patchedDependencies": {
+      "@plasmohq/parcel-transformer-manifest@0.21.1": "patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch"
     }
   },
   "devDependencies": {
