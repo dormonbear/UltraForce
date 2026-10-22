@@ -100,6 +100,9 @@ jobs:
       - name: Manifest Policy Regressions / 清单策略回归
         run: node --test scripts/manifest-policy.test.mjs scripts/manifest-policy-build.test.mjs
 
+      - name: YAML Configuration Regressions / YAML 配置回归
+        run: node --test scripts/yaml-config.test.mjs
+
       - name: Build Extension
         run: pnpm build
 
