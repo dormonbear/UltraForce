@@ -94,6 +94,9 @@ jobs:
       - name: Unit Tests
         run: pnpm test:run
 
+      - name: Build Cache Regressions / 构建缓存回归
+        run: node --test scripts/build-cache.test.mjs
+
       - name: Build Extension
         run: pnpm build
 
