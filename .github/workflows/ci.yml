@@ -40,6 +40,9 @@ jobs:
       - name: Release Workflow Tests
         run: node --test scripts/release-workflow.test.mjs
 
+      - name: Build Cache Regressions / 构建缓存回归
+        run: node --test scripts/build-cache.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
