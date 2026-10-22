@@ -49,6 +49,9 @@ jobs:
       - name: YAML Configuration Regressions / YAML 配置回归
         run: node --test scripts/yaml-config.test.mjs
 
+      - name: Build Input Regressions / 构建输入回归
+        run: node --test scripts/build-inputs.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
