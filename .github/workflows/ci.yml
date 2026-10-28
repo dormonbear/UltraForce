@@ -79,6 +79,9 @@ jobs:
       - name: Sharp Native and Image Regressions / Sharp 原生库及图像回归
         run: node --test scripts/sharp-build-inputs.test.mjs
 
+      - name: Vue Renderer and Parent Transformer Regressions / Vue 渲染器及父转换器回归
+        run: node --test scripts/vue-renderer-build-inputs.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
