@@ -64,6 +64,9 @@ jobs:
       - name: SVG Build Input Regressions / SVG 构建输入回归
         run: node --test scripts/svgo-build-inputs.test.mjs
 
+      - name: Vite Toolchain Compatibility / Vite 工具链兼容性
+        run: node --test scripts/vite-toolchain.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
