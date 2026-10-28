@@ -118,6 +118,9 @@ jobs:
       - name: PostCSS Source Map Regressions / PostCSS 源码映射回归
         run: node --test scripts/postcss-source-maps.test.mjs
 
+      - name: SVG Build Input Regressions / SVG 构建输入回归
+        run: node --test scripts/svgo-build-inputs.test.mjs
+
       - name: Build Extension
         run: pnpm build
 
