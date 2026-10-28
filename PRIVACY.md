@@ -92,10 +92,20 @@ The former API Statistics UI and request tracking have been removed.
 
 ## Permissions and verification limits
 
-The extension requests `storage`, `activeTab`, `tabs`, `cookies`, and host
-permissions for Salesforce-family domains. Cookies support existing-session
-authentication; tabs and activeTab support navigation and the search shortcut.
-See the manifest configuration in `package.json` for the exact domain list.
+The packaged extension requests `scripting`, `storage`, `activeTab`, `tabs`,
+`cookies`, and host permissions for Salesforce-family domains. The
+[`scripting` permission](https://developer.chrome.com/docs/extensions/reference/api/scripting)
+allows JavaScript/CSS injection with host permissions or temporary active-tab
+access. Cookies support existing-session authentication; tabs and activeTab
+support navigation and the search shortcut. See the manifest configuration in
+`package.json` for the exact domain list and the generated production manifest
+for the packaged permission list.
+
+打包后的扩展请求 `scripting`、`storage`、`activeTab`、`tabs`、`cookies`，以及
+Salesforce 系列域名的主机权限。[`scripting` 权限](https://developer.chrome.com/docs/extensions/reference/api/scripting)
+允许在具有主机权限或临时活动标签页访问权限的页面中注入 JavaScript／CSS。
+Cookie 用于现有会话认证；tabs 和 activeTab 支持导航及搜索快捷键。
+准确域名列表见 `package.json` 中的清单配置，打包权限列表见生成的生产清单。
 
 Regression tests cover error handling without storage writes, request handling
 without statistics, static production logging, and key-only migration. A
