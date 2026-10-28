@@ -1,5 +1,27 @@
 # Release Notes
 
+## v0.5.1
+
+Release Date: 2026-10-29 / 发布日期：2026-10-29
+
+### Maintenance and reliability / 维护及可靠性
+
+- Update React and React DOM together to 19.3.1, and Zustand to 5.0.16, with packaged search and settings verified in English and Simplified Chinese.
+  React 与 React DOM 配套更新至 19.3.1，Zustand 更新至 5.0.16，并验证正式产物的中英文搜索及设置。
+- Patch focused build-tool dependency paths for cache serialization, manifest policy, YAML configuration, archive/glob inputs and PostCSS source maps. Synthetic regressions cover the reproduced failures and normal compatibility cases.
+  定向修复缓存序列化、清单策略、YAML 配置、归档／glob 输入及 PostCSS 源码映射的构建工具依赖路径；合成回归覆盖已复现失败及正常兼容用例。
+- Continuous and release checks now exercise the actual production ZIP in both languages, including closed Shadow DOM isolation, alongside authentication, privacy and search-race regressions.
+  持续及发布检查现会验证真实正式 ZIP 的两种语言及封闭 Shadow DOM 隔离，并运行认证、隐私及搜索竞态回归。
+- Direct routine dependency updates to the development branch and retain existing security overrides and the CSP compatibility patch.
+  将常规依赖更新指向开发分支，并保留既有安全覆盖及 CSP 兼容补丁。
+
+### Privacy and verification scope / 隐私及验证范围
+
+- Clarify the already-packaged scripting permission without expanding permissions. No new collection, application endpoints or persisted data are introduced.
+  说明既有打包 scripting 权限，不扩大权限；不新增收集、应用端点或持久化数据。
+- The matched full dependency audit still reports 38 advisory records / 40 instances, including 19 high, 16 moderate and five low. These maintenance changes do not establish browser-runtime exploitation or resolve every dependency advisory; [the remaining audit](https://github.com/dormonbear/UltraForce/issues/48) stays open.
+  完整同窗口依赖审计仍报告 38 条公告／40 个实例，包括 19 项高危、16 项中危及五项低危。这些维护改动不证明浏览器运行时可利用，也未解决全部依赖公告；[剩余审计](https://github.com/dormonbear/UltraForce/issues/48)继续开放。
+
 ## v0.5.0
 
 Release Date: 2026-10-21 / 发布日期：2026-10-21
