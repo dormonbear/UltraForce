@@ -14,7 +14,8 @@ const viteEntry = vitest.resolve('vite')
 const { build, createServer } = await import(pathToFileURL(viteEntry).href)
 
 async function fixture(run) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'ultraforce-vite-toolchain-')))
+  // Match Vite's native canonical paths, including Windows short temporary directory names. / 与 Vite 原生规范路径保持一致，包括 Windows 临时目录短名。
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'ultraforce-vite-toolchain-')))
   try {
     writeFileSync(join(root, 'value.ts'), 'export const value: number = 21\n')
     writeFileSync(join(root, 'entry.ts'), 'import { value } from "./value"\nexport const answer: number = value * 2\n')

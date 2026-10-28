@@ -129,11 +129,11 @@ test('glob preserves brace, extglob, ignore and dotfile behavior / glob 保留�
       await writeFile(filepath, '')
     }
     const options = { cwd: directory, ignore: '**/skip.*' }
-    assert.deepEqual(glob.globSync('src/*.{ts,tsx}', options).sort(), ['src/a.ts', 'src/b.tsx'])
+    assert.deepEqual(glob.globSync('src/*.{ts,tsx}', options).sort(), [join('src', 'a.ts'), join('src', 'b.tsx')])
     assert.deepEqual((await glob.glob('src/!(*.md)', { ...options, dot: true })).sort(), [
-      'src/.hidden.ts',
-      'src/a.ts',
-      'src/b.tsx'
+      join('src', '.hidden.ts'),
+      join('src', 'a.ts'),
+      join('src', 'b.tsx')
     ])
   })
 })
