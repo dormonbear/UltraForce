@@ -94,6 +94,12 @@ jobs:
       - name: Unit Tests
         run: pnpm test:run
 
+      - name: Release Workflow Regressions / 发布工作流回归
+        run: node --test scripts/release-workflow.test.mjs
+
+      - name: Chrome Web Store Publisher Regressions / Chrome 应用商店发布器回归
+        run: node --test scripts/cws-publish.test.mjs
+
       - name: Dependency Target Contract / 依赖目标契约
         run: node --test scripts/dependabot-config.test.mjs
 
@@ -182,20 +188,31 @@ jobs:
           prerelease: false
 
       - name: Upload to Chrome Web Store
+        id: cws_upload
         if: env.CWS_PUBLISH == 'true'
         continue-on-error: true
+        env:
+          CWS_SERVICE_ACCOUNT_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          ZIP_PATH: ${{ steps.pkg.outputs.zip_path }}
         run: |
-          echo '${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}' > /tmp/cws-key.json
+          umask 077
+          printf '%s' "$CWS_SERVICE_ACCOUNT_KEY" > "$RUNNER_TEMP/cws-key.json"
           node scripts/cws-publish.mjs upload \
-            --zip "${{ steps.pkg.outputs.zip_path }}" \
-            --extension-id "${{ secrets.CWS_EXTENSION_ID }}" \
-            --key /tmp/cws-key.json
+            --zip "$ZIP_PATH" \
+            --extension-id "$CWS_EXTENSION_ID" \
+            --key "$RUNNER_TEMP/cws-key.json"
 
       - name: Publish to Chrome Web Store
-        if: env.CWS_PUBLISH == 'true'
+        if: env.CWS_PUBLISH == 'true' && steps.cws_upload.outcome == 'success'
         continue-on-error: true
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
         run: |
           node scripts/cws-publish.mjs publish \
-            --extension-id "${{ secrets.CWS_EXTENSION_ID }}" \
-            --key /tmp/cws-key.json
-          rm -f /tmp/cws-key.json
+            --extension-id "$CWS_EXTENSION_ID" \
+            --key "$RUNNER_TEMP/cws-key.json"
+
+      - name: Clean Chrome Web Store Key / 清理 Chrome 应用商店密钥
+        if: always() && env.CWS_PUBLISH == 'true'
+        run: rm -f "$RUNNER_TEMP/cws-key.json"
