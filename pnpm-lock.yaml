@@ -28,6 +28,10 @@ patchedDependencies:
     hash: e6tmxf34i4x6z2um7x5aiw7liu
     path: patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch
 
+  http-cache-semantics@4.2.0:
+    hash: fkfepanoicmm26665zzeo4io3m
+    path: patches/http-cache-semantics@4.2.0.patch
+
 importers:
 
   .:
@@ -6680,7 +6684,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.0.4
       get-stream: 6.0.1
-      http-cache-semantics: 4.2.0
+      http-cache-semantics: 4.2.0(patch_hash=fkfepanoicmm26665zzeo4io3m)
       keyv: 4.5.4
       mimic-response: 4.0.0
       normalize-url: 8.0.2
@@ -6690,7 +6694,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.0.4
       get-stream: 9.0.1
-      http-cache-semantics: 4.2.0
+      http-cache-semantics: 4.2.0(patch_hash=fkfepanoicmm26665zzeo4io3m)
       keyv: 4.5.4
       mimic-response: 4.0.0
       normalize-url: 8.0.2
@@ -7154,7 +7158,7 @@ snapshots:
       domutils: 2.8.0
       entities: 3.0.1
 
-  http-cache-semantics@4.2.0: {}
+  http-cache-semantics@4.2.0(patch_hash=fkfepanoicmm26665zzeo4io3m): {}
 
   http2-wrapper@2.2.1:
     dependencies:
