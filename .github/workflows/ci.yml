@@ -64,6 +64,9 @@ jobs:
       - name: Babel Build Input Regressions / Babel 构建输入回归
         run: node --test scripts/babel-build-inputs.test.mjs
 
+      - name: Svelte Compiler and Parent Transformer Regressions / Svelte 编译器及父转换器回归
+        run: node --test scripts/svelte-build-inputs.test.mjs
+
       - name: SVG Build Input Regressions / SVG 构建输入回归
         run: node --test scripts/svgo-build-inputs.test.mjs
 
@@ -187,6 +190,7 @@ jobs:
           scripts/sharp-build-inputs.test.mjs scripts/vue-renderer-build-inputs.test.mjs
           scripts/http-cache-revalidation.test.mjs
           scripts/babel-build-inputs.test.mjs
+          scripts/svelte-build-inputs.test.mjs
       - name: Full Frontend Tests with Coverage / 全量前端测试及覆盖率
         run: pnpm test:run --coverage
       - name: Upload Windows Coverage / 上传 Windows 覆盖率
