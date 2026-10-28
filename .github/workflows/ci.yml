@@ -88,6 +88,9 @@ jobs:
       - name: E2E Command Regressions / E2E 命令回归
         run: node --test scripts/build-e2e.test.mjs
 
+      - name: Git Checkout Newline Regressions / Git 检出换行回归
+        run: node --test scripts/checkout-newlines.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
@@ -173,7 +176,7 @@ jobs:
       # Release Bash/zip contracts stay on Ubuntu; cross-platform library cases run here. / 发布 Bash／zip 契约保留 Ubuntu，跨平台库用例在此运行。
       - name: Cross-platform Dependency and Native Regressions / 跨平台依赖及原生库回归
         run: >-
-          node --test scripts/build-e2e.test.mjs scripts/dependabot-config.test.mjs
+          node --test scripts/build-e2e.test.mjs scripts/checkout-newlines.test.mjs scripts/dependabot-config.test.mjs
           scripts/build-cache.test.mjs scripts/manifest-policy.test.mjs scripts/manifest-policy-build.test.mjs
           scripts/yaml-config.test.mjs scripts/build-inputs.test.mjs scripts/postcss-source-maps.test.mjs
           scripts/svgo-build-inputs.test.mjs scripts/vite-toolchain.test.mjs scripts/immutable-build-inputs.test.mjs
