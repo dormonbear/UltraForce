@@ -119,7 +119,11 @@
     "overrides": {
       "lmdb@2.7.11>msgpackr": "1.11.5",
       "@plasmohq/parcel-config@0.42.0>@plasmohq/parcel-transformer-manifest": "0.21.1",
-      "cosmiconfig@9.0.0>js-yaml": "4.3.2"
+      "cosmiconfig@9.0.0>js-yaml": "4.3.2",
+      "plasmo@0.90.5>fflate": "0.8.3",
+      "sucrase@3.35.0>glob": "10.5.0",
+      "glob@10.5.0>minimatch": "9.0.7",
+      "minimatch@9.0.7>brace-expansion": "5.0.12"
     },
     "patchedDependencies": {
       "@plasmohq/parcel-transformer-manifest@0.21.1": "patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch"
