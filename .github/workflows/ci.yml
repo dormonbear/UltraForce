@@ -67,6 +67,9 @@ jobs:
       - name: Vite Toolchain Compatibility / Vite 工具链兼容性
         run: node --test scripts/vite-toolchain.test.mjs
 
+      - name: Immutable and Sass Regressions / Immutable 及 Sass 回归
+        run: node --test scripts/immutable-build-inputs.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
