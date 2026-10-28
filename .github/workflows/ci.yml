@@ -82,6 +82,9 @@ jobs:
       - name: Vue Renderer and Parent Transformer Regressions / Vue 渲染器及父转换器回归
         run: node --test scripts/vue-renderer-build-inputs.test.mjs
 
+      - name: HTTP Cache Revalidation Regressions / HTTP 缓存重新验证回归
+        run: node --test scripts/http-cache-revalidation.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true

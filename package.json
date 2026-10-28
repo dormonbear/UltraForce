@@ -136,7 +136,8 @@
       "minimatch@9.0.7>brace-expansion": "5.0.12"
     },
     "patchedDependencies": {
-      "@plasmohq/parcel-transformer-manifest@0.21.1": "patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch"
+      "@plasmohq/parcel-transformer-manifest@0.21.1": "patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch",
+      "http-cache-semantics@4.2.0": "patches/http-cache-semantics@4.2.0.patch"
     }
   },
   "devDependencies": {
