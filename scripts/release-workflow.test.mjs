@@ -10,7 +10,11 @@ import { parse } from 'yaml'
 const workflow = parse(readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8'))
 const steps = workflow.jobs.release.steps
 const git = (cwd, ...args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  }).trim()
 
 function fixture(run) {
   const cwd = mkdtempSync(join(tmpdir(), 'ultraforce-release-binding-'))
@@ -328,3 +332,59 @@ test('packed production UI gates publication / 打包后正式界面验证阻止
   assert.match(smoke.run, /EXTENSION_PATH=.*node scripts\/smoke-test\.mjs/)
   assert.equal(smoke.env.ZIP_PATH, '${{ steps.pkg.outputs.zip_path }}')
 })
+
+test('publisher regressions gate CI and release / 发布器回归阻止无效 CI 和发布', () => {
+  const ci = parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'))
+  for (const job of [ci.jobs['lint-and-typecheck'], workflow.jobs.release]) {
+    const regression = job.steps.find((step) => step.run === 'node --test scripts/cws-publish.test.mjs')
+    assert.ok(regression, 'Missing publisher regression gate / 缺失发布器回归门槛')
+    assert.notEqual(regression['continue-on-error'], true)
+  }
+})
+
+test('publish requires this upload to succeed / 发布要求本次上传成功', () => {
+  const upload = steps.find((step) => step.name === 'Upload to Chrome Web Store')
+  const publish = steps.find((step) => step.name === 'Publish to Chrome Web Store')
+  assert.equal(upload.id, 'cws_upload')
+  assert.equal(publish.if, "env.CWS_PUBLISH == 'true' && steps.cws_upload.outcome == 'success'")
+  for (const enabled of ['true', 'false']) {
+    for (const outcome of ['success', 'failure', 'skipped', 'cancelled']) {
+      const condition = publish.if
+        .replaceAll('env.CWS_PUBLISH', JSON.stringify(enabled))
+        .replaceAll('steps.cws_upload.outcome', JSON.stringify(outcome))
+      assert.equal(Function(`return (${condition})`)(), enabled === 'true' && outcome === 'success')
+    }
+  }
+})
+
+test('publisher failures preserve exit codes and always clean the key / 发布器失败保留退出码并始终清理密钥', () =>
+  fixture(({ cwd }) => {
+    const bin = join(cwd, 'bin')
+    mkdirSync(bin)
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit "$CWS_TEST_EXIT"\n', { mode: 0o755 })
+    const upload = steps.find((step) => step.name === 'Upload to Chrome Web Store')
+    const publish = steps.find((step) => step.name === 'Publish to Chrome Web Store')
+    assert.equal(upload.env.CWS_SERVICE_ACCOUNT_KEY, '${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}')
+    assert.match(upload.run, /printf '%s' "\$CWS_SERVICE_ACCOUNT_KEY"/)
+    assert.match(upload.run, /umask 077/)
+    assert.ok(!upload.run.includes('${{'), 'No shell interpolation of secrets / 不将秘密插入 Shell 源码')
+    assert.ok(!publish.run.includes('${{'), 'No shell interpolation of secrets / 不将秘密插入 Shell 源码')
+    const cleanup = steps.find((step) => step.name === 'Clean Chrome Web Store Key / 清理 Chrome 应用商店密钥')
+    assert.ok(cleanup, 'Missing always-run cleanup / 缺失始终执行的清理')
+    assert.equal(cleanup.if, "always() && env.CWS_PUBLISH == 'true'")
+    assert.ok(steps.indexOf(cleanup) > steps.indexOf(publish))
+    const context = {
+      'secrets.CWS_SERVICE_ACCOUNT_KEY': 'synthetic-key',
+      'secrets.CWS_EXTENSION_ID': 'fixture-id',
+      'steps.pkg.outputs.zip_path': 'fixture.zip'
+    }
+    const keyPath = join(cwd, 'cws-key.json')
+    for (const exit of [0, 23]) {
+      const env = { PATH: `${bin}:${process.env.PATH}`, CWS_TEST_EXIT: String(exit) }
+      assert.equal(execute(upload, cwd, context, env).status, exit)
+      assert.equal(readFileSync(keyPath, 'utf8'), 'synthetic-key')
+      assert.equal(execute(publish, cwd, context, env).status, exit)
+      assert.equal(execute(cleanup, cwd, context, env).status, 0)
+      assert.equal(spawnSync('test', ['-e', keyPath]).status, 1)
+    }
+  }))

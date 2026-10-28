@@ -40,6 +40,9 @@ jobs:
       - name: Release Workflow Tests
         run: node --test scripts/release-workflow.test.mjs
 
+      - name: Chrome Web Store Publisher Regressions / Chrome 应用商店发布器回归
+        run: node --test scripts/cws-publish.test.mjs
+
       - name: Dependency Target Contract / 依赖目标契约
         run: node --test scripts/dependabot-config.test.mjs
 
