@@ -94,6 +94,21 @@ jobs:
       - name: Unit Tests
         run: pnpm test:run
 
+      - name: Dependency Target Contract / 依赖目标契约
+        run: node --test scripts/dependabot-config.test.mjs
+
+      - name: Build Cache Regressions / 构建缓存回归
+        run: node --test scripts/build-cache.test.mjs
+
+      - name: Manifest Policy Regressions / 清单策略回归
+        run: node --test scripts/manifest-policy.test.mjs scripts/manifest-policy-build.test.mjs
+
+      - name: YAML Configuration Regressions / YAML 配置回归
+        run: node --test scripts/yaml-config.test.mjs
+
+      - name: Build Input Regressions / 构建输入回归
+        run: node --test scripts/build-inputs.test.mjs
+
       - name: Build Extension
         run: pnpm build
 
@@ -111,13 +126,6 @@ jobs:
 
       - name: Install Playwright Chromium
         run: pnpm exec playwright install chromium --with-deps
-
-      # Gate the release on the packed extension actually working in a real
-      # browser: content script executes without module errors and the
-      # keyboard shortcut opens the modal. Catches broken bundles that unit
-      # tests cannot see (e.g. externalized dependencies).
-      - name: Smoke Test Extension
-        run: xvfb-run --auto-servernum node scripts/smoke-test.mjs
 
       - name: Package Extension
         run: pnpm package
@@ -143,6 +151,15 @@ jobs:
             throw new Error('Release tag and packaged manifest version differ')
           }
           NODE
+
+      - name: Verify Packaged UI / 验证打包后的界面
+        env:
+          ZIP_PATH: ${{ steps.pkg.outputs.zip_path }}
+        run: |
+          ARTIFACT_DIR=$(mktemp -d "$RUNNER_TEMP/ultraforce-package.XXXXXX")
+          trap 'rm -rf "$ARTIFACT_DIR"' EXIT
+          unzip -q "$ZIP_PATH" -d "$ARTIFACT_DIR"
+          EXTENSION_PATH="$ARTIFACT_DIR" node scripts/smoke-test.mjs
 
       - name: Extract Release Notes
         env:

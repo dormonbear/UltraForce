@@ -34,14 +34,7 @@
   z-index: 2147483647;
   pointer-events: all;
   outline: none;
-  font-family:
-    'Inter',
-    -apple-system,
-    BlinkMacSystemFont,
-    'SF Pro Display',
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   color: #ffffff;
   opacity: 0;
   animation: modal-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
