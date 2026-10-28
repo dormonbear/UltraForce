@@ -22,6 +22,7 @@ after(() => {
 const require = createRequire(import.meta.url)
 const plasmo = createRequire(require.resolve('plasmo'))
 const parcel = createRequire(plasmo.resolve('@parcel/core'))
+const { LMDBCache } = parcel('@parcel/cache')
 const config = createRequire(plasmo.resolve('@plasmohq/parcel-config'))
 const inlineCss = createRequire(config.resolve('@plasmohq/parcel-transformer-inline-css'))
 
@@ -144,6 +145,7 @@ nodeTest(
   async () => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'ultraforce-browserslist-parcel-')))
     const previous = process.cwd()
+    let cache
     try {
       writeFileSync(join(root, 'index.js'), 'globalThis.fixture = globalThis.input?.nested?.value ?? 7;')
       writeFileSync(
@@ -153,10 +155,13 @@ nodeTest(
       const config = createRequire(plasmo.resolve('@plasmohq/parcel-config'))
       const { Parcel } = plasmo('@parcel/core')
       process.chdir(root)
+      // Parcel ends its workers, but the fixture must close its parent LMDB before Windows cleanup. / Parcel 结束工作进程，但夹具须在 Windows 清理前关闭父 LMDB。
+      cache = new LMDBCache(join(root, '.parcel-cache'))
       const result = await new Parcel({
         entries: join(root, 'index.js'),
         defaultConfig: config.resolve('@parcel/config-default'),
         cacheDir: join(root, '.parcel-cache'),
+        cache,
         mode: 'production',
         shouldAutoInstall: false,
         shouldDisableCache: true,
@@ -181,6 +186,10 @@ nodeTest(
       assert.equal(missing.fixture, 7)
     } finally {
       process.chdir(previous)
+      if (cache) {
+        await cache.store.close()
+        assert.equal(cache.store.status, 'closed')
+      }
       rmSync(root, { recursive: true, force: true })
     }
   }

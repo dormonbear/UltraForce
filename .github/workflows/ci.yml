@@ -85,6 +85,12 @@ jobs:
       - name: HTTP Cache Revalidation Regressions / HTTP 缓存重新验证回归
         run: node --test scripts/http-cache-revalidation.test.mjs
 
+      - name: E2E Command Regressions / E2E 命令回归
+        run: node --test scripts/build-e2e.test.mjs
+
+      - name: Git Checkout Newline Regressions / Git 检出换行回归
+        run: node --test scripts/checkout-newlines.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
@@ -146,6 +152,109 @@ jobs:
         with:
           name: synthetic-browser-results
           path: test-results/
+          retention-days: 7
+
+  windows-quality:
+    name: Windows Quality and Coverage / Windows 质量及覆盖率
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint / 代码检查
+        run: pnpm lint
+      - name: Format Check / 格式检查
+        run: pnpm format:check
+      - name: Type Check / 类型检查
+        run: pnpm type-check
+      # Release Bash/zip contracts stay on Ubuntu; cross-platform library cases run here. / 发布 Bash／zip 契约保留 Ubuntu，跨平台库用例在此运行。
+      - name: Cross-platform Dependency and Native Regressions / 跨平台依赖及原生库回归
+        run: >-
+          node --test scripts/build-e2e.test.mjs scripts/checkout-newlines.test.mjs scripts/dependabot-config.test.mjs
+          scripts/build-cache.test.mjs scripts/manifest-policy.test.mjs scripts/manifest-policy-build.test.mjs
+          scripts/yaml-config.test.mjs scripts/build-inputs.test.mjs scripts/postcss-source-maps.test.mjs
+          scripts/svgo-build-inputs.test.mjs scripts/vite-toolchain.test.mjs scripts/immutable-build-inputs.test.mjs
+          scripts/browserslist-build-inputs.test.mjs scripts/rollup-build-inputs.test.mjs
+          scripts/sharp-build-inputs.test.mjs scripts/vue-renderer-build-inputs.test.mjs
+          scripts/http-cache-revalidation.test.mjs
+      - name: Full Frontend Tests with Coverage / 全量前端测试及覆盖率
+        run: pnpm test:run --coverage
+      - name: Upload Windows Coverage / 上传 Windows 覆盖率
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-coverage-report
+          path: coverage/
+          retention-days: 14
+
+  windows-synthetic-browser:
+    name: Windows Synthetic Browser Tests / Windows 合成浏览器测试
+    runs-on: windows-latest
+    needs: [windows-quality]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium / 安装 Chromium
+        run: pnpm exec playwright install chromium
+      - name: Build Test Extension / 构建测试扩展
+        run: pnpm build:e2e
+      - name: Verify Locales and Privacy Boundaries / 验证语言及隐私边界
+        run: >-
+          pnpm exec playwright test tests/e2e/localization.spec.ts tests/e2e/auth-boundary.spec.ts
+          tests/e2e/privacy.spec.ts tests/e2e/setup-search-race.spec.ts
+      - name: Upload Windows Failure Evidence / 上传 Windows 失败证据
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-synthetic-browser-results
+          path: test-results/
+          retention-days: 7
+
+  # Separate checkout prevents the E2E flag bundle entering production artifacts. / 独立检出防止 E2E 标志构建进入正式产物。
+  windows-build:
+    name: Windows Production Build / Windows 正式构建
+    runs-on: windows-latest
+    needs: [windows-quality]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Production Extension / 构建正式扩展
+        run: pnpm build
+      - name: Verify Managed Schema Shipped / 验证托管策略架构已打包
+        run: node scripts/verify-managed-schema.mjs
+      - name: Verify Bundled Fonts Shipped / 验证内置字体已打包
+        run: node scripts/verify-fonts.mjs
+      - name: Install Production Browser / 安装正式产物测试浏览器
+        run: pnpm exec playwright install chromium
+      - name: Verify Production UI / 验证正式产物界面
+        run: node scripts/smoke-test.mjs
+      - name: Package Production Extension / 打包正式扩展
+        run: pnpm package
+      - name: Upload Windows Production Artifact / 上传 Windows 正式产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-extension-build
+          path: build/
           retention-days: 7
 
   build:
