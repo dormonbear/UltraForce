@@ -40,6 +40,9 @@ jobs:
       - name: Release Workflow Tests
         run: node --test scripts/release-workflow.test.mjs
 
+      - name: Dependency Target Contract / 依赖目标契约
+        run: node --test scripts/dependabot-config.test.mjs
+
       - name: Build Cache Regressions / 构建缓存回归
         run: node --test scripts/build-cache.test.mjs
 
