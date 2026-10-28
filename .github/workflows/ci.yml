@@ -73,6 +73,9 @@ jobs:
       - name: Browserslist Build Regressions / Browserslist 构建回归
         run: node --test scripts/browserslist-build-inputs.test.mjs
 
+      - name: Rollup Build Regressions / Rollup 构建回归
+        run: node --test scripts/rollup-build-inputs.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
