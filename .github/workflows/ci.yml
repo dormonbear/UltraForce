@@ -70,6 +70,9 @@ jobs:
       - name: Immutable and Sass Regressions / Immutable 及 Sass 回归
         run: node --test scripts/immutable-build-inputs.test.mjs
 
+      - name: Browserslist Build Regressions / Browserslist 构建回归
+        run: node --test scripts/browserslist-build-inputs.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
