@@ -76,6 +76,9 @@ jobs:
       - name: Rollup Build Regressions / Rollup 构建回归
         run: node --test scripts/rollup-build-inputs.test.mjs
 
+      - name: Sharp Native and Image Regressions / Sharp 原生库及图像回归
+        run: node --test scripts/sharp-build-inputs.test.mjs
+
       - name: Audit Dependencies
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
