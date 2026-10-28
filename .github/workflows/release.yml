@@ -109,6 +109,9 @@ jobs:
       - name: Build Input Regressions / 构建输入回归
         run: node --test scripts/build-inputs.test.mjs
 
+      - name: PostCSS Source Map Regressions / PostCSS 源码映射回归
+        run: node --test scripts/postcss-source-maps.test.mjs
+
       - name: Build Extension
         run: pnpm build
 
