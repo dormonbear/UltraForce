@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  '@svgr/plugin-svgo@6.5.1>deepmerge': '-'
   '@babel/core@7.28.3': 7.29.6
   plasmo@0.90.5>sharp: 0.35.5
   tsup@7.2.0>rollup: 3.30.0
@@ -2755,10 +2756,6 @@ packages:
   deep-extend@0.6.0:
     resolution: {integrity: sha512-LOHxIOaPYdHlJRtCQfDIVZtfw/ufM8+rVj649RIHzcm/vGwQRXFt6OPqIFWsm2XEMrNIEtWR64sY1LEKD2vAOA==}
     engines: {node: '>=4.0.0'}
-
-  deepmerge@4.3.1:
-    resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
-    engines: {node: '>=0.10.0'}
 
   defer-to-connect@2.0.1:
     resolution: {integrity: sha512-4tvttepXG1VaYGrRibk5EwJd1t4udunSOVMdLSAL6mId1ix438oPwPZMALY41FCijukO1L0twNcGsdzS7dHgDg==}
@@ -6255,7 +6252,6 @@ snapshots:
     dependencies:
       '@svgr/core': 6.5.1(supports-color@7.2.0)
       cosmiconfig: 7.1.0
-      deepmerge: 4.3.1
       svgo: 2.8.4
 
   '@swc/core-darwin-arm64@1.13.3':
@@ -6862,8 +6858,6 @@ snapshots:
       mimic-response: 3.1.0
 
   deep-extend@0.6.0: {}
-
-  deepmerge@4.3.1: {}
 
   defer-to-connect@2.0.1: {}
 
