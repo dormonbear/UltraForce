@@ -67,6 +67,9 @@ jobs:
       - name: Svelte Compiler and Parent Transformer Regressions / Svelte 编译器及父转换器回归
         run: node --test scripts/svelte-build-inputs.test.mjs
 
+      - name: Svelte Input Guard Regressions / Svelte 输入保护回归
+        run: node --test scripts/svelte-input-guard.test.mjs
+
       - name: SVG Build Input Regressions / SVG 构建输入回归
         run: node --test scripts/svgo-build-inputs.test.mjs
 
@@ -197,6 +200,7 @@ jobs:
           scripts/http-cache-revalidation.test.mjs
           scripts/babel-build-inputs.test.mjs
           scripts/svelte-build-inputs.test.mjs
+          scripts/svelte-input-guard.test.mjs
           scripts/deepmerge-unused-build.test.mjs
           scripts/parcel-resolver-unused-build.test.mjs
       - name: Full Frontend Tests with Coverage / 全量前端测试及覆盖率

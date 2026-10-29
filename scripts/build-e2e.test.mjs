@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-function run(args = [], exitCode = 0) {
+function run(args = [], exitCode = 0, svelteInput = false) {
   const { scripts } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
   const [runtime, ...command] = scripts['build:e2e'].split(' ')
   assert.equal(runtime, 'node', 'Use shell-independent Node dispatch / 使用不依赖 Shell 的 Node 调度')
@@ -17,6 +17,14 @@ function run(args = [], exitCode = 0) {
     const dependency = join(project, 'node_modules', 'plasmo')
     mkdirSync(join(dependency, 'bin'), { recursive: true })
     copyFileSync(new URL('./build-e2e.mjs', import.meta.url), join(project, 'scripts', 'build-e2e.mjs'))
+    copyFileSync(
+      new URL('./check-svelte-inputs.mjs', import.meta.url),
+      join(project, 'scripts', 'check-svelte-inputs.mjs')
+    )
+    if (svelteInput) {
+      mkdirSync(join(project, 'src'), { recursive: true })
+      writeFileSync(join(project, 'src', 'owned.svelte'), '<p>Owned / 自有</p>')
+    }
     writeFileSync(join(dependency, 'package.json'), JSON.stringify({ name: 'plasmo', bin: 'bin/index.mjs' }))
     writeFileSync(
       join(dependency, 'bin', 'index.mjs'),
@@ -54,6 +62,13 @@ test('E2E launcher preserves literal arguments without shell expansion / E2E 启
   const result = run(args)
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(JSON.parse(result.stdout).args, ['build', ...args])
+})
+
+test('E2E launcher blocks Svelte input before starting Plasmo / E2E 启动器在启动 Plasmo 前阻止 Svelte 输入', () => {
+  const result = run([], 0, true)
+  assert.equal(result.status, 1)
+  assert.equal(result.stdout, '')
+  assert.match(result.stderr, /requires restoring the Parcel Svelte transformer/)
 })
 
 for (const exitCode of [0, 23]) {

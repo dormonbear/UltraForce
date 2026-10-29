@@ -1,6 +1,14 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
+import { checkSvelteInputs } from './check-svelte-inputs.mjs'
+
+try {
+  checkSvelteInputs(process.cwd())
+} catch (error) {
+  console.error('Svelte input check failed / Svelte 输入检查失败:', error.message)
+  process.exit(1)
+}
 
 const require = createRequire(import.meta.url)
 const packagePath = require.resolve('plasmo/package.json')

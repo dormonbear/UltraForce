@@ -3,18 +3,33 @@ import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import test from 'node:test'
-import { pathToFileURL } from 'node:url'
+import nodeTest from 'node:test'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { directSvelteTransformer, svelteTransformerRemoved } from './check-svelte-inputs.mjs'
 
 // Follow the installed transformer edge, never a hoisted substitute. / 沿已安装转换器依赖边解析，避免提升后的替代包。
-let edge = createRequire(import.meta.url)
-for (const name of ['plasmo', '@plasmohq/parcel-config', '@plasmohq/parcel-transformer-svelte']) {
-  edge = createRequire(edge.resolve(name))
+const root = fileURLToPath(new URL('..', import.meta.url))
+const removed = svelteTransformerRemoved(root)
+const transformer = directSvelteTransformer(root)
+if (!removed && !transformer) {
+  throw new Error(
+    'Svelte transformer must be restored when its removal override is absent. / 移除覆盖不存在时必须恢复 Svelte 转换器。'
+  )
 }
-const compiler = edge('svelte/compiler')
-const plugin = edge('@plasmohq/parcel-transformer-svelte').default[Symbol.for('parcel-plugin-config')]
-const jsdomRequire = createRequire(createRequire(import.meta.url).resolve('jsdom'))
-const parse5 = await import(pathToFileURL(jsdomRequire.resolve('parse5')).href)
+const test = (name, callback) =>
+  nodeTest(
+    name,
+    { skip: removed ? 'Direct Svelte transformer is removed / 直接 Svelte 转换器已移除' : false },
+    callback
+  )
+let edge, compiler, plugin, parse5
+if (transformer) {
+  edge = createRequire(transformer)
+  compiler = edge('svelte/compiler')
+  plugin = edge('@plasmohq/parcel-transformer-svelte').default[Symbol.for('parcel-plugin-config')]
+  const jsdomRequire = createRequire(createRequire(import.meta.url).resolve('jsdom'))
+  parse5 = await import(pathToFileURL(jsdomRequire.resolve('parse5')).href)
+}
 const marker = '</noscript><span data-owned="sentinel">owned / 自有</span>'
 const ssrSource =
   '<script>export let value;</script><noscript><span data-value={value}>fallback / 后备</span></noscript><p>after / 之后</p>'
