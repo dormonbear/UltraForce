@@ -1,22 +1,51 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
+
+export function resolverSnapshots(lock) {
+  const parent = '@plasmohq/parcel-resolver-post@0.4.5'
+  return Object.entries(lock.snapshots).filter(([key]) => key === parent || key.startsWith(`${parent}(`))
+}
+
+export function resolverHasTsup(lock) {
+  return resolverSnapshots(lock).some(([, snapshot]) =>
+    ['dependencies', 'optionalDependencies'].some((section) => Object.hasOwn(snapshot[section] ?? {}, 'tsup'))
+  )
+}
+
+// Resolve only the direct pnpm link, never an unrelated hoisted package. / 仅解析 pnpm 直接链接，不解析无关的提升包。
+export function resolveResolverTsup(lock, resolverEntry) {
+  if (!resolverHasTsup(lock)) return undefined
+  const resolverRoot = dirname(dirname(resolverEntry))
+  const directTsup = resolve(resolverRoot, '../../tsup')
+  return createRequire(resolverEntry).resolve(directTsup)
+}
 
 // Follow installed build-tool edges, rather than a separately installed test dependency. / 沿已安装构建工具依赖路径解析，而非另装测试依赖。
 const require = createRequire(import.meta.url)
 const plasmoRequire = createRequire(require.resolve('plasmo'))
 export const fflate = plasmoRequire('fflate')
 let parentRequire = plasmoRequire
-for (const name of ['@plasmohq/parcel-config', '@plasmohq/parcel-resolver-post', 'tsup', 'sucrase']) {
-  parentRequire = createRequire(parentRequire.resolve(name))
+parentRequire = createRequire(parentRequire.resolve('@plasmohq/parcel-config'))
+const resolverEntry = parentRequire.resolve('@plasmohq/parcel-resolver-post')
+parentRequire = createRequire(resolverEntry)
+const lock = parse(readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8'))
+const tsupPath = resolveResolverTsup(lock, resolverEntry)
+export let glob, globCli, minimatch, expand
+if (tsupPath) {
+  parentRequire = createRequire(tsupPath)
+  parentRequire = createRequire(parentRequire.resolve('sucrase'))
+  glob = parentRequire('glob')
+  const globRequire = createRequire(parentRequire.resolve('glob'))
+  globCli = globRequire.resolve('../esm/bin.mjs')
+  const minimatchRequire = createRequire(globRequire.resolve('minimatch'))
+  minimatch = globRequire('minimatch').minimatch
+  const brace = minimatchRequire('brace-expansion')
+  expand = typeof brace === 'function' ? brace : brace.expand
 }
-export const glob = parentRequire('glob')
-const globRequire = createRequire(parentRequire.resolve('glob'))
-export const globCli = globRequire.resolve('../esm/bin.mjs')
-const minimatchRequire = createRequire(globRequire.resolve('minimatch'))
-export const { minimatch } = globRequire('minimatch')
-const brace = minimatchRequire('brace-expansion')
-export const expand = typeof brace === 'function' ? brace : brace.expand
 
 // A real ZIP64 footer activates the extra-field path; changing only a size sentinel does not. / 真实 ZIP64 页脚会进入附加字段路径，仅改大小哨兵不会进入该路径。
 export function zip64Fixture(includeExtra) {

@@ -73,6 +73,9 @@ jobs:
       - name: Unused SVG Dependency Regressions / 未使用 SVG 依赖回归
         run: node --test scripts/deepmerge-unused-build.test.mjs
 
+      - name: Unused Resolver Dependency Regressions / 未使用解析器依赖回归
+        run: node --test scripts/parcel-resolver-unused-build.test.mjs
+
       - name: Vite Toolchain Compatibility / Vite 工具链兼容性
         run: node --test scripts/vite-toolchain.test.mjs
 
@@ -101,7 +104,7 @@ jobs:
         run: node --test scripts/checkout-newlines.test.mjs
 
       - name: Audit Dependencies
-        run: pnpm audit --audit-level=moderate
+        run: pnpm audit --audit-level=low
         continue-on-error: true
 
   unit-test:
@@ -195,6 +198,7 @@ jobs:
           scripts/babel-build-inputs.test.mjs
           scripts/svelte-build-inputs.test.mjs
           scripts/deepmerge-unused-build.test.mjs
+          scripts/parcel-resolver-unused-build.test.mjs
       - name: Full Frontend Tests with Coverage / 全量前端测试及覆盖率
         run: pnpm test:run --coverage
       - name: Upload Windows Coverage / 上传 Windows 覆盖率
