@@ -5,16 +5,33 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test, { after } from 'node:test'
+import { parse } from 'yaml'
+import { resolverHasTsup, resolverSnapshots, resolveResolverTsup } from './build-inputs-fixture.mjs'
 
 // Follow the installed Plasmo resolver's tsup edge. / 沿实际 Plasmo 解析器的 tsup 依赖路径解析。
 let consumer = createRequire(import.meta.url)
-for (const name of ['plasmo', '@plasmohq/parcel-config', '@plasmohq/parcel-resolver-post', 'tsup']) {
+for (const name of ['plasmo', '@plasmohq/parcel-config']) {
   consumer = createRequire(consumer.resolve(name))
 }
-const { rollup } = consumer('rollup')
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'ultraforce-rollup-')))
-after(() => rmSync(root, { recursive: true, force: true }))
+const resolverEntry = consumer.resolve('@plasmohq/parcel-resolver-post')
+const lock = parse(readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8'))
+const tsupEntry = resolveResolverTsup(lock, resolverEntry)
+if (tsupEntry) consumer = createRequire(tsupEntry)
+const { rollup } = tsupEntry ? consumer('rollup') : {}
+const root = tsupEntry ? realpathSync(mkdtempSync(join(tmpdir(), 'ultraforce-rollup-'))) : undefined
+after(() => {
+  if (root) rmSync(root, { recursive: true, force: true })
+})
 let sequence = 0
+const testWithTsup = (name, callback) =>
+  test(name, { skip: tsupEntry ? false : 'The resolver tsup edge is absent / 解析器的 tsup 依赖边不存在' }, callback)
+
+// These checks apply only while the original tsup consumer exists. / 这些检查仅在原始 tsup 消费者存在时适用。
+test('resolver snapshot has no tsup dependency / 解析器快照不含 tsup 依赖', { skip: !!tsupEntry }, () => {
+  assert.equal(lock.overrides['@plasmohq/parcel-resolver-post@0.4.5>tsup'], '-')
+  assert.ok(resolverSnapshots(lock).length > 0)
+  assert.equal(resolverHasTsup(lock), false)
+})
 
 function fixture() {
   const directory = join(root, String(sequence++))
@@ -27,43 +44,46 @@ function fixture() {
 }
 
 for (const mode of ['entry', 'bundle-key', 'fileName', 'absolute']) {
-  test(`installed Rollup rejects escaping ${mode} and preserves the fixture sentinel / 已安装 Rollup 拒绝越界 ${mode} 并保留夹具哨兵`, async () => {
-    const { input, sentinel, output } = fixture()
-    const fileName = mode === 'absolute' ? sentinel : 'nested/../../sentinel.js'
-    const bundle = await rollup({
-      input,
-      plugins:
-        mode === 'entry'
-          ? []
-          : [
-              {
-                name: 'synthetic-output',
-                generateBundle(_options, files) {
-                  files[mode === 'fileName' ? 'safe.js' : fileName] = {
-                    type: 'asset',
-                    fileName,
-                    source: 'synthetic output'
+  testWithTsup(
+    `installed Rollup rejects escaping ${mode} and preserves the fixture sentinel / 已安装 Rollup 拒绝越界 ${mode} 并保留夹具哨兵`,
+    async () => {
+      const { input, sentinel, output } = fixture()
+      const fileName = mode === 'absolute' ? sentinel : 'nested/../../sentinel.js'
+      const bundle = await rollup({
+        input,
+        plugins:
+          mode === 'entry'
+            ? []
+            : [
+                {
+                  name: 'synthetic-output',
+                  generateBundle(_options, files) {
+                    files[mode === 'fileName' ? 'safe.js' : fileName] = {
+                      type: 'asset',
+                      fileName,
+                      source: 'synthetic output'
+                    }
                   }
                 }
-              }
-            ]
-    })
-    try {
-      const error = await bundle
-        .write({ dir: output, format: 'es', entryFileNames: mode === 'entry' ? fileName : '[name].js' })
-        .then(
-          () => null,
-          (error) => error
-        )
-      assert.equal(readFileSync(sentinel, 'utf8'), 'synthetic sentinel')
-      assert.equal(error?.code, 'FILE_NAME_OUTSIDE_OUTPUT_DIRECTORY')
-    } finally {
-      await bundle.close()
+              ]
+      })
+      try {
+        const error = await bundle
+          .write({ dir: output, format: 'es', entryFileNames: mode === 'entry' ? fileName : '[name].js' })
+          .then(
+            () => null,
+            (error) => error
+          )
+        assert.equal(readFileSync(sentinel, 'utf8'), 'synthetic sentinel')
+        assert.equal(error?.code, 'FILE_NAME_OUTSIDE_OUTPUT_DIRECTORY')
+      } finally {
+        await bundle.close()
+      }
     }
-  })
+  )
 }
 
-test('named input traversal is rejected inside the owned fixture / 在自有夹具内拒绝命名入口越界', async () => {
+testWithTsup('named input traversal is rejected inside the owned fixture / 在自有夹具内拒绝命名入口越界', async () => {
   const { input, sentinel, output } = fixture()
   const bundle = await rollup({ input: { 'nested/../../sentinel': input } })
   try {
@@ -79,7 +99,7 @@ test('named input traversal is rejected inside the owned fixture / 在自有夹�
 })
 
 for (const fileName of ['nested/asset.txt', './asset.txt', '..prefix.txt', 'nested/deeper/../asset.txt']) {
-  test(`valid normalized output remains writable: ${fileName} / 有效规范化产物仍可写入`, async () => {
+  testWithTsup(`valid normalized output remains writable: ${fileName} / 有效规范化产物仍可写入`, async () => {
     const { input, sentinel, output } = fixture()
     const bundle = await rollup({
       input,
@@ -103,26 +123,28 @@ for (const fileName of ['nested/asset.txt', './asset.txt', '..prefix.txt', 'nest
   })
 }
 
-test('actual tsup uses Rollup for treeshaking and declaration bundling / 实际 tsup 使用 Rollup 进行摇树及声明打包', () => {
-  const { directory } = fixture()
-  mkdirSync(join(directory, 'node_modules'))
-  symlinkSync(
-    dirname(consumer.resolve('typescript/package.json')),
-    join(directory, 'node_modules', 'typescript'),
-    'junction'
-  )
-  writeFileSync(join(directory, 'package.json'), '{"name":"synthetic","version":"1.0.0","type":"module"}')
-  writeFileSync(join(directory, 'tsconfig.json'), '{"compilerOptions":{"strict":true,"types":[]}}')
-  writeFileSync(join(directory, 'types.ts'), 'export interface Shape { answer: number }')
-  writeFileSync(
-    join(directory, 'index.ts'),
-    "import type { Shape } from './types'; export const value: Shape = { answer: 42 };"
-  )
-  const result = spawnSync(
-    process.execPath,
-    [
-      '-e',
-      `
+testWithTsup(
+  'actual tsup uses Rollup for treeshaking and declaration bundling / 实际 tsup 使用 Rollup 进行摇树及声明打包',
+  () => {
+    const { directory } = fixture()
+    mkdirSync(join(directory, 'node_modules'))
+    symlinkSync(
+      dirname(consumer.resolve('typescript/package.json')),
+      join(directory, 'node_modules', 'typescript'),
+      'junction'
+    )
+    writeFileSync(join(directory, 'package.json'), '{"name":"synthetic","version":"1.0.0","type":"module"}')
+    writeFileSync(join(directory, 'tsconfig.json'), '{"compilerOptions":{"strict":true,"types":[]}}')
+    writeFileSync(join(directory, 'types.ts'), 'export interface Shape { answer: number }')
+    writeFileSync(
+      join(directory, 'index.ts'),
+      "import type { Shape } from './types'; export const value: Shape = { answer: 42 };"
+    )
+    const result = spawnSync(
+      process.execPath,
+      [
+        '-e',
+        `
 const assert = require('node:assert/strict')
 const { createRequire } = require('node:module')
 const consumer = createRequire(process.argv[1])
@@ -130,33 +152,34 @@ const rollup = consumer('rollup')
 const original = rollup.rollup
 let calls = 0
 rollup.rollup = (...args) => { calls++; return original(...args) }
-consumer('tsup').build({ entry: ['index.ts'], format: ['esm', 'cjs'], dts: true, treeshake: true,
+consumer(process.argv[1]).build({ entry: ['index.ts'], format: ['esm', 'cjs'], dts: true, treeshake: true,
   config: false, tsconfig: 'tsconfig.json', silent: true, outDir: 'dist' }).then(() => {
   assert.ok(calls >= 2, 'Rollup treeshaking must execute / 必须执行 Rollup 摇树')
 }).catch((error) => { console.error(error); process.exitCode = 1 })
 `,
-      consumer.resolve('tsup')
-    ],
-    {
-      cwd: directory,
-      encoding: 'utf8',
-      timeout: 30000,
-      maxBuffer: 65536,
-      env: { ...process.env, NODE_ENV: 'production' }
+        tsupEntry
+      ],
+      {
+        cwd: directory,
+        encoding: 'utf8',
+        timeout: 30000,
+        maxBuffer: 65536,
+        env: { ...process.env, NODE_ENV: 'production' }
+      }
+    )
+    assert.ifError(result.error)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.signal, null)
+    for (const extension of ['js', 'cjs']) {
+      const code = readFileSync(join(directory, 'dist', `index.${extension}`), 'utf8')
+      assert.match(code, /answer: 42/)
     }
-  )
-  assert.ifError(result.error)
-  assert.equal(result.status, 0, result.stderr)
-  assert.equal(result.signal, null)
-  for (const extension of ['js', 'cjs']) {
-    const code = readFileSync(join(directory, 'dist', `index.${extension}`), 'utf8')
-    assert.match(code, /answer: 42/)
+    for (const extension of ['d.ts', 'd.cts']) {
+      const declaration = readFileSync(join(directory, 'dist', `index.${extension}`), 'utf8')
+      assert.match(declaration, /interface Shape/)
+      assert.match(declaration, /answer: number/)
+      assert.doesNotMatch(declaration, /from ['"]\.\/types/)
+      assert.match(declaration, /export \{ value \}/)
+    }
   }
-  for (const extension of ['d.ts', 'd.cts']) {
-    const declaration = readFileSync(join(directory, 'dist', `index.${extension}`), 'utf8')
-    assert.match(declaration, /interface Shape/)
-    assert.match(declaration, /answer: number/)
-    assert.doesNotMatch(declaration, /from ['"]\.\/types/)
-    assert.match(declaration, /export \{ value \}/)
-  }
-})
+)
