@@ -4,6 +4,7 @@ import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermission
 import { getSfHost, getSession } from '~lib/auth'
 import { claimExtensionScript, isExtensionContextValid } from '~lib/extension-context'
 import { scheduleExtensionUpdatedNotice } from '~lib/extension-updated-notice'
+import { isToggleShortcut } from '~lib/keyboard-interceptor'
 import { logger } from '~lib/logger'
 import { useSettingsStore } from '~stores/settings-store'
 
@@ -92,11 +93,7 @@ class UltraForceContentScript {
   }
 
   private matchesShortcut(event: KeyboardEvent): boolean {
-    const shortcutKey = useSettingsStore.getState().shortcutKey.toLowerCase()
-    const key = event.key.toLowerCase()
-    if (shortcutKey === 'escape') return key === 'escape'
-    if (shortcutKey.startsWith('alt+')) return event.altKey && key === shortcutKey.slice(4)
-    return (event.ctrlKey || event.metaKey) && key === shortcutKey
+    return isToggleShortcut(event, useSettingsStore.getState().shortcutKey)
   }
 
   private readonly handleOpeningShortcut = (event: KeyboardEvent): void => {

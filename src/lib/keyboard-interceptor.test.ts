@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createKeyboardInterceptor } from './keyboard-interceptor'
+import { createKeyboardInterceptor, isToggleShortcut } from './keyboard-interceptor'
 
 function createMockInput(value = '', selectionStart = 0, selectionEnd = 0): HTMLInputElement {
   const input = document.createElement('input')
@@ -21,6 +21,21 @@ function createKeyEvent(type: string, key: string, opts: Partial<KeyboardEventIn
   vi.spyOn(event, 'preventDefault')
   return event
 }
+
+describe('isToggleShortcut / 切换快捷键匹配', () => {
+  it.each([
+    ['B', { ctrlKey: true }, 'b', true],
+    ['b', { metaKey: true }, 'B', true],
+    ['b', {}, 'b', false],
+    ['i', { altKey: true }, 'AlT+I', true],
+    ['I', { altKey: true }, 'alt+i', true],
+    ['i', { ctrlKey: true }, 'alt+i', false],
+    ['Escape', {}, 'EsCaPe', true],
+    ['e', {}, 'escape', false]
+  ])('matches %s with %j and shortcut %s / 匹配按键、修饰键和快捷键', (key, modifiers, shortcut, matches) => {
+    expect(isToggleShortcut(createKeyEvent('keydown', key, modifiers), shortcut)).toBe(matches)
+  })
+})
 
 describe('createKeyboardInterceptor', () => {
   let input: HTMLInputElement

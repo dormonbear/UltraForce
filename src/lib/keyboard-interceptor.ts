@@ -95,11 +95,15 @@ function notifyValueChange(input: HTMLInputElement, value: string): void {
   )
 }
 
-export function isToggleShortcut(event: KeyboardEvent, shortcut: string): boolean {
+export function isToggleShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey'>,
+  shortcut: string
+): boolean {
   const key = event.key.toLowerCase()
-  return shortcut.startsWith('alt+')
-    ? event.altKey && key === shortcut.slice(4)
-    : (event.ctrlKey || event.metaKey) && key === shortcut.toLowerCase()
+  const normalized = shortcut.toLowerCase()
+  if (normalized === 'escape') return key === 'escape'
+  if (normalized.startsWith('alt+')) return event.altKey && key === normalized.slice(4)
+  return (event.ctrlKey || event.metaKey) && key === normalized
 }
 
 export interface KeyboardInterceptorOptions {
