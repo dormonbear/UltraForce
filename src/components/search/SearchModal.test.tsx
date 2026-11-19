@@ -272,32 +272,22 @@ describe('SearchModal', () => {
     })
 
     it('traps Tab with text and no highlighted result / 输入内容且无选中结果时将 Tab 焦点留在对话框内', () => {
+      reportPersistError(
+        'favorites',
+        'Pin could not be saved to browser storage (browser storage may be full). It will be gone after reload.'
+      )
       renderModal()
       const input = screen.getByRole('combobox')
-      const modal = screen.getByRole('dialog')
+      const dismiss = screen.getByRole('button', { name: 'Dismiss storage warning' })
       input.focus()
       fireEvent.change(input, { target: { value: 'acc' } })
 
       fireEvent.keyDown(input, { key: 'Tab' })
-      expect(modal.contains(document.activeElement)).toBe(true)
-      expect(document.activeElement).not.toBe(input)
-
-      // Tabbing cycles through the modal's focusable controls and wraps back to the input
-      let wrappedToInput = false
-      for (let i = 0; i < 8; i++) {
-        fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' })
-        expect(modal.contains(document.activeElement)).toBe(true)
-        if (document.activeElement === input) {
-          wrappedToInput = true
-          break
-        }
-      }
-      expect(wrappedToInput).toBe(true)
-
-      // Shift+Tab from the input wraps to the last focusable control
+      expect(dismiss).toHaveFocus()
+      fireEvent.keyDown(dismiss, { key: 'Tab' })
+      expect(input).toHaveFocus()
       fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })
-      expect(modal.contains(document.activeElement)).toBe(true)
-      expect(document.activeElement).not.toBe(input)
+      expect(dismiss).toHaveFocus()
     })
 
     it('traps Tab focus inside the settings panel', async () => {
@@ -476,14 +466,73 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('results mode / 结果模式', () => {
+    it('morphs when visible search text changes / 根据可见搜索文本切换布局', () => {
+      renderModal()
+      const dialog = screen.getByRole('dialog')
+      const input = screen.getByRole('combobox')
+      expect(dialog).toHaveAttribute('data-ui-mode', 'idle')
+      fireEvent.change(input, { target: { value: 'acc' } })
+      expect(dialog).toHaveAttribute('data-ui-mode', 'results')
+      fireEvent.change(input, { target: { value: '' } })
+      expect(dialog).toHaveAttribute('data-ui-mode', 'idle')
+      fireEvent.change(input, { target: { value: ':f ' } })
+      expect(input).toHaveValue('')
+      expect(dialog).toHaveAttribute('data-ui-mode', 'idle')
+      fireEvent.keyDown(input, { key: 'Tab' })
+      fireEvent.change(input, { target: { value: 'flo' } })
+      expect(screen.getByRole('heading', { name: 'Choose a scope' })).toBeVisible()
+      expect(dialog).toHaveAttribute('data-ui-mode', 'idle')
+    })
+
+    it('excludes round buttons from accessibility and focus while typing / 输入时从无障碍树和焦点循环中移除圆形按钮', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      const labels = ['History', 'Favorites', 'Settings']
+      const buttons = labels.map((name) => screen.getByRole('button', { name }))
+      for (const button of buttons) expect(button.tabIndex).toBe(0)
+
+      fireEvent.change(input, { target: { value: 'acc' } })
+      for (const name of labels) expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+      fireEvent.keyDown(input, { key: 'Tab' })
+      expect(input).toHaveFocus()
+
+      fireEvent.change(input, { target: { value: '' } })
+      buttons[1].focus()
+      fireEvent.keyDown(buttons[1], { key: 'Tab', shiftKey: true })
+      expect(buttons[0]).toHaveFocus()
+      for (const name of labels) expect(screen.getByRole('button', { name })).toBeVisible()
+    })
+
+    it.each([
+      ['en-US', 'Open', 'Autocomplete'],
+      ['zh-CN', '打开', '自动补全']
+    ])('localizes the results action pill in %s / 本地化结果操作提示', (locale, open, autocomplete) => {
+      const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+      try {
+        const { container } = renderModal()
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: 'acc' } })
+        const pill = container.querySelector<HTMLElement>('.search-footer-pill')!
+        const openHint = within(pill).getByText(open).closest('.shortcut-item')
+        expect(openHint?.querySelector('kbd')).toHaveTextContent('Enter')
+        const autocompleteHint = within(pill).getByText(autocomplete).closest('.shortcut-item')
+        expect(autocompleteHint?.querySelector('kbd')).toHaveTextContent('Tab')
+      } finally {
+        languages.mockRestore()
+      }
+    })
+  })
+
   describe('search bar actions / 搜索栏操作', () => {
     it('clears the query and toggles the active section / 清空查询并切换当前分区', async () => {
       renderModal()
       const input = screen.getByRole('combobox')
-      await userEvent.type(input, 'account')
+      await userEvent.type(input, ':f ')
+      expect(input).toHaveAccessibleDescription('Scope: Flows')
       const history = screen.getByRole('button', { name: 'History', pressed: false })
 
       await userEvent.click(history)
+      expect(input).not.toHaveAccessibleDescription()
       expect(input).toHaveValue('')
       expect(input).toHaveFocus()
       expect(history).toHaveAttribute('aria-pressed', 'true')

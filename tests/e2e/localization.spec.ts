@@ -81,6 +81,9 @@ for (const locale of ['en-US', 'zh-CN']) {
       await input.pressSequentially(':fixture acme')
       await expect(dialog.getByTitle('Objects & Fields', { exact: true })).toBeVisible()
       await expect(input).toHaveValue('acme')
+      await input.selectText()
+      await input.press('Backspace')
+      await expect(input).toHaveValue('')
       await page.getByRole('button', { name: chinese ? '设置' : 'Settings', exact: true }).click()
       await expect(page.getByRole('heading', { name: chinese ? '设置' : 'Settings', exact: true })).toBeVisible()
       await expect(

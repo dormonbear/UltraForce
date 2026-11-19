@@ -127,6 +127,7 @@ test('built extension removes legacy diagnostics and never records request activ
     await expect(page.locator('[data-ultraforce-result-item] .result-name')).toHaveText(['Synthetic privacy result'])
     await input.fill('fail')
     await expect(page.getByText(/PRIVATE-RESPONSE/)).toBeVisible()
+    await input.fill('')
     await page.locator('[data-ultraforce-settings-button]').click()
     await expect(page.getByText('API Statistics', { exact: true })).toHaveCount(0)
     expect(await worker.evaluate((keys) => chrome.storage.local.get(keys), legacyKeys)).toEqual({})

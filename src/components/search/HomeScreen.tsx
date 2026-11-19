@@ -7,29 +7,10 @@ import { useHistoryStore, sortByLastVisited } from '~stores/history-store'
 import { useFavoritesStore, type FavoriteItem } from '~stores/favorites-store'
 import type { HistoryItem } from '~stores/history-store'
 import type { HomeSection } from './SearchBarActions'
+import TypeBadge from './TypeBadge'
 
 const MAX_RECENT_ITEMS = 8
 const MAX_FAVORITE_ITEMS = 10
-
-const TYPE_ICONS: Record<string, string> = {
-  ApexClass: '</>',
-  ApexTrigger: '</>',
-  CustomObject: 'O',
-  CustomField: 'F',
-  Flow: 'FL',
-  User: 'U',
-  PermissionSet: 'PS',
-  Profile: 'PR',
-  LightningComponentBundle: 'LW',
-  AuraDefinitionBundle: 'AU',
-  ApexPage: 'VF',
-  ApexComponent: 'VC',
-  CustomLabel: 'CL',
-  Record: 'R',
-  SetupShortcut: 'S',
-  CustomMetadataType: 'CM',
-  CustomSetting: 'CS'
-}
 
 interface HomeScreenProps {
   /** Navigate to a URL directly. */
@@ -41,11 +22,6 @@ interface HomeScreenProps {
   /** Selected types hint for the search tips. */
   selectedTypes?: string[]
   section?: HomeSection
-}
-
-/** Get a short type icon/label for the item badge. */
-function getTypeIcon(type: string): string {
-  return TYPE_ICONS[type] || type.charAt(0).toUpperCase()
 }
 
 /** Format relative time like "2m ago", "3h ago", "5d ago". */
@@ -167,9 +143,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 tabIndex={0}
                 title={`${item.name} (${item.type})`}
               >
-                <span className="home-item-badge" data-type={item.type}>
-                  {getTypeIcon(item.type)}
-                </span>
+                <TypeBadge type={item.type} />
                 <span className="home-item-name">
                   {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
                     ? t(item.name)
@@ -222,9 +196,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   count: item.visitCount
                 })}
               >
-                <span className="home-item-badge" data-type={item.type}>
-                  {getTypeIcon(item.type)}
-                </span>
+                <TypeBadge type={item.type} />
                 <span className="home-item-name">
                   {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
                     ? t(item.name)

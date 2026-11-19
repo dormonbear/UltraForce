@@ -2,6 +2,8 @@ import { t } from '~lib/i18n'
 import React, { useEffect, useRef, useState } from 'react'
 import type { SearchResult } from '~types'
 import type { FavoriteItem } from '~stores/favorites-store'
+import TypeBadge from './TypeBadge'
+import { getMetadataTypeLabel } from './metadata-type-label'
 
 export type ObjectAction = 'list' | 'fields' | 'layouts' | 'details' | 'preview' | 'recordtypes' | 'validationrules'
 
@@ -83,6 +85,9 @@ const ResultItem: React.FC<ResultItemProps> = ({
 
   const lastModifiedBy = result.metadata?.LastModifiedBy?.Name
   const lastModifiedDate = result.metadata?.LastModifiedDate
+  const showModified = isApex && lastModifiedDate
+  const hasRightContent =
+    onToggleFavorite || showModified || isApexPage || result.namespace || isCustomField || isCustomObject
 
   return (
     <div
@@ -95,6 +100,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
       aria-selected={isSelected}
       onClick={onClick}
     >
+      <TypeBadge type={result.type} />
       <div className="result-info">
         <div className="result-name">
           {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(result.type) ? t(result.name) : result.name}
@@ -109,6 +115,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
       </div>
 
       <div className="result-actions">
+        {!hasRightContent && <span className="result-type-label">{getMetadataTypeLabel(result.type)}</span>}
         {onToggleFavorite && (
           <div className="favorite-action">
             <ActionButton
@@ -139,10 +146,10 @@ const ResultItem: React.FC<ResultItemProps> = ({
             />
           </div>
         )}
-        {isApex && lastModifiedDate && (
+        {showModified && (
           <div className="result-meta">
             {lastModifiedBy && <span className="meta-user">{lastModifiedBy}</span>}
-            <span className="meta-date">{formatDate(lastModifiedDate)}</span>
+            <span className="meta-date">{formatDate(showModified)}</span>
           </div>
         )}
 
@@ -256,6 +263,11 @@ const arePropsEqual = (prev: ResultItemProps, next: ResultItemProps): boolean =>
   prev.isSelected === next.isSelected &&
   prev.isFavorite === next.isFavorite &&
   prev.result.name === next.result.name &&
-  prev.result.description === next.result.description
+  prev.result.description === next.result.description &&
+  prev.result.type === next.result.type &&
+  prev.result.namespace === next.result.namespace &&
+  prev.result.metadata?.LastModifiedBy?.Name === next.result.metadata?.LastModifiedBy?.Name &&
+  prev.result.metadata?.LastModifiedDate === next.result.metadata?.LastModifiedDate &&
+  Boolean(prev.onToggleFavorite) === Boolean(next.onToggleFavorite)
 
 export default React.memo(ResultItem, arePropsEqual)

@@ -106,11 +106,13 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
 export function SearchFooter({
   liveStatusText = '',
   canOpenScopes = false,
-  pickerOpen = false
+  pickerOpen = false,
+  resultsMode = false
 }: {
   liveStatusText?: string
   canOpenScopes?: boolean
   pickerOpen?: boolean
+  resultsMode?: boolean
 }) {
   return (
     <>
@@ -120,24 +122,35 @@ export function SearchFooter({
         </div>
       )}
 
-      <div className="search-footer">
-        <div className="shortcuts">
+      {resultsMode ? (
+        <div className="search-footer-pill">
           <div className="shortcut-item">
-            <kbd>{t('Up/Down')}</kbd> {t('Navigate')}
-          </div>
-          {!pickerOpen && (
-            <div className="shortcut-item">
-              <kbd>Tab</kbd> {t(canOpenScopes ? 'Scopes' : 'Autocomplete')}
-            </div>
-          )}
-          <div className="shortcut-item">
-            <kbd>Enter</kbd> {t(pickerOpen ? 'Choose' : 'Open')}
+            {t('Open')} <kbd>Enter</kbd>
           </div>
           <div className="shortcut-item">
-            <kbd>Esc</kbd> {t(pickerOpen ? 'Back' : 'Close')}
+            <kbd>Tab</kbd> {t('Autocomplete')}
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="search-footer">
+          <div className="shortcuts">
+            <div className="shortcut-item">
+              <kbd>{t('Up/Down')}</kbd> {t('Navigate')}
+            </div>
+            {!pickerOpen && (
+              <div className="shortcut-item">
+                <kbd>Tab</kbd> {t(canOpenScopes ? 'Scopes' : 'Autocomplete')}
+              </div>
+            )}
+            <div className="shortcut-item">
+              <kbd>Enter</kbd> {t(pickerOpen ? 'Choose' : 'Open')}
+            </div>
+            <div className="shortcut-item">
+              <kbd>Esc</kbd> {t(pickerOpen ? 'Back' : 'Close')}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

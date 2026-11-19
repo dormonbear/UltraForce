@@ -49,12 +49,12 @@ interface SearchResultsProps {
 }
 
 const METADATA_LABELS: Record<string, string> = {
-  ApexClass: 'Apex Classes',
-  ApexTrigger: 'Apex Triggers',
-  CustomObject: 'Custom Objects',
-  CustomField: 'Custom Fields',
+  ApexClass: 'Apex classes',
+  ApexTrigger: 'Apex triggers',
+  CustomObject: 'Custom objects',
+  CustomField: 'Custom fields',
   Flow: 'Flows',
-  PermissionSet: 'Permission Sets',
+  PermissionSet: 'Permission sets',
   Profile: 'Profiles'
 }
 

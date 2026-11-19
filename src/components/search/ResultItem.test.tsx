@@ -33,6 +33,17 @@ describe('ResultItem', () => {
     expect(screen.getByText('TestClass')).toBeTruthy()
   })
 
+  it('shows the shared type badge and falls back to a type label / 显示共用类型徽标并在右侧空闲时显示类型名称', () => {
+    const { rerender } = render(<ResultItem {...defaultProps} />)
+    const row = screen.getByRole('option')
+    expect(row.querySelector('.home-item-badge')).toHaveAttribute('data-type', 'ApexClass')
+    expect(row.querySelector('.home-item-badge')).toHaveTextContent('</>')
+    expect(screen.getByText('Apex Classes')).toBeVisible()
+    rerender(<ResultItem {...defaultProps} result={makeResult({ namespace: 'fixture' })} />)
+    expect(screen.getByText('fixture')).toBeVisible()
+    expect(screen.queryByText('Apex Classes')).not.toBeInTheDocument()
+  })
+
   it('should render description when provided', () => {
     render(<ResultItem {...defaultProps} result={makeResult({ description: 'A test class' })} />)
     expect(screen.getByText('A test class')).toBeTruthy()

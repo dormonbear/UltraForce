@@ -5,6 +5,7 @@ export type HomeSection = 'history' | 'favorites'
 
 interface SearchBarActionsProps {
   activeSection: HomeSection | null
+  hidden?: boolean
   onToggleSection: (section: HomeSection) => void
   onSettings: () => void
 }
@@ -14,10 +15,17 @@ const sectionActions = [
   { section: 'favorites', label: 'Favorites', icon: 'star' }
 ] as const
 
-export default function SearchBarActions({ activeSection, onToggleSection, onSettings }: SearchBarActionsProps) {
+export default function SearchBarActions({
+  activeSection,
+  hidden = false,
+  onToggleSection,
+  onSettings
+}: SearchBarActionsProps) {
   return (
     <div
       className="search-bar-actions"
+      aria-hidden={hidden}
+      inert={hidden}
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.stopPropagation()
       }}

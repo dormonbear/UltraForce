@@ -55,7 +55,7 @@ describe('SearchResults', () => {
     expect(screen.getByText('Alpha')).toBeTruthy()
     expect(screen.getByText('Bravo')).toBeTruthy()
     expect(screen.getByText('Charlie')).toBeTruthy()
-    expect(screen.getByText('Apex Classes')).toBeTruthy()
+    expect(screen.getByText('Apex classes', { selector: '.group-title' })).toBeTruthy()
   })
 
   it('exposes the results container as a listbox with options', () => {
