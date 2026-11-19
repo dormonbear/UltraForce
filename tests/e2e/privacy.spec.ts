@@ -125,7 +125,7 @@ test('built extension removes legacy diagnostics and never records request activ
     }).toPass({ timeout: 10000 })
     await input.fill(':private success')
     await expect(page.locator('[data-ultraforce-result-item] .result-name')).toHaveText(['Synthetic privacy result'])
-    await input.fill(':private fail')
+    await input.fill('fail')
     await expect(page.getByText(/PRIVATE-RESPONSE/)).toBeVisible()
     await page.locator('[data-ultraforce-settings-button]').click()
     await expect(page.getByText('API Statistics', { exact: true })).toHaveCount(0)

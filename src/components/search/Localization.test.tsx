@@ -6,7 +6,7 @@ import EmptyState from './EmptyState'
 import CommandHints from './CommandHints'
 import ResultItem from './ResultItem'
 import SettingsPanel from './SettingsPanel'
-import { getMatchingCommands } from '~lib/command-parser'
+import { BUILTIN_COMMANDS, getMatchingCommands } from '~lib/command-parser'
 
 vi.mock('~lib/salesforce-api', () => ({
   getUnsupportedTypes: vi.fn().mockResolvedValue([]),
@@ -27,7 +27,15 @@ describe('Chinese UI and content preservation / 中文界面及内容保留', ()
   })
 
   it('localizes search accessibility and query interpolation / 本地化搜索无障碍标签及查询插值', () => {
-    render(<SearchInput query="" onQueryChange={vi.fn()} onKeyDown={vi.fn()} sfHost="acme.my.salesforce.com" />)
+    render(
+      <SearchInput
+        query=""
+        commands={BUILTIN_COMMANDS}
+        onQueryChange={vi.fn()}
+        onKeyDown={vi.fn()}
+        sfHost="acme.my.salesforce.com"
+      />
+    )
     expect(screen.getByRole('combobox', { name: '搜索 Salesforce 元数据' })).toHaveAttribute(
       'placeholder',
       '搜索 acme 元数据…'

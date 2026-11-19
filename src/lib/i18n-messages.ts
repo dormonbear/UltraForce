@@ -27,6 +27,8 @@ export const chineseMessages: Readonly<Record<string, string>> = {
   Record: '记录',
   'Click here to focus, then type to search': '点击此处获取焦点，然后输入搜索内容',
   'Search {org} metadata...': '搜索 {org} 元数据…',
+  'Search {scope}...': '在 {scope} 中搜索...',
+  'Scope: {scope}': '范围：{scope}',
   'Search Salesforce metadata...': '搜索 Salesforce 元数据…',
   'Search Salesforce metadata': '搜索 Salesforce 元数据',
   PROD: '生产',

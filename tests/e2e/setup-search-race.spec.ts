@@ -86,6 +86,8 @@ test('newer Setup search survives an older custom response', async ({ extensionP
     const input = page.locator('[data-ultraforce-input]')
     await input.fill(':race old')
     await entered.promise
+    await input.fill('')
+    await input.press('Backspace')
     await input.fill(':g debug')
     const names = page.locator('[data-ultraforce-result-item] .result-name')
     await expect(names).toHaveText(['Debug Logs'])
@@ -99,7 +101,7 @@ test('newer Setup search survives an older custom response', async ({ extensionP
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     )
     await expect(names).toHaveText(['Debug Logs'])
-    await expect(input).toHaveValue(':g debug')
+    await expect(input).toHaveValue('debug')
   } finally {
     response.release()
   }
@@ -126,6 +128,8 @@ test('newer custom search survives an older Setup layout response', async ({ ext
     const input = page.locator('[data-ultraforce-input]')
     await input.fill(':g debug')
     await entered.promise
+    await input.fill('')
+    await input.press('Backspace')
     await input.fill(':race new')
     const names = page.locator('[data-ultraforce-result-item] .result-name')
     await expect(names).toHaveText(['Newest race result'])
@@ -137,7 +141,7 @@ test('newer custom search survives an older Setup layout response', async ({ ext
       () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
     )
     await expect(names).toHaveText(['Newest race result'])
-    await expect(input).toHaveValue(':race new')
+    await expect(input).toHaveValue('new')
   } finally {
     response.release()
   }

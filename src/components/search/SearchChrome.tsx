@@ -30,6 +30,12 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
       )
+    case 'flow':
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <path d="M13 2 4 14h7l-1 8 10-12h-7l1-8z" />
+        </svg>
+      )
     case 'sharing':
       return (
         <svg {...ACTION_ICON_PROPS}>

@@ -136,6 +136,35 @@
   flex-shrink: 0;
 }
 
+.command-scope-chip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(220px, 50%);
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(150, 150, 150, 0.15);
+  color: rgba(200, 200, 200, 0.9);
+  cursor: text;
+}
+
+.command-scope-chip svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.command-scope-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search-input {
   flex: 1;
   min-width: 0;
@@ -940,6 +969,17 @@ kbd {
     }
   }
 
+  .command-scope-chip {
+    animation: command-scope-enter 140ms var(--search-ease-out) backwards;
+  }
+
+  @keyframes command-scope-enter {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+  }
+
   .command-hints,
   .command-hint-tag {
     transition:
@@ -1694,34 +1734,35 @@ kbd {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+.home-item-badge,
+.command-scope-chip[data-type] {
   background: rgba(100, 140, 255, 0.15);
   color: rgba(140, 170, 255, 0.9);
 }
 
-.home-item-badge[data-type='ApexClass'],
-.home-item-badge[data-type='ApexTrigger'] {
+:is(.home-item-badge, .command-scope-chip):is([data-type='ApexClass'], [data-type='ApexTrigger']) {
   background: rgba(255, 150, 50, 0.15);
   color: rgba(255, 180, 100, 0.9);
 }
 
-.home-item-badge[data-type='CustomObject'] {
+:is(.home-item-badge, .command-scope-chip)[data-type='CustomObject'] {
   background: rgba(100, 200, 150, 0.15);
   color: rgba(130, 220, 170, 0.9);
 }
 
-.home-item-badge[data-type='Flow'] {
+:is(.home-item-badge, .command-scope-chip)[data-type='Flow'] {
   background: rgba(180, 130, 255, 0.15);
   color: rgba(200, 160, 255, 0.9);
 }
 
-.home-item-badge[data-type='User'],
-.home-item-badge[data-type='Profile'],
-.home-item-badge[data-type='PermissionSet'] {
+:is(.home-item-badge, .command-scope-chip):is([data-type='User'], [data-type='Profile'], [data-type='PermissionSet']) {
   background: rgba(255, 200, 50, 0.15);
   color: rgba(255, 220, 100, 0.9);
 }
 
-.home-item-badge[data-type='SetupShortcut'] {
+:is(.home-item-badge, .command-scope-chip)[data-type='SetupShortcut'] {
   background: rgba(150, 150, 150, 0.15);
   color: rgba(200, 200, 200, 0.9);
 }

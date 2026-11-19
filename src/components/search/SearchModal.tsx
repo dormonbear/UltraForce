@@ -642,6 +642,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
               <SearchInput
                 ref={inputRef}
                 query={query}
+                commands={allCommands}
                 onQueryChange={handleQueryChange}
                 onKeyDown={(e) => {
                   if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {

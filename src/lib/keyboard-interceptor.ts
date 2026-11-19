@@ -197,23 +197,28 @@ export function createKeyboardInterceptor(
       input.focus()
     }
 
+    const commandPrefix = input.dataset.commandPrefix ?? ''
     if (e.key === 'Backspace') {
+      if (commandPrefix && !input.value && input.selectionStart === 0) {
+        notifyValueChange(input, '')
+        return
+      }
       const newValue = deleteChar(input, 'backward')
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:backspace', { value: newValue })
       return
     }
 
     if (e.key === 'Delete') {
       const newValue = deleteChar(input, 'forward')
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:delete', { value: newValue })
       return
     }
 
     if (isPrintable(e.key) && !hasCtrlOrCmd) {
       const newValue = insertChar(input, e.key)
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:insert', { key: e.key, value: newValue })
     }
   }

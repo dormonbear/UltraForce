@@ -22,8 +22,10 @@ export class UltraForcePage {
   }
 
   async clearInput() {
+    const input = this.page.locator('[data-ultraforce-input]')
     await this.page.keyboard.press('Meta+a')
     await this.page.keyboard.press('Backspace')
+    if (await input.getAttribute('data-command-prefix')) await input.press('Backspace')
     await this.page.waitForTimeout(200)
   }
 
