@@ -93,10 +93,13 @@ function getSearchPlaceholder(scope: string | null, displayName: string | null, 
 function getScopeDetails(chip: SearchCommand | null) {
   if (!chip) return null
   const type = chip.isBuiltin ? (chip.types[0] ?? 'SetupShortcut') : undefined
+  const title = chip.isBuiltin ? t(chip.description) : chip.description
   return {
     type,
     prefix: `:${chip.key} `,
-    label: chip.isBuiltin ? t(chip.description) : chip.description,
+    title,
+    // Drop parenthetical details to keep the chip compact. / 去掉括号说明以保持标签紧凑。
+    label: title.replace(/\s*[(（].*$/, '') || title,
     icon: (type && SCOPE_ICONS[type]) || 'type'
   }
 }
@@ -174,7 +177,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
               htmlFor={inputId}
               aria-hidden="false"
               data-type={scope.type}
-              title={scope.label}
+              title={scope.title}
             >
               <ActionIcon icon={scope.icon} />
               <span className="command-scope-text">{scope.label}</span>

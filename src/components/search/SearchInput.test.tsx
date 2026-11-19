@@ -37,6 +37,18 @@ describe('SearchInput', () => {
       expect(onQueryChange).toHaveBeenCalledWith(':f create caseX')
     })
 
+    it.each([
+      ['en-US', 'Custom Codes', 'Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)'],
+      ['zh-CN', '自定义代码', '自定义代码（Apex／触发器／Visualforce／LWC／Aura）']
+    ])('shortens long scope labels in %s / 缩短较长的范围标签', (locale, label, title) => {
+      vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+      renderInput({ query: ':c ' })
+      expect(screen.getByTitle(title)).toHaveTextContent(label)
+      expect(screen.getByTitle(title)).not.toHaveTextContent('Apex')
+      expect(screen.getByRole('combobox').getAttribute('placeholder')).toContain(label)
+      expect(screen.getByRole('combobox').getAttribute('placeholder')).not.toContain('Apex')
+    })
+
     it.each([':f', ':zz foo'])('keeps %j in the input / 在输入框中保留 %j', (query) => {
       renderInput({ query })
       const input = screen.getByRole('combobox')
