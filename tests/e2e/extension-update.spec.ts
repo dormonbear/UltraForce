@@ -70,6 +70,14 @@ test('search reattaches after two extension reloads / 扩展重载两次后搜�
       await page.keyboard.press('Escape')
       await expect(dialog).toBeHidden()
     }
+
+    await extensionCard.locator('#enableToggle').click()
+    await page.bringToFront()
+    await page.keyboard.press(shortcut)
+    await expect(notice).toBeVisible()
+    await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
+    await expect(notice).toHaveCount(0)
+    await expect(page.locator('body')).toHaveAttribute('data-original-document', '')
   } finally {
     await context.close()
     rmSync(profile, { recursive: true, force: true })

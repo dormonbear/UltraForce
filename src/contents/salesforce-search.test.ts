@@ -179,27 +179,36 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
   })
 
   it.each([
-    ['en-US', 'UltraForce was updated', 'Refresh this page to keep using it.', 'Refresh'],
-    ['zh-CN', 'UltraForce 已更新', '刷新此页面即可继续使用。', '刷新']
-  ])('offers a localized page refresh in %s / 显示本地化刷新提示', async (locale, title, detail, action) => {
-    vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
-    const reload = vi.fn()
-    vi.stubGlobal('location', { reload })
-    await loadContentScript()
-    vi.useFakeTimers()
-    runtime.id = undefined
-    expect(shortcut().defaultPrevented).toBe(false)
+    ['en-US', 'UltraForce was updated', 'Refresh this page to keep using it.', 'Refresh', 'Dismiss'],
+    ['zh-CN', 'UltraForce 已更新', '刷新此页面即可继续使用。', '刷新', '关闭']
+  ])(
+    'offers localized refresh and dismiss actions in %s / 提供本地化刷新和关闭操作',
+    async (locale, title, detail, action, dismiss) => {
+      vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+      const reload = vi.fn()
+      vi.stubGlobal('location', { reload })
+      await loadContentScript()
+      vi.useFakeTimers()
+      runtime.id = undefined
+      expect(shortcut().defaultPrevented).toBe(false)
 
-    await vi.advanceTimersByTimeAsync(149)
-    expect(document.querySelector(modalSelector)).toBeNull()
-    await vi.advanceTimersByTimeAsync(1)
-    const dialog = document.querySelector(modalSelector)?.shadowRoot?.querySelector('[role="alert"]')
-    expect(dialog).toBeTruthy()
-    expect(dialog!.querySelector('h2')).toHaveTextContent(title)
-    expect(dialog!.querySelector('p')).toHaveTextContent(detail)
-    const button = dialog!.querySelector('button')!
-    expect(button).toHaveTextContent(action)
-    button.click()
-    expect(reload).toHaveBeenCalledOnce()
-  })
+      await vi.advanceTimersByTimeAsync(149)
+      expect(document.querySelector(modalSelector)).toBeNull()
+      await vi.advanceTimersByTimeAsync(1)
+      const dialog = document.querySelector(modalSelector)?.shadowRoot?.querySelector('[role="alert"]')
+      expect(dialog).toBeTruthy()
+      expect(dialog!.querySelector('h2')).toHaveTextContent(title)
+      expect(dialog!.querySelector('p')).toHaveTextContent(detail)
+      const button = dialog!.querySelector('button')!
+      expect(button).toHaveTextContent(action)
+      button.click()
+      expect(reload).toHaveBeenCalledOnce()
+
+      const dismissButton = dialog!.querySelectorAll('button')[1]
+      expect(dismissButton).toHaveTextContent(dismiss)
+      dismissButton.click()
+      expect(document.querySelector(modalSelector)).toBeNull()
+      expect(reload).toHaveBeenCalledOnce()
+    }
+  )
 })

@@ -39,7 +39,14 @@ export function scheduleExtensionUpdatedNotice(): void {
         // The page may already be leaving. / 页面可能正在离开。
       }
     })
-    notice.append(title, description, button)
+    const dismiss = document.createElement('button')
+    dismiss.type = 'button'
+    dismiss.textContent = t('Dismiss')
+    dismiss.addEventListener('click', () => host.remove())
+    const actions = document.createElement('div')
+    actions.style.cssText = 'display: flex; gap: 0.5rem'
+    actions.append(button, dismiss)
+    notice.append(title, description, actions)
     shadow.append(notice)
     document.body?.append(host)
   }, 150)
