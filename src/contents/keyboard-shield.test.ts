@@ -170,6 +170,32 @@ it('passes non-keyboard callbacks through with their original identity / 以原�
   expect(listener).toHaveBeenCalledOnce()
 })
 
+it('looks up a replaced handleEvent at dispatch time / 在事件派发时查找替换后的 handleEvent', () => {
+  const target = new EventTarget()
+  const original = vi.fn()
+  const replacement = vi.fn()
+  const listener = { handleEvent: original }
+  target.addEventListener('keydown', listener)
+  listener.handleEvent = replacement
+
+  const event = new KeyboardEvent('keydown')
+  target.dispatchEvent(event)
+  expect(original).not.toHaveBeenCalled()
+  expect(replacement).toHaveBeenCalledExactlyOnceWith(event)
+  expect(replacement.mock.contexts).toEqual([listener])
+})
+
+it('ignores preventDefault in passive keyboard listeners / 被动键盘监听器中的 preventDefault 不生效', () => {
+  const target = new EventTarget()
+  const listener = vi.fn((event: Event) => event.preventDefault())
+  target.addEventListener('keydown', listener, { passive: true })
+
+  const event = new KeyboardEvent('keydown', { cancelable: true })
+  expect(target.dispatchEvent(event)).toBe(true)
+  expect(listener).toHaveBeenCalledExactlyOnceWith(event)
+  expect(event.defaultPrevented).toBe(false)
+})
+
 it('shields and removes boxed keyboard event types / 对包装为对象的键盘事件类型执行屏蔽和移除', () => {
   const target = new EventTarget()
   const listener = vi.fn()
