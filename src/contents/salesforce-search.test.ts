@@ -1,4 +1,5 @@
 import { getSession, getSfHost } from '~lib/auth'
+import { checkMetadataPermissions, validateSalesforceSession, warmupMetadataCache } from '~lib/salesforce-api'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { render, unmount } = vi.hoisted(() => ({ render: vi.fn(), unmount: vi.fn() }))
@@ -7,6 +8,12 @@ vi.mock('~components/search/SearchModal', () => ({ default: () => null }))
 vi.mock('~lib/auth', () => ({
   getSfHost: vi.fn().mockResolvedValue(null),
   getSession: vi.fn().mockResolvedValue(null)
+}))
+vi.mock('~lib/salesforce-api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('~lib/salesforce-api')>()),
+  validateSalesforceSession: vi.fn(),
+  checkMetadataPermissions: vi.fn().mockResolvedValue([]),
+  warmupMetadataCache: vi.fn().mockResolvedValue(undefined)
 }))
 
 const runtime = chrome.runtime as Omit<typeof chrome.runtime, 'id'> & { id: string | undefined }
@@ -245,6 +252,56 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
 
     expect(document.documentElement).not.toHaveAttribute('data-ultraforce-modal-open')
   })
+
+  it('answers runtime messages and toggles search through both action names / 响应运行时消息并通过两种操作名称切换搜索', async () => {
+    await loadContentScript()
+    const respond = vi.fn()
+    messages.callListeners({ action: 'ping' }, {}, respond)
+    messages.callListeners({ action: 'unknown' }, {}, respond)
+    messages.callListeners({ action: 'toggleSearch' }, {}, respond)
+    expect(respond.mock.calls).toEqual([
+      [{ success: true, message: 'Content script is running' }],
+      [{ success: false, error: 'Unknown action' }],
+      [{ success: true }]
+    ])
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    expect(document.documentElement).toHaveAttribute('data-ultraforce-modal-open')
+
+    respond.mockClear()
+    messages.callListeners({ action: 'toggleModal' }, {}, respond)
+    expect(respond).toHaveBeenCalledExactlyOnceWith({ success: true })
+    await vi.waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-ultraforce-modal-open'))
+  })
+
+  it.each([
+    { valid: true, discard: false },
+    { valid: true, discard: true },
+    { valid: false, discard: false }
+  ])(
+    'refreshes the session with validity $valid and discard $discard / 刷新会话（有效 $valid，丢弃页面 $discard）',
+    async ({ valid, discard }) => {
+      await loadContentScript()
+      vi.useFakeTimers()
+      const host = 'example.my.salesforce.com'
+      vi.mocked(getSfHost).mockResolvedValueOnce(host)
+      vi.mocked(getSession).mockResolvedValueOnce({ key: 'synthetic', hostname: host })
+      vi.mocked(validateSalesforceSession).mockResolvedValueOnce(valid)
+
+      const respond = vi.fn()
+      messages.callListeners({ action: 'refreshSession' }, {}, respond)
+      expect(respond).toHaveBeenCalledExactlyOnceWith({ success: true })
+      await vi.advanceTimersByTimeAsync(1999)
+      expect(validateSalesforceSession).toHaveBeenCalledExactlyOnceWith(host)
+      expect(warmupMetadataCache).not.toHaveBeenCalled()
+
+      if (discard) window.dispatchEvent(new PageTransitionEvent('pagehide'))
+      await vi.advanceTimersByTimeAsync(1)
+      if (valid && !discard) expect(warmupMetadataCache).toHaveBeenCalledExactlyOnceWith(host)
+      else expect(warmupMetadataCache).not.toHaveBeenCalled()
+      if (valid) expect(checkMetadataPermissions).not.toHaveBeenCalled()
+      else expect(checkMetadataPermissions).toHaveBeenCalledExactlyOnceWith(host)
+    }
+  )
 
   it('suppresses the refresh notice if a replacement appears in time / 新实例及时接管时不显示刷新提示', async () => {
     await loadContentScript()

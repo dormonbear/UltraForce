@@ -8,18 +8,25 @@ vi.mock('~lib/storage-service', () => ({
   storageRemove: vi.fn().mockResolvedValue(undefined),
   STORAGE_KEYS: { LEGACY_SETTINGS: 'settings' }
 }))
+vi.mock('./reinject', () => ({ reinjectContentScripts: vi.fn().mockResolvedValue(undefined) }))
 
-// vitest-chrome does not provide chrome.action / chrome.commands; stub the
-// listener registrations the module performs at import time. Runs before the
-// module import below via vi.hoisted.
-vi.hoisted(() => {
-  const chromeAny = (globalThis as any).chrome
-  chromeAny.runtime.id = 'fixture-extension'
-  chromeAny.action = { onClicked: { addListener: () => {} } }
-  chromeAny.commands = { onCommand: { addListener: () => {} } }
+const listeners = vi.hoisted(() => {
+  const handlers = {} as {
+    clickAction: (tab: Partial<chrome.tabs.Tab>) => Promise<void>
+    runCommand: (command: string) => void
+  }
+  Object.assign(chrome.runtime, { id: 'fixture-extension' })
+  Object.assign(chrome, {
+    action: {
+      onClicked: { addListener: (listener: typeof handlers.clickAction) => (handlers.clickAction = listener) }
+    },
+    commands: { onCommand: { addListener: (listener: typeof handlers.runCommand) => (handlers.runCommand = listener) } }
+  })
+  return handlers
 })
 
 import { storageRemove, storageSet } from '~lib/storage-service'
+import { reinjectContentScripts } from './reinject'
 import './index'
 
 // vitest-chrome exposes a callListeners() helper that dispatches to every
@@ -198,18 +205,62 @@ describe('background message handlers', () => {
   })
 })
 
-describe('legacy diagnostic cleanup', () => {
-  it.each(['install', 'update'])('removes only diagnostic keys on %s without reading values', async (reason) => {
-    vi.clearAllMocks()
-    ;(chrome.runtime.onInstalled as unknown as { callListeners: (details: { reason: string }) => void }).callListeners({
-      reason
-    })
-    await vi.waitFor(() => {
-      expect(storageRemove).toHaveBeenCalledWith(['ultraforce_error_logs', 'ultraforce_api_stats'])
-    })
-    expect(chrome.storage.local.get).not.toHaveBeenCalled()
-    if (reason === 'update') expect(storageSet).not.toHaveBeenCalled()
+describe('toolbar and keyboard commands / 工具栏和键盘命令', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('toggles search from the toolbar and tolerates a closed receiver / 通过工具栏切换搜索并容忍接收端关闭', async () => {
+    chrome.tabs.sendMessage.mockRejectedValueOnce(new Error('Tab closed / 标签页已关闭'))
+
+    await listeners.clickAction({ id: 1, url: 'https://example.invalid/' })
+    await listeners.clickAction({ id: 2 })
+    await expect(listeners.clickAction({ id: 3, url: SF_SENDER.url })).resolves.toBeUndefined()
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledExactlyOnceWith(3, { action: 'toggleModal' })
   })
+
+  it('routes the search command through the active Salesforce tab / 通过当前 Salesforce 标签页执行搜索命令', async () => {
+    listeners.runCommand('unrelated-command')
+    expect(chrome.tabs.query).not.toHaveBeenCalled()
+
+    chrome.tabs.query
+      .mockImplementationOnce((_filter, callback) => callback([]))
+      .mockImplementationOnce((_filter, callback) => callback([{ id: 1, url: 'https://example.invalid/' }]))
+      .mockImplementationOnce((_filter, callback) => callback([{ id: 2, url: SF_SENDER.url }]))
+    chrome.tabs.sendMessage.mockRejectedValueOnce(new Error('Receiver unavailable / 接收端不可用'))
+    for (let attempt = 0; attempt < 3; attempt++) listeners.runCommand('toggle-search')
+
+    expect(chrome.tabs.query).toHaveBeenCalledTimes(3)
+    expect(chrome.tabs.query.mock.calls[0]).toEqual([{ active: true, currentWindow: true }, expect.any(Function)])
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledExactlyOnceWith(2, { action: 'toggleModal' })
+  })
+})
+
+describe('installation and diagnostic cleanup / 安装与诊断数据清理', () => {
+  it.each(['install', 'update'] as const)(
+    'cleans diagnostics and reinjects scripts on %s / 安装或更新时清理诊断数据并重新注入脚本',
+    async (reason) => {
+      vi.clearAllMocks()
+      ;(
+        chrome.runtime.onInstalled as unknown as { callListeners: (details: { reason: string }) => void }
+      ).callListeners({
+        reason
+      })
+      await vi.waitFor(() => {
+        expect(reinjectContentScripts).toHaveBeenCalledExactlyOnceWith(reason)
+      })
+      expect(storageRemove).toHaveBeenCalledExactlyOnceWith(['ultraforce_error_logs', 'ultraforce_api_stats'])
+      expect(chrome.storage.local.get).not.toHaveBeenCalled()
+      if (reason === 'install') {
+        expect(storageSet).toHaveBeenCalledExactlyOnceWith('settings', {
+          searchLimit: 1000,
+          autoSearch: true,
+          showDebug: false
+        })
+        expect(storageSet).toHaveBeenCalledBefore(reinjectContentScripts)
+      } else {
+        expect(storageSet).not.toHaveBeenCalled()
+      }
+    }
+  )
 
   it('cleans legacy keys on browser startup', async () => {
     vi.clearAllMocks()

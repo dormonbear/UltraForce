@@ -40,22 +40,26 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html'],
-      include: ['src/**/*.{ts,tsx}'],
+      include: ['src/**/!(*.test).{ts,tsx}'],
       exclude: [
-        'src/**/*.test.{ts,tsx}',
+        // Shared test harness. / 共用测试初始化文件。
         'src/test-setup.ts',
-        'src/types/**',
-        'src/contents/**',
-        'src/background/**',
+        // Ambient declaration for Plasmo's CSS imports. / Plasmo CSS 导入的环境类型声明。
+        'src/types/data-text.d.ts',
+        // Existing type barrel with a single command discriminator. / 现有类型入口，仅包含一个命令判别函数。
+        'src/types/index.ts',
+        // Re-exports bundled CSS as a string. / 将打包的 CSS 重新导出为字符串。
         'src/components/search/styles.ts'
       ],
-      // Floors, not targets: set just under the measured values so coverage
-      // cannot regress. Raise them whenever the measured numbers move up.
       thresholds: {
         lines: 81,
         functions: 84,
         branches: 68,
-        statements: 81
+        statements: 81,
+        // Keep the same floors on the original scope even when overall coverage rises. / 即使总体覆盖率提高，原有范围仍执行相同门槛。
+        'src/!(background|contents){,/**}': { lines: 81, functions: 84, branches: 68, statements: 81 },
+        'src/background/**': { lines: 99, functions: 99, branches: 98, statements: 98 },
+        'src/contents/**': { lines: 95, functions: 86, branches: 87, statements: 91 }
       }
     }
   },

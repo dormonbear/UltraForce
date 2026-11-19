@@ -118,6 +118,23 @@ it('preserves once across duplicate registration and re-registration / 重复注
   expect(listener).toHaveBeenCalledTimes(2)
 })
 
+it('consumes a once listener even when shielded / 即使监听器被屏蔽也消耗其 once 注册', () => {
+  const target = new EventTarget()
+  const listener = vi.fn()
+  target.addEventListener('keydown', listener, { once: true })
+
+  document.documentElement.setAttribute(modalAttribute, '')
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  document.documentElement.removeAttribute(modalAttribute)
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  expect(listener).not.toHaveBeenCalled()
+
+  target.addEventListener('keydown', listener, { once: true })
+  const event = new KeyboardEvent('keydown')
+  target.dispatchEvent(event)
+  expect(listener).toHaveBeenCalledExactlyOnceWith(event)
+})
+
 it('preserves abort behavior for duplicate and later registrations / 保留重复注册及后续注册的中止行为', () => {
   const target = new EventTarget()
   const listener = vi.fn()
