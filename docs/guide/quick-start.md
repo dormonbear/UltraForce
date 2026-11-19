@@ -56,7 +56,7 @@ contact.email     # Case-insensitive
 
 | Key / 按键 | Action / 操作 |
 |---|---|
-| Up / Down | Move through results / 在结果中移动 |
+| Up / Down（上／下方向键） | Move through results / 在结果中移动 |
 | `Enter` | Open the selected result / 打开所选结果 |
 | `Tab` with no search text / 搜索文本为空时按 `Tab` | Open the scope picker, even if a chip is already active / 打开范围选择器，即使已有范围标签 |
 | `Tab` with search text / 有搜索文本时按 `Tab` | Autocomplete the selected result where supported / 自动补全支持此操作的所选结果 |
