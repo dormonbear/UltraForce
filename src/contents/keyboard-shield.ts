@@ -57,8 +57,9 @@ if (!shieldWindow.__ultraForceKeyboardShield) {
     return document.documentElement.hasAttribute('data-ultraforce-modal-open')
   }
 
-  // Keep original listeners removable. / 保留移除原监听器的能力。
-  const wrappedListeners = new WeakMap<EventListener, EventListener>()
+  // Keep one wrapper per listener so native registration and removal share its identity.
+  // 每个监听器保留一个包装函数，让原生注册和移除使用同一标识。
+  const wrappedListeners = new WeakMap<EventListenerOrEventListenerObject, EventListener>()
 
   const origAdd = EventTarget.prototype.addEventListener
   const origRemove = EventTarget.prototype.removeEventListener
@@ -68,16 +69,24 @@ if (!shieldWindow.__ultraForceKeyboardShield) {
     listener: EventListenerOrEventListenerObject | null,
     options?: boolean | AddEventListenerOptions
   ) {
-    if (KEYBOARD_EVENTS.has(type) && typeof listener === 'function') {
+    if (!KEYBOARD_EVENTS.has(type) || (typeof listener !== 'function' && typeof listener !== 'object') || !listener) {
+      return origAdd.call(this, type, listener, options)
+    }
+
+    let wrapped = wrappedListeners.get(listener)
+    if (!wrapped) {
       const original = listener
-      const wrapped = function (this: EventTarget, e: Event) {
+      wrapped = function (this: EventTarget, event: Event) {
         if (isModalOpen()) return
-        return original.call(this, e)
+        if (typeof original === 'function') {
+          Reflect.apply(original, this, [event])
+        } else {
+          original.handleEvent(event)
+        }
       }
       wrappedListeners.set(original, wrapped)
-      return origAdd.call(this, type, wrapped, options)
     }
-    return origAdd.call(this, type, listener, options)
+    return origAdd.call(this, type, wrapped, options)
   }
 
   EventTarget.prototype.removeEventListener = function (
@@ -85,13 +94,7 @@ if (!shieldWindow.__ultraForceKeyboardShield) {
     listener: EventListenerOrEventListenerObject | null,
     options?: boolean | EventListenerOptions
   ) {
-    if (KEYBOARD_EVENTS.has(type) && typeof listener === 'function') {
-      const wrapped = wrappedListeners.get(listener)
-      if (wrapped) {
-        wrappedListeners.delete(listener)
-        return origRemove.call(this, type, wrapped, options)
-      }
-    }
-    return origRemove.call(this, type, listener, options)
+    const wrapped = KEYBOARD_EVENTS.has(type) && listener ? wrappedListeners.get(listener) : undefined
+    return origRemove.call(this, type, wrapped ?? listener, options)
   }
 }
