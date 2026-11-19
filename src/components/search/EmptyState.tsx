@@ -5,6 +5,7 @@ import { getMetadataTypeLabel } from './metadata-type-label'
 interface EmptyStateProps {
   type: 'loading' | 'empty' | 'no-session' | 'start' | 'command' | 'error' | 'id-navigation'
   query?: string
+  scope?: string
   commandTypes?: string[]
   commandDescription?: string
   selectedTypes?: string[]
@@ -27,6 +28,7 @@ const SEARCH_HINTS = [
 const EmptyState: React.FC<EmptyStateProps> = ({
   type,
   query,
+  scope,
   commandTypes,
   commandDescription,
   selectedTypes,
@@ -104,10 +106,14 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   }
 
   if (type === 'empty') {
+    const text = query ?? ''
+    const description = scope
+      ? t('No {scope} found for "{text}"', { scope, text })
+      : t('No results for "{query}"', { query: text })
     return (
       <div className="search-empty">
         <div className="empty-title">{t('No Results Found')}</div>
-        <div className="empty-desc">{t('No results for "{query}"', { query: query || '' })}</div>
+        <div className="empty-desc">{description}</div>
       </div>
     )
   }

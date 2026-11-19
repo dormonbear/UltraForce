@@ -14,11 +14,13 @@ import CommandHints from './CommandHints'
 import CommandPanel, { COMMAND_LISTBOX_ID, getCommandOptionId } from './CommandPanel'
 import { useCommandPanel } from './useCommandPanel'
 import { getAutocompleteQuery } from './autocomplete-query'
+import { getScopeDetails } from './command-scope'
 import { RecordActions, SearchFooter, StorageWarning, type RecordAction } from './SearchChrome'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
 import { logger } from '~lib/logger'
 import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
+import { splitCommandChip } from '~lib/command-chip'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
 import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from '~lib/contextual-suggestions'
@@ -271,6 +273,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const hasText = !pickerOpen && !commandPanel.canOpen
 
   // Parse command from query
+  const { chip, remainder } = splitCommandChip(query, allCommands)
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(
     () => getMatchingCommands(query, allCommands, unsupportedTypes),
@@ -742,7 +745,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     ) : !hasResults && extractedId ? (
                       <EmptyState type="id-navigation" query={extractedId} />
                     ) : !hasResults ? (
-                      !showCommandHints && <EmptyState type="empty" query={query} />
+                      !showCommandHints && (
+                        <EmptyState
+                          type="empty"
+                          query={remainder}
+                          scope={chip ? getScopeDetails(chip).label : undefined}
+                        />
+                      )
                     ) : (
                       <SearchResults
                         results={limitedSearchResults}

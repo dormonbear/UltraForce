@@ -80,6 +80,7 @@ export const chineseMessages: Readonly<Record<string, string>> = {
   'to open record {id}': '打开记录 {id}',
   'No Results Found': '未找到结果',
   'No results for "{query}"': '未找到“{query}”的结果',
+  'No {scope} found for "{text}"': '在 {scope} 中没有找到 "{text}"',
   'Not Logged In': '尚未登录',
   'Please log in to Salesforce in this browser to use UltraForce.': '请在此浏览器中登录 Salesforce 后使用 UltraForce。',
   'UltraForce uses your browser session to access Salesforce APIs.':

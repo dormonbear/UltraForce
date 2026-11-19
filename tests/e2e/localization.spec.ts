@@ -72,6 +72,7 @@ for (const locale of ['en-US', 'zh-CN']) {
       await expect(input).toBeFocused()
       await input.pressSequentially('case')
       await expect(input).toHaveValue('case')
+      await expect(dialog.getByText(chinese ? '在 流程 中没有找到 "case"' : 'No Flows found for "case"')).toBeVisible()
       await input.selectText()
       await input.press('Backspace')
       await expect(input).toHaveValue('')

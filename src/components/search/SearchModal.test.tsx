@@ -507,6 +507,30 @@ describe('SearchModal', () => {
     })
   })
 
+  it.each([
+    ['en-US', 'No Flows found for "123421"', 'No Custom Codes found for "missing"', 'No results for ":bogus 123421"'],
+    ['zh-CN', '在 流程 中没有找到 "123421"', '在 自定义代码 中没有找到 "missing"', '未找到“:bogus 123421”的结果']
+  ])('uses the visible scope and search text in %s / 使用可见的范围和搜索文本', (locale, flow, code, unknown) => {
+    const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+    try {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      fireEvent.change(input, { target: { value: ':f 123421' } })
+      expect(input).toHaveValue('123421')
+      expect(screen.getByText(flow)).toBeInTheDocument()
+      fireEvent.change(input, { target: { value: '' } })
+      fireEvent.keyDown(input, { key: 'Backspace' })
+      fireEvent.change(input, { target: { value: ':c missing' } })
+      expect(screen.getByText(code)).toBeInTheDocument()
+      fireEvent.change(input, { target: { value: '' } })
+      fireEvent.keyDown(input, { key: 'Backspace' })
+      fireEvent.change(input, { target: { value: ':bogus 123421' } })
+      expect(screen.getByText(unknown)).toBeInTheDocument()
+    } finally {
+      languages.mockRestore()
+    }
+  })
+
   describe('no session state', () => {
     it('should show no-session state from store', () => {
       useSessionStore.getState().setSession(null, false)
