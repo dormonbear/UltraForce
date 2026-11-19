@@ -54,6 +54,14 @@ test('chooses Flows from the Tab scope picker / 从 Tab 搜索范围面板选择
     await expect(dialog.getByTitle('Flows', { exact: true })).toBeVisible()
     await expect(input).toHaveValue('')
     await expect(input).toBeFocused()
+    await input.press('Backspace')
+    await input.pressSequentially('account')
+    await input.evaluate((element: HTMLInputElement) => element.setSelectionRange(0, 0))
+    await input.pressSequentially(':f ')
+    await expect(dialog.getByTitle('Flows', { exact: true })).toBeVisible()
+    await expect(input).toHaveValue('account')
+    await expect(input).toHaveJSProperty('selectionStart', 0)
+
     await input.press('Alt+k')
     await expect(dialog).toHaveCount(0)
   } finally {
