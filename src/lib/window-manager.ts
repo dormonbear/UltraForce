@@ -145,10 +145,12 @@ class UltraForceWindowManager {
     try {
       this.log('Initializing WindowManager...')
 
-      await this.createContainer()
+      if (!this.options.isContextActive()) return
+      this.createContainer()
       this.setupEventListeners()
       await this.loadSession()
 
+      if (!this.options.isContextActive()) return
       this._isInitialized = true
       this.log('WindowManager initialized successfully')
 
@@ -159,7 +161,7 @@ class UltraForceWindowManager {
     }
   }
 
-  private async createContainer(): Promise<void> {
+  private createContainer(): void {
     this.containerElement = document.createElement('div')
     this.containerElement.id = this.options.containerId
     this.containerElement.style.cssText = `
@@ -207,14 +209,16 @@ class UltraForceWindowManager {
   private async loadSession(): Promise<void> {
     try {
       const sfHost = await getSfHost(window.location.href)
-      if (sfHost) {
+      if (sfHost && this.options.isContextActive()) {
         this.log('SF Host detected:', sfHost)
 
         // Scope per-org persisted stores BEFORE issuing any session-dependent reads
         // so recent/favorites cannot leak across orgs when multiple tabs are open.
         await Promise.all([setHistoryOrgScope(sfHost), setFavoritesOrgScope(sfHost)])
 
+        if (!this.options.isContextActive()) return
         const session = await getSession(sfHost)
+        if (!this.options.isContextActive()) return
         const hasSession = session !== null
         useSessionStore.getState().setSession(sfHost, hasSession)
         this.log('Session status:', hasSession ? 'Active' : 'None')
@@ -249,6 +253,7 @@ class UltraForceWindowManager {
 
     if (!this.options.isContextActive()) return
     await this.loadSession()
+    if (!this.options.isContextActive()) return
 
     // Detect record context
     const { objectApiName: urlObjectApiName, recordId } = getCurrentRecordFromUrl()

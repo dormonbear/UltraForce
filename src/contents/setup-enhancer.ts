@@ -26,7 +26,20 @@ class SetupEnhancer {
 
   constructor(private readonly release: () => void) {
     const { signal } = this.listeners
-    window.addEventListener('beforeunload', () => this.destroy(), { signal })
+    window.addEventListener(
+      'pagehide',
+      (event) => {
+        if (!event.persisted) this.destroy()
+      },
+      { signal }
+    )
+    window.addEventListener(
+      'pageshow',
+      (event) => {
+        if (event.persisted) this.checkContext()
+      },
+      { signal }
+    )
     document.addEventListener(SETUP_START_EVENT, () => this.checkContext(), { signal })
 
     const start = () => {

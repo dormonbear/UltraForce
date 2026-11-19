@@ -25,6 +25,8 @@ interface CapturedObserver {
 
 let observers: CapturedObserver[] = []
 let RealMutationObserver: typeof MutationObserver
+const fieldsUrl =
+  'https://example.salesforce-setup.com/lightning/setup/ObjectManager/Account/FieldsAndRelationships/view'
 
 function installMutationObserverSpy(): void {
   RealMutationObserver = global.MutationObserver
@@ -82,11 +84,62 @@ describe('setup-enhancer', () => {
   })
 
   afterEach(() => {
-    window.dispatchEvent(new Event('beforeunload'))
+    window.dispatchEvent(new PageTransitionEvent('pagehide'))
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
     global.MutationObserver = RealMutationObserver
     vi.clearAllMocks()
+  })
+
+  it('starts pending scrolling after canceled navigation / 取消导航后仍会启动待执行的滚动', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+    window.addEventListener('beforeunload', (event) => event.preventDefault(), { once: true })
+    expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(container.scrollTopWrites).toEqual([1000])
+  })
+
+  it('keeps pending scrolling and one watcher on cache restore / 恢复缓存后保留待执行滚动和一个 URL 观察器', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    await vi.advanceTimersByTimeAsync(2000)
+
+    expect(container.scrollTopWrites).toEqual([1000])
+    expect(observers).toHaveLength(1)
+    expect(observers[0].disconnect).not.toHaveBeenCalled()
+  })
+
+  it('does not start Setup after discard before DOM readiness / 等待 DOM 就绪期间丢弃页面后不会启动设置增强', async () => {
+    const readyState = vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading')
+    try {
+      await loadModule()
+      window.dispatchEvent(new PageTransitionEvent('pagehide'))
+      document.dispatchEvent(new Event('DOMContentLoaded'))
+      expect(observers).toHaveLength(0)
+    } finally {
+      readyState.mockRestore()
+    }
+  })
+
+  it('cancels scheduled Setup scrolling on discard / 丢弃页面时取消待执行的设置页滚动', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+
+    window.dispatchEvent(new PageTransitionEvent('pagehide'))
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(container.scrollTopWrites).toEqual([])
   })
 
   it('sets up a URL watcher observing document.body when autoLoadFields is enabled', async () => {
@@ -221,7 +274,7 @@ describe('setup-enhancer', () => {
     expect(container.scrollTopWrites).toContain(container.scrollHeight)
   })
 
-  it('disconnects the duplicate observer on beforeunload', async () => {
+  it('disconnects the duplicate observer on discard / 丢弃页面时断开去重观察器', async () => {
     setLocation(
       'https://example.salesforce-setup.com/lightning/setup/ObjectManager/Account/FieldsAndRelationships/view'
     )
@@ -236,7 +289,7 @@ describe('setup-enhancer', () => {
     const duplicateObserver = observers[observers.length - 1]
     expect(duplicateObserver.observe).toHaveBeenCalled()
 
-    window.dispatchEvent(new Event('beforeunload'))
+    window.dispatchEvent(new PageTransitionEvent('pagehide'))
     expect(duplicateObserver.disconnect).toHaveBeenCalled()
   })
 })
