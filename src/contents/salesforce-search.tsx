@@ -58,7 +58,7 @@ class UltraForceContentScript {
     window.addEventListener(
       'pageshow',
       (event) => {
-        if (event.persisted) this.checkContext()
+        if (event.persisted && !this.checkContext()) this.waitForUpdateShortcut()
       },
       { signal }
     )
@@ -131,6 +131,28 @@ class UltraForceContentScript {
     this.destroy()
     if (opening) scheduleExtensionUpdatedNotice()
     return false
+  }
+
+  private waitForUpdateShortcut(): void {
+    const fallback = new AbortController()
+    const { signal } = fallback
+    document.addEventListener(SEARCH_START_EVENT, () => fallback.abort(), { once: true, signal })
+    window.addEventListener(
+      'pagehide',
+      (event) => {
+        if (!event.persisted) fallback.abort()
+      },
+      { signal }
+    )
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        if (!this.matchesShortcut(event)) return
+        fallback.abort()
+        scheduleExtensionUpdatedNotice()
+      },
+      { capture: true, signal }
+    )
   }
 
   private setupMessageListener(): void {

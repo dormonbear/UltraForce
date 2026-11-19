@@ -70,6 +70,32 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
     await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
   })
 
+  it('shows the update notice once on the shortcut after an invalid cached restore / 失效的缓存页面恢复后按快捷键仅显示一次更新提示', async () => {
+    await loadContentScript()
+    vi.useFakeTimers()
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+    runtime.id = undefined
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+
+    expect(messages.hasListeners()).toBe(false)
+    expect(document.querySelector(modalSelector)).toBeNull()
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+    await vi.advanceTimersByTimeAsync(150)
+    expect(document.querySelector(modalSelector)).toBeNull()
+
+    expect(shortcut().defaultPrevented).toBe(false)
+    await vi.advanceTimersByTimeAsync(150)
+    const notice = document.querySelector(modalSelector)
+    expect(notice?.shadowRoot?.querySelector('[role="alert"]')).toBeTruthy()
+    notice?.remove()
+
+    expect(shortcut().defaultPrevented).toBe(false)
+    await vi.advanceTimersByTimeAsync(150)
+    expect(document.querySelector(modalSelector)).toBeNull()
+    expect(render).not.toHaveBeenCalled()
+  })
+
   it('does not start search after discard before DOM readiness / 等待 DOM 就绪期间丢弃页面后不会启动搜索', async () => {
     vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading')
     vi.resetModules()

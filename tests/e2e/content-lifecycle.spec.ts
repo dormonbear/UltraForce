@@ -89,26 +89,59 @@ test('search opens after canceling the leave prompt / 取消离开提示后仍�
   await expect(page.getByRole('dialog', { name: 'UltraForce search' })).toBeVisible()
 })
 
-test('search survives a browser back-forward cache round trip / 搜索在往返缓存恢复后仍可用', async ({
-  salesforcePage: page
-}) => {
-  await page.goto(`${origin}/lightning/page/home`)
-  await waitForContentScript(page.context(), page)
-  await page.evaluate(() => {
-    window.addEventListener('pageshow', (event) => {
-      if (event.persisted) document.body.setAttribute('data-restored-from-cache', '')
+for (const { invalidate, title } of [
+  { invalidate: false, title: 'search survives a browser back-forward cache round trip / 搜索在往返缓存恢复后仍可用' },
+  {
+    invalidate: true,
+    title: 'a restored orphan reports the extension update on the shortcut / 恢复的孤立脚本在按快捷键时提示扩展更新'
+  }
+]) {
+  test(title, async ({ salesforcePage: page }) => {
+    await page.goto(`${origin}/lightning/page/home`)
+    const context = page.context()
+    await waitForContentScript(context, page)
+    await page.evaluate(() => {
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) document.body.setAttribute('data-restored-from-cache', '')
+      })
     })
+    if (invalidate) {
+      // Simulate invalidation in the isolated world while preserving the cached document.
+      // 在隔离环境中模拟扩展上下文失效，同时保留缓存文档。
+      const invalidated = await context.serviceWorkers()[0].evaluate(async (url) => {
+        const [tab] = await chrome.tabs.query({ url })
+        const [injection] = await chrome.scripting.executeScript({
+          target: { tabId: tab.id! },
+          func: () => {
+            Object.defineProperty(chrome, 'runtime', { value: undefined })
+            return !chrome.runtime
+          }
+        })
+        return injection.result
+      }, page.url())
+      expect(invalidated).toBe(true)
+    }
+
+    await page.getByRole('link', { name: 'Leave page / 离开页面' }).click()
+    await expect(page).toHaveURL(`${origin}/leave`)
+    await page.goBack({ waitUntil: 'commit' })
+    await expect(page.locator('body')).toHaveAttribute('data-restored-from-cache', '')
+
+    const shortcut = process.platform === 'darwin' ? 'Meta+b' : 'Control+b'
+    const containers = page.locator('[id^="ultraforce-modal"]')
+    if (invalidate) {
+      await expect(containers).toHaveCount(0)
+      await page.keyboard.press(shortcut)
+      await expect(page.getByText('UltraForce was updated')).toBeVisible()
+      await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
+      await expect(containers).toHaveCount(0)
+    } else {
+      await page.keyboard.press(shortcut)
+      await expect(page.getByRole('dialog', { name: 'UltraForce search' })).toBeVisible()
+      await expect(containers).toHaveCount(1)
+    }
   })
-
-  await page.getByRole('link', { name: 'Leave page / 离开页面' }).click()
-  await expect(page).toHaveURL(`${origin}/leave`)
-  await page.goBack({ waitUntil: 'commit' })
-  await expect(page.locator('body')).toHaveAttribute('data-restored-from-cache', '')
-
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
-  await expect(page.getByRole('dialog', { name: 'UltraForce search' })).toBeVisible()
-  await expect(page.locator('[id^="ultraforce-modal"]')).toHaveCount(1)
-})
+}
 
 test('Setup retries scrolling after navigation interrupts a run / 导航中断后设置页会重试滚动', async ({
   salesforcePage: page
