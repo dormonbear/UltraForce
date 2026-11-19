@@ -25,6 +25,7 @@ interface CapturedObserver {
 
 let observers: CapturedObserver[] = []
 let RealMutationObserver: typeof MutationObserver
+const detailsUrl = 'https://example.salesforce-setup.com/lightning/setup/ObjectManager/Account/Details/view'
 const fieldsUrl =
   'https://example.salesforce-setup.com/lightning/setup/ObjectManager/Account/FieldsAndRelationships/view'
 
@@ -80,7 +81,7 @@ describe('setup-enhancer', () => {
     getState.mockReturnValue({ autoLoadFields: true })
     document.body.innerHTML = ''
     installMutationObserverSpy()
-    setLocation('https://example.salesforce-setup.com/lightning/setup/ObjectManager/Account/Details/view')
+    setLocation(detailsUrl)
   })
 
   afterEach(() => {
@@ -272,6 +273,60 @@ describe('setup-enhancer', () => {
     await vi.advanceTimersByTimeAsync(500 * 6)
 
     expect(container.scrollTopWrites).toContain(container.scrollHeight)
+  })
+
+  it('cancels a pending start when navigating away / 离开页面时取消待执行的滚动', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+
+    await vi.advanceTimersByTimeAsync(1000)
+    setLocation(detailsUrl)
+    window.dispatchEvent(new Event('popstate'))
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(container.scrollTopWrites).toEqual([])
+    expect(observers).toHaveLength(1)
+  })
+
+  it('retries an interrupted auto-load on return / 返回页面后重试被中断的自动加载', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(container.scrollTopWrites).toEqual([1000])
+    setLocation(detailsUrl)
+    window.dispatchEvent(new Event('popstate'))
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(container.scrollTopWrites).toEqual([1000])
+    expect(observers).toHaveLength(1)
+
+    setLocation(fieldsUrl)
+    window.dispatchEvent(new Event('popstate'))
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(container.scrollTopWrites).toEqual([1000, 1000])
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(container.scrollTop).toBe(0)
+    expect(observers[1].observedTargets).toContain(container)
+  })
+
+  it('disconnects the completed run’s duplicate observer on SPA navigation / 单页导航时断开已完成任务的去重观察器', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+    await vi.advanceTimersByTimeAsync(4000)
+    const [urlWatcher, duplicateObserver] = observers
+    expect(duplicateObserver.observedTargets).toContain(container)
+
+    setLocation(detailsUrl)
+    urlWatcher.callback([], urlWatcher as unknown as MutationObserver)
+
+    expect(duplicateObserver.disconnect).toHaveBeenCalledOnce()
+    expect(urlWatcher.disconnect).not.toHaveBeenCalled()
   })
 
   it('disconnects the duplicate observer on discard / 丢弃页面时断开去重观察器', async () => {

@@ -105,13 +105,10 @@ class SetupEnhancer {
     this.isLoading = true
     const generation = this.scrollGeneration
 
-    this.completedUrls.add(urlKey)
-
     try {
       const scrollContainer = this.findScrollContainer()
       if (!scrollContainer) {
         logger.debug('Scroll container not found')
-        this.isLoading = false
         return
       }
 
@@ -142,9 +139,9 @@ class SetupEnhancer {
       scrollContainer.scrollTop = 0
 
       this.disableInfiniteScroll(scrollContainer)
+      this.completedUrls.add(urlKey)
     } catch (error) {
       logger.error('Auto-load error:', error)
-      this.completedUrls.delete(urlKey)
     } finally {
       if (generation === this.scrollGeneration) this.isLoading = false
     }
@@ -244,6 +241,8 @@ class SetupEnhancer {
     clearTimeout(this.pendingCheck)
     this.scrollGeneration++
     this.isLoading = false
+    this.observer?.disconnect()
+    this.observer = null
   }
 
   private destroy(): void {
@@ -251,7 +250,6 @@ class SetupEnhancer {
     this.release()
     this.stopAutoScroll()
     this.urlObserver?.disconnect()
-    this.observer?.disconnect()
   }
 }
 

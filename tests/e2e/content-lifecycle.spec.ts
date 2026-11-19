@@ -3,6 +3,32 @@ import path from 'node:path'
 import { waitForContentScript } from './helpers/content-script'
 
 const origin = 'https://lifecycle.my.salesforce.com'
+const setupPath = '/lightning/setup/ObjectManager/Account/'
+const fieldsPath = `${setupPath}FieldsAndRelationships/view`
+const detailsPath = `${setupPath}Details/view`
+const setupFixture = `
+  <button type="button">Back to fields / 返回字段列表</button>
+  <p role="status">Fields / 字段</p>
+  <div class="viewport scroller" role="region" aria-label="Fields / 字段" style="height:100px;overflow:auto">
+    <div style="height:1000px"></div>
+  </div>
+  <script>
+    const fields = document.querySelector('[role="region"]')
+    const status = document.querySelector('[role="status"]')
+    function interruptOnScroll() {
+      if (fields.scrollTop === 0) return
+      fields.removeEventListener('scroll', interruptOnScroll)
+      history.pushState(null, '', '${detailsPath}')
+      fields.scrollTop = 0
+      status.textContent = 'Details / 详细信息'
+    }
+    fields.addEventListener('scroll', interruptOnScroll)
+    document.querySelector('button').addEventListener('click', () => history.back())
+    window.addEventListener('popstate', () => {
+      status.textContent = 'Fields / 字段'
+    })
+  </script>
+`
 
 const test = base.extend<{ salesforcePage: Page }>({
   salesforcePage: async ({}, use) => {
@@ -24,6 +50,8 @@ const test = base.extend<{ salesforcePage: Page }>({
             contentType: 'text/html; charset=utf-8',
             body: '<a href="/leave">Leave page / 离开页面</a>'
           })
+        } else if (url.origin === origin && url.pathname === fieldsPath) {
+          await route.fulfill({ contentType: 'text/html; charset=utf-8', body: setupFixture })
         } else if (url.origin === origin && url.pathname === '/leave') {
           await route.fulfill({ contentType: 'text/html; charset=utf-8', body: 'Second page / 第二页' })
         } else {
@@ -80,4 +108,19 @@ test('search survives a browser back-forward cache round trip / 搜索在往返�
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
   await expect(page.getByRole('dialog', { name: 'UltraForce search' })).toBeVisible()
   await expect(page.locator('[id^="ultraforce-modal"]')).toHaveCount(1)
+})
+
+test('Setup retries scrolling after navigation interrupts a run / 导航中断后设置页会重试滚动', async ({
+  salesforcePage: page
+}) => {
+  await page.goto(`${origin}${fieldsPath}`)
+  const status = page.getByRole('status')
+  await expect(status).toHaveText('Details / 详细信息')
+  await expect(page).toHaveURL(`${origin}${detailsPath}`)
+
+  await page.getByRole('button', { name: 'Back to fields / 返回字段列表' }).click()
+  await expect(page).toHaveURL(`${origin}${fieldsPath}`)
+  await expect(status).toHaveText('Fields / 字段')
+  const fields = page.getByRole('region', { name: 'Fields / 字段' })
+  await expect.poll(() => fields.evaluate((element) => element.scrollTop), { timeout: 7000 }).toBeGreaterThan(0)
 })
