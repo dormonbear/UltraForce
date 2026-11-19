@@ -350,6 +350,19 @@ test('all version guards precede publication and inputs are not interpolated int
   assert.ok(!steps.find((step) => step.id === 'target').run.includes('${{'))
 })
 
+test('production builds check the search JSX runtime before packaging / 正式构建在打包前检查搜索 JSX 运行时', () => {
+  const ci = parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'))
+  for (const job of [ci.jobs.build, ci.jobs['windows-build'], workflow.jobs.release]) {
+    const buildIndex = job.steps.findIndex((step) => step.run === 'pnpm build')
+    const packageIndex = job.steps.findIndex((step) => step.run === 'pnpm package')
+    assert.ok(buildIndex >= 0 && buildIndex + 1 < packageIndex)
+    const check = job.steps[buildIndex + 1]
+    assert.equal(check.run, 'node --test scripts/search-jsx-runtime.test.mjs')
+    assert.equal(check.if, undefined)
+    assert.notEqual(check['continue-on-error'], true)
+  }
+})
+
 test('packed production UI gates publication / 打包后正式界面验证阻止无效发布', () => {
   const index = (name) => steps.findIndex((step) => step.name === name)
   const smokeIndex = index('Verify Packaged UI / 验证打包后的界面')

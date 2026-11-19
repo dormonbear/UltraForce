@@ -1,5 +1,45 @@
 # Release Notes
 
+## v0.6.0
+
+Release Date: 2026-11-19 / 发布日期：2026-11-19
+
+### New search experience / 全新搜索体验
+
+- The floating pill-shaped search bar has round History, Favorites, and Settings buttons. History and Favorites each show their own list, and the same Settings button opens and closes Settings.
+  悬浮胶囊搜索栏提供圆形的历史记录、收藏和设置按钮。历史记录和收藏各自显示对应列表，同一个设置按钮可打开或关闭设置。
+- Typing a query or applying a scope brings the search bar and grouped results into one card. Empty-result messages name the active scope.
+  输入查询或应用搜索范围后，搜索栏与分组结果合并为一张卡片。无结果时，提示会显示当前搜索范围。
+- Built-in and custom `:` commands appear as compact scope chips with full descriptions on hover. Command hints highlight the matching prefix, and applying a scope preserves the caret position. Press Tab with no search text to open a filterable scope picker with details for the highlighted scope.
+  内置和自定义 `:` 命令会显示为紧凑的范围标签，悬停时可查看完整说明。命令提示会高亮匹配的前缀，应用范围时会保留光标位置。搜索文本为空时，按 Tab 可打开可筛选的范围选择器，并查看当前高亮范围的详情。
+- Spring transitions follow the control that opened the panel and respect the system’s reduced-motion preference. The bilingual guides cover the new layout and keyboard navigation.
+  弹簧过渡动效以打开面板的控件为起点，并遵循系统的减少动态效果偏好。双语指南介绍了新布局及键盘导航。
+
+### Reliability / 可靠性
+
+- Tabs opened by UltraForce no longer incorrectly show **Not Logged In** for an existing Salesforce session when Chrome omits the sender URL. The fallback requires a top-level frame with a matching origin.
+  当 Chrome 省略发送方 URL 时，UltraForce 打开的标签页不再把已有 Salesforce 会话误判为**未登录**。仅当顶层框架的来源匹配时才会使用备用 URL。
+- Search and the Setup enhancer can resume in open Salesforce tabs after an extension update without a page reload. If the handoff fails, UltraForce offers a dismissible prompt to refresh the page.
+  扩展更新后，已打开的 Salesforce 标签页无需重新加载即可恢复搜索和设置页增强功能。如果接管失败，UltraForce 会显示可关闭的刷新提示。
+- Search uses consistent shortcut matching whether the search bar is open or closed. When Escape is the configured shortcut, it first closes Settings or the scope picker and returns focus to search. Press Escape again to close search. Keyboard shielding is released if the page removes the search container.
+  无论搜索栏打开还是关闭，搜索都使用一致的快捷键匹配规则。将 Escape 设为搜索快捷键后，按下它会先关闭设置或范围选择器，并将焦点还给搜索框。再次按下 Escape 可关闭搜索。如果页面移除搜索容器，键盘屏蔽会解除。
+
+### Security and maintenance / 安全及维护
+
+- Patch build and test dependency paths for SVGO, Vite, Immutable in Sass, Browserslist, Rollup, Sharp and its native libraries, Vue and Svelte server-side rendering, and Babel source maps. Remove the unused SVGR `deepmerge` and Parcel resolver `tsup` dependencies, and retire the redundant Rollup CI step. Low-severity audit details are visible, and [the remaining audit](https://github.com/dormonbear/UltraForce/issues/48) stays open.
+  修复 SVGO、Vite、Sass 使用的 Immutable、Browserslist、Rollup、Sharp 及其原生库、Vue 与 Svelte 服务端渲染，以及 Babel 源码映射涉及的构建和测试依赖。移除 SVGR 未使用的 `deepmerge` 和 Parcel 解析器未使用的 `tsup`，并取消重复的 Rollup CI 步骤。审计会显示低危详情，[剩余审计](https://github.com/dormonbear/UltraForce/issues/48)继续开放。
+- Build-tool HTTP caches honor mandatory response revalidation while retaining ordinary caching.
+  构建工具的 HTTP 缓存遵守响应中的强制重新验证要求，同时保留常规缓存。
+- Windows CI runs unit and selected dependency tests, synthetic browser tests, and a production build with bilingual smoke tests and packaging. CI and release use Node.js 22 and pnpm 9.15.9, retain the Chrome build target, and check that the production search bundle includes its JSX runtime.
+  Windows CI 运行单元测试、选定的依赖测试及合成浏览器测试，并对正式构建执行中英文冒烟测试和打包。CI 和发布流程使用 Node.js 22 和 pnpm 9.15.9，保留 Chrome 构建目标，并检查正式搜索产物是否包含 JSX 运行时。
+- Release tooling rejects placeholder notes. Chrome Web Store publishing validates the store response, requires a successful upload before publishing, and removes temporary credentials after the attempt. Package summaries are updated in both languages.
+  发布工具会拒绝含占位文本的说明。Chrome 应用商店发布流程会校验商店响应，仅在上传成功后发布，并在流程结束后清理临时凭据。扩展包的中英文摘要均已更新。
+
+### Privacy / 隐私
+
+- This release adds no data collection. The manifest configuration now explicitly declares the `scripting` permission, which was already present in the packaged manifest. The packaged permissions stay the same.
+  此版本不新增数据收集。清单配置现在显式声明 `scripting` 权限，该权限已存在于此前打包的清单中。打包后的权限保持不变。
+
 ## v0.5.1
 
 Release Date: 2026-10-29 / 发布日期：2026-10-29

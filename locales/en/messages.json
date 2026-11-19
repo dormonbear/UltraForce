@@ -1,5 +1,7 @@
 {
   "extensionName": { "message": "UltraForce for Salesforce" },
-  "extensionDescription": { "message": "Modern Salesforce metadata search and management tool" },
+  "extensionDescription": {
+    "message": "Search Salesforce metadata, jump to Setup pages, and reopen recent items from a keyboard-first command palette."
+  },
   "toggleSearch": { "message": "Toggle UltraForce Search" }
 }

@@ -241,6 +241,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Build Production Extension / 构建正式扩展
         run: pnpm build
+      - name: Verify Search JSX Runtime / 验证搜索 JSX 运行时
+        run: node --test scripts/search-jsx-runtime.test.mjs
       - name: Verify Managed Schema Shipped / 验证托管策略架构已打包
         run: node scripts/verify-managed-schema.mjs
       - name: Verify Bundled Fonts Shipped / 验证内置字体已打包

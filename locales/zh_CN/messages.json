@@ -1,5 +1,7 @@
 {
   "extensionName": { "message": "UltraForce for Salesforce" },
-  "extensionDescription": { "message": "便捷的 Salesforce 元数据搜索与管理工具" },
+  "extensionDescription": {
+    "message": "在 Salesforce 页面上通过键盘搜索元数据、跳转到设置页面，并快速打开最近访问的项目。"
+  },
   "toggleSearch": { "message": "打开或关闭 UltraForce 搜索" }
 }

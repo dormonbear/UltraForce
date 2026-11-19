@@ -1,6 +1,6 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "displayName": "UltraForce for Salesforce",
