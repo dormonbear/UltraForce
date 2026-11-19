@@ -6,7 +6,7 @@ Search across all Salesforce metadata types from a single interface.
 
 1. Press `Cmd+B` / `Ctrl+B` to open search
 2. Type your search query
-3. Results appear instantly from cached metadata
+3. The search bar and panel join into one card, with a type badge beside each result / 搜索栏与面板合为一张卡片，每条结果旁都有类型徽标
 4. Press `Enter` to navigate to the selected item
 
 ## Search Modes
@@ -22,11 +22,13 @@ Contact             # Matches object, flows, fields
 
 ### Filtered Search
 
-Use commands to filter by type:
+Type a command and a space to set a scope, or choose one with `Tab` when the search text is empty. If a scoped search finds no matches, the message names the active scope and shows the search text.
+
+输入命令并按空格可设定搜索范围，或在搜索文本为空时按 `Tab` 选择范围。范围内没有匹配结果时，提示会显示当前范围和搜索词。
 
 ```
 :c AccountHelper    # Code only
-:o Account          # Objects only
+:o Account          # Objects and fields / 对象和字段
 :f approval         # Flows only
 ```
 

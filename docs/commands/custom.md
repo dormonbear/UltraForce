@@ -5,7 +5,7 @@ Create custom commands with SOQL queries to search any Salesforce data.
 ## Creating Commands
 
 1. Open UltraForce with `Cmd+B` / `Ctrl+B`
-2. Click the settings icon
+2. Click the round **Settings** button beside the empty search bar / 点击空搜索栏旁的圆形 **设置** 按钮
 3. Navigate to "Custom Commands"
 4. Click "Add Command"
 
