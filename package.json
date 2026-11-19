@@ -52,6 +52,7 @@
       }
     },
     "permissions": [
+      "scripting",
       "storage",
       "activeTab",
       "tabs",

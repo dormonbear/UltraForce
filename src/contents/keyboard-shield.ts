@@ -47,46 +47,51 @@ export const config: PlasmoCSConfig = {
   ]
 }
 
-const KEYBOARD_EVENTS = new Set(['keydown', 'keyup', 'keypress'])
+const shieldWindow = window as Window & { __ultraForceKeyboardShield?: boolean }
 
-function isModalOpen(): boolean {
-  return document.documentElement.hasAttribute('data-ultraforce-modal-open')
-}
+if (!shieldWindow.__ultraForceKeyboardShield) {
+  shieldWindow.__ultraForceKeyboardShield = true
+  const KEYBOARD_EVENTS = new Set(['keydown', 'keyup', 'keypress'])
 
-// Map original listeners to their wrapped counterparts for correct removal
-const wrappedListeners = new WeakMap<Function, Function>()
-
-const origAdd = EventTarget.prototype.addEventListener
-const origRemove = EventTarget.prototype.removeEventListener
-
-EventTarget.prototype.addEventListener = function (
-  type: string,
-  listener: EventListenerOrEventListenerObject | null,
-  options?: boolean | AddEventListenerOptions
-) {
-  if (KEYBOARD_EVENTS.has(type) && typeof listener === 'function') {
-    const original = listener
-    const wrapped = function (this: any, e: Event) {
-      if (isModalOpen()) return
-      return original.call(this, e)
-    }
-    wrappedListeners.set(original, wrapped)
-    return origAdd.call(this, type, wrapped, options)
+  function isModalOpen(): boolean {
+    return document.documentElement.hasAttribute('data-ultraforce-modal-open')
   }
-  return origAdd.call(this, type, listener, options)
-}
 
-EventTarget.prototype.removeEventListener = function (
-  type: string,
-  listener: EventListenerOrEventListenerObject | null,
-  options?: boolean | EventListenerOptions
-) {
-  if (KEYBOARD_EVENTS.has(type) && typeof listener === 'function') {
-    const wrapped = wrappedListeners.get(listener)
-    if (wrapped) {
-      wrappedListeners.delete(listener)
-      return origRemove.call(this, type, wrapped as EventListener, options)
+  // Keep original listeners removable. / 保留移除原监听器的能力。
+  const wrappedListeners = new WeakMap<EventListener, EventListener>()
+
+  const origAdd = EventTarget.prototype.addEventListener
+  const origRemove = EventTarget.prototype.removeEventListener
+
+  EventTarget.prototype.addEventListener = function (
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions
+  ) {
+    if (KEYBOARD_EVENTS.has(type) && typeof listener === 'function') {
+      const original = listener
+      const wrapped = function (this: EventTarget, e: Event) {
+        if (isModalOpen()) return
+        return original.call(this, e)
+      }
+      wrappedListeners.set(original, wrapped)
+      return origAdd.call(this, type, wrapped, options)
     }
+    return origAdd.call(this, type, listener, options)
   }
-  return origRemove.call(this, type, listener, options)
+
+  EventTarget.prototype.removeEventListener = function (
+    type: string,
+    listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions
+  ) {
+    if (KEYBOARD_EVENTS.has(type) && typeof listener === 'function') {
+      const wrapped = wrappedListeners.get(listener)
+      if (wrapped) {
+        wrappedListeners.delete(listener)
+        return origRemove.call(this, type, wrapped, options)
+      }
+    }
+    return origRemove.call(this, type, listener, options)
+  }
 }

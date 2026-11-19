@@ -143,6 +143,7 @@ async function resetSingleton(): Promise<void> {
 describe('UltraForceWindowManager', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    Object.assign(chrome.runtime, { id: 'fixture-extension' })
 
     // Reset singleton
     await resetSingleton()

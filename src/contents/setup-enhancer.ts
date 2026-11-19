@@ -1,4 +1,5 @@
 import type { PlasmoCSConfig } from 'plasmo'
+import { claimExtensionScript, isExtensionContextValid } from '~lib/extension-context'
 import { logger } from '~lib/logger'
 import { useSettingsStore } from '~stores/settings-store'
 
@@ -12,49 +13,57 @@ export const config: PlasmoCSConfig = {
   run_at: 'document_idle'
 }
 
-/**
- * Setup Page Enhancer
- * Auto-loads all content on lazy-loaded Setup pages
- */
+const SETUP_START_EVENT = 'ultraforce:setup-start'
+
 class SetupEnhancer {
+  private readonly listeners = new AbortController()
+  private urlObserver?: MutationObserver
   private isLoading = false
   private observer: MutationObserver | null = null
-  private scrollInterval: number | null = null
-  private enabled = true
+  private pendingCheck?: ReturnType<typeof setTimeout>
+  private scrollGeneration = 0
   private completedUrls = new Set<string>()
 
-  constructor() {
-    this.initialize()
+  constructor(private readonly release: () => void) {
+    const { signal } = this.listeners
+    window.addEventListener('beforeunload', () => this.destroy(), { signal })
+    document.addEventListener(SETUP_START_EVENT, () => this.checkContext(), { signal })
+
+    const start = () => {
+      if (!this.checkContext()) return
+      document.dispatchEvent(new Event(SETUP_START_EVENT))
+      if (useSettingsStore.getState().autoLoadFields === false) return
+      this.setupUrlWatcher()
+      this.checkAndEnhancePage()
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start, { once: true, signal })
+    } else {
+      start()
+    }
   }
 
-  private async initialize(): Promise<void> {
-    const { autoLoadFields } = useSettingsStore.getState()
-    if (autoLoadFields === false) {
-      this.enabled = false
-      return
-    }
-
-    this.setupUrlWatcher()
-    this.checkAndEnhancePage()
+  private checkContext(): boolean {
+    if (this.listeners.signal.aborted) return false
+    if (isExtensionContextValid()) return true
+    this.destroy()
+    return false
   }
 
   private setupUrlWatcher(): void {
     let lastUrl = location.href
-
-    const urlObserver = new MutationObserver(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href
-        this.stopAutoScroll()
-        setTimeout(() => this.checkAndEnhancePage(), 1000)
-      }
-    })
-
-    urlObserver.observe(document.body, { childList: true, subtree: true })
-
-    window.addEventListener('popstate', () => {
+    const onNavigation = () => {
+      if (!this.checkContext()) return
+      lastUrl = location.href
       this.stopAutoScroll()
-      setTimeout(() => this.checkAndEnhancePage(), 1000)
+      this.pendingCheck = setTimeout(() => this.checkAndEnhancePage(), 1000)
+    }
+
+    this.urlObserver = new MutationObserver(() => {
+      if (location.href !== lastUrl) onNavigation()
     })
+    this.urlObserver.observe(document.body, { childList: true, subtree: true })
+    window.addEventListener('popstate', onNavigation, { signal: this.listeners.signal })
   }
 
   private getUrlKey(): string {
@@ -63,7 +72,7 @@ class SetupEnhancer {
   }
 
   private checkAndEnhancePage(): void {
-    if (!this.enabled) return
+    if (!this.checkContext()) return
 
     const url = location.href
     const urlKey = this.getUrlKey()
@@ -75,13 +84,14 @@ class SetupEnhancer {
 
     if (url.includes('/FieldsAndRelationships/view')) {
       logger.debug('Detected Fields & Relationships page, starting auto-load...')
-      setTimeout(() => this.autoLoadAllContent(urlKey), 2000)
+      this.pendingCheck = setTimeout(() => this.autoLoadAllContent(urlKey), 2000)
     }
   }
 
   private async autoLoadAllContent(urlKey: string): Promise<void> {
-    if (this.isLoading) return
+    if (this.isLoading || !this.checkContext()) return
     this.isLoading = true
+    const generation = this.scrollGeneration
 
     this.completedUrls.add(urlKey)
 
@@ -101,6 +111,7 @@ class SetupEnhancer {
         scrollContainer.scrollTop = scrollContainer.scrollHeight
 
         await this.wait(500)
+        if (generation !== this.scrollGeneration || !this.checkContext()) return
 
         const currentHeight = scrollContainer.scrollHeight
 
@@ -123,7 +134,7 @@ class SetupEnhancer {
       logger.error('Auto-load error:', error)
       this.completedUrls.delete(urlKey)
     } finally {
-      this.isLoading = false
+      if (generation === this.scrollGeneration) this.isLoading = false
     }
   }
 
@@ -218,35 +229,19 @@ class SetupEnhancer {
   }
 
   private stopAutoScroll(): void {
-    if (this.scrollInterval) {
-      clearInterval(this.scrollInterval)
-      this.scrollInterval = null
-    }
+    clearTimeout(this.pendingCheck)
+    this.scrollGeneration++
     this.isLoading = false
   }
 
-  public destroy(): void {
+  private destroy(): void {
+    this.listeners.abort()
+    this.release()
     this.stopAutoScroll()
-    if (this.observer) {
-      this.observer.disconnect()
-    }
+    this.urlObserver?.disconnect()
+    this.observer?.disconnect()
   }
 }
 
-// Initialize
-let enhancer: SetupEnhancer | null = null
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    enhancer = new SetupEnhancer()
-  })
-} else {
-  enhancer = new SetupEnhancer()
-}
-
-// Cleanup on page unload
-window.addEventListener('beforeunload', () => {
-  if (enhancer) {
-    enhancer.destroy()
-  }
-})
+const release = claimExtensionScript('setup-enhancer')
+if (release) new SetupEnhancer(release)
