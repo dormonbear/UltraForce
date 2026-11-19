@@ -107,6 +107,20 @@ describe('setup-enhancer', () => {
     expect(observers).toHaveLength(1)
   })
 
+  it('lets the orphaned setup enhancer release its claim on same-version reload / 同版本重载时让孤立的设置增强脚本释放标记', async () => {
+    const { claimExtensionScript } = await import('~lib/extension-context')
+    const release = vi.fn(claimExtensionScript('setup-enhancer')!)
+    document.addEventListener('ultraforce:setup-start', release, { once: true })
+    try {
+      await loadModule()
+      expect(release).toHaveBeenCalledOnce()
+      expect(observers).toHaveLength(1)
+    } finally {
+      document.removeEventListener('ultraforce:setup-start', release)
+      if (!release.mock.calls.length) release()
+    }
+  })
+
   it('does nothing when autoLoadFields is disabled', async () => {
     getState.mockReturnValue({ autoLoadFields: false })
 
