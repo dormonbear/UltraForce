@@ -3,6 +3,7 @@ import UltraForceWindowManager from '~lib/window-manager'
 import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermissions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
 import { logger } from '~lib/logger'
+import { isToggleShortcut } from '~lib/keyboard-interceptor'
 import { useSettingsStore } from '~stores/settings-store'
 
 export const config: PlasmoCSConfig = {
@@ -95,17 +96,7 @@ class UltraForceContentScript {
         }
       }
 
-      if (shortcutKey.startsWith('alt+')) {
-        const key = shortcutKey.slice(4)
-        if (event.altKey && event.key.toLowerCase() === key) {
-          event.preventDefault()
-          event.stopPropagation()
-          this.toggleModal()
-          return
-        }
-      }
-
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
+      if (isToggleShortcut(event, shortcutKey)) {
         event.preventDefault()
         event.stopPropagation()
         this.toggleModal()

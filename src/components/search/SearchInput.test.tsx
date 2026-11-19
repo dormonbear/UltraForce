@@ -1,13 +1,22 @@
 import React from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { BUILTIN_COMMANDS } from '~lib/command-parser'
+import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import SearchInput from './SearchInput'
 
 function renderInput(props: Partial<React.ComponentProps<typeof SearchInput>> = {}) {
   const onQueryChange = vi.fn()
   const onKeyDown = vi.fn()
   const utils = render(
-    <SearchInput query="" onQueryChange={onQueryChange} onKeyDown={onKeyDown} sfHost={null} {...props} />
+    <SearchInput
+      query=""
+      commands={BUILTIN_COMMANDS}
+      onQueryChange={onQueryChange}
+      onKeyDown={onKeyDown}
+      sfHost={null}
+      {...props}
+    />
   )
   return { onQueryChange, onKeyDown, ...utils }
 }
@@ -15,6 +24,85 @@ function renderInput(props: Partial<React.ComponentProps<typeof SearchInput>> = 
 describe('SearchInput', () => {
   beforeEach(() => {
     cleanup()
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  describe('command scope / 命令范围', () => {
+    it('shows the scope and edits the remainder / 显示范围并编辑剩余文本', () => {
+      const { onQueryChange } = renderInput({ query: ':f create case' })
+      const input = screen.getByRole('combobox')
+      expect(screen.getByTitle('Flows')).toHaveTextContent('Flows')
+      expect(input).toHaveValue('create case')
+      fireEvent.change(input, { target: { value: 'create caseX' } })
+      expect(onQueryChange).toHaveBeenCalledWith(':f create caseX')
+    })
+
+    it.each([
+      ['en-US', 'Custom Codes', 'Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)'],
+      ['zh-CN', '自定义代码', '自定义代码（Apex／触发器／Visualforce／LWC／Aura）']
+    ])('shortens long scope labels in %s / 缩短较长的范围标签', (locale, label, title) => {
+      vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+      renderInput({ query: ':c ' })
+      expect(screen.getByTitle(title)).toHaveTextContent(label)
+      expect(screen.getByTitle(title)).not.toHaveTextContent('Apex')
+      expect(screen.getByRole('combobox').getAttribute('placeholder')).toContain(label)
+      expect(screen.getByRole('combobox').getAttribute('placeholder')).not.toContain('Apex')
+    })
+
+    it.each([':f', ':zz foo'])('keeps %j in the input / 在输入框中保留 %j', (query) => {
+      renderInput({ query })
+      const input = screen.getByRole('combobox')
+      expect(input).toHaveValue(query)
+      expect(input).not.toHaveAttribute('aria-describedby')
+    })
+
+    it.each([
+      ['en-US', 'Search Flows...', 'Scope: Flows'],
+      ['zh-CN', '在 流程 中搜索...', '范围：流程']
+    ])(
+      'localizes the placeholder and description in %s / 本地化 %s 占位符和说明',
+      (locale, placeholder, description) => {
+        vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+        renderInput({ query: ':f ' })
+        const input = screen.getByRole('combobox')
+        expect(input).toHaveValue('')
+        expect(input).toHaveAttribute('placeholder', placeholder)
+        expect(input).toHaveAccessibleDescription(description)
+      }
+    )
+
+    it('removes an empty scope with Backspace / 通过退格键移除空范围', () => {
+      const { onQueryChange } = renderInput({ query: ':f ' })
+      fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Backspace' })
+      expect(onQueryChange).toHaveBeenCalledWith('')
+    })
+
+    it('allows regular Backspace with text at the caret / 光标所在输入框有文本时保留退格键行为', () => {
+      const { onQueryChange } = renderInput({ query: ':f x' })
+      const input = screen.getByRole<HTMLInputElement>('combobox')
+      input.setSelectionRange(0, 0)
+      expect(fireEvent.keyDown(input, { key: 'Backspace' })).toBe(true)
+      expect(onQueryChange).not.toHaveBeenCalled()
+    })
+
+    it('forwards a complete custom event value while scoped / 在限定范围时转发完整的自定义事件值', () => {
+      const { onQueryChange } = renderInput({ query: ':f ' })
+      fireEvent(screen.getByRole('combobox'), new CustomEvent('ultraforce-input', { detail: { value: ':g debug' } }))
+      expect(onQueryChange).toHaveBeenCalledWith(':g debug')
+    })
+
+    it('keeps the query scoped through intercepted edits / 拦截编辑时保留查询范围', () => {
+      const { onQueryChange } = renderInput({ query: ':f ' })
+      const input = screen.getByRole<HTMLInputElement>('combobox')
+      const intercept = createKeyboardInterceptor(() => input)
+      intercept(new KeyboardEvent('keydown', { key: 'x' }))
+      expect(onQueryChange).toHaveBeenLastCalledWith(':f x')
+      expect(input).toHaveValue('x')
+      intercept(new KeyboardEvent('keydown', { key: 'Backspace' }))
+      expect(onQueryChange).toHaveBeenLastCalledWith(':f ')
+      intercept(new KeyboardEvent('keydown', { key: 'Backspace' }))
+      expect(onQueryChange).toHaveBeenLastCalledWith('')
+    })
   })
 
   describe('placeholder', () => {
@@ -97,7 +185,15 @@ describe('SearchInput', () => {
     it('uses the latest onQueryChange callback for custom events', () => {
       const { onQueryChange, rerender } = renderInput()
       const secondChange = vi.fn()
-      rerender(<SearchInput query="" onQueryChange={secondChange} onKeyDown={vi.fn()} sfHost={null} />)
+      rerender(
+        <SearchInput
+          query=""
+          commands={BUILTIN_COMMANDS}
+          onQueryChange={secondChange}
+          onKeyDown={vi.fn()}
+          sfHost={null}
+        />
+      )
       fireEvent(screen.getByRole('combobox'), new CustomEvent('ultraforce-input', { detail: { value: 'v2' } }))
       expect(onQueryChange).not.toHaveBeenCalled()
       expect(secondChange).toHaveBeenCalledWith('v2')
@@ -113,14 +209,32 @@ describe('SearchInput', () => {
   describe('ref and attributes', () => {
     it('attaches a forwarded object ref to the input element', () => {
       const ref = React.createRef<HTMLInputElement>()
-      render(<SearchInput query="" onQueryChange={vi.fn()} onKeyDown={vi.fn()} sfHost={null} ref={ref} />)
+      render(
+        <SearchInput
+          query=""
+          commands={BUILTIN_COMMANDS}
+          onQueryChange={vi.fn()}
+          onKeyDown={vi.fn()}
+          sfHost={null}
+          ref={ref}
+        />
+      )
       expect(ref.current).toBeInstanceOf(HTMLInputElement)
       expect(ref.current?.hasAttribute('data-ultraforce-input')).toBe(true)
     })
 
     it('calls a forwarded function ref with the input element', () => {
       const ref = vi.fn()
-      render(<SearchInput query="" onQueryChange={vi.fn()} onKeyDown={vi.fn()} sfHost={null} ref={ref} />)
+      render(
+        <SearchInput
+          query=""
+          commands={BUILTIN_COMMANDS}
+          onQueryChange={vi.fn()}
+          onKeyDown={vi.fn()}
+          sfHost={null}
+          ref={ref}
+        />
+      )
       expect(ref).toHaveBeenCalledWith(expect.any(HTMLInputElement))
     })
 

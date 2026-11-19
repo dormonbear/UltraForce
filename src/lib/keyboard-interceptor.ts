@@ -95,10 +95,18 @@ function notifyValueChange(input: HTMLInputElement, value: string): void {
   )
 }
 
+export function isToggleShortcut(event: KeyboardEvent, shortcut: string): boolean {
+  const key = event.key.toLowerCase()
+  return shortcut.startsWith('alt+')
+    ? event.altKey && key === shortcut.slice(4)
+    : (event.ctrlKey || event.metaKey) && key === shortcut.toLowerCase()
+}
+
 export interface KeyboardInterceptorOptions {
   getInput: () => HTMLInputElement | null
   getModal?: () => HTMLElement | null
   getShadowRoot?: () => ShadowRoot | null
+  getToggleShortcut?: () => string
 }
 
 export function createKeyboardInterceptor(
@@ -115,16 +123,22 @@ export function createKeyboardInterceptor(
     // Never intercept modifier-only keys
     if (MODIFIER_KEYS.has(e.key)) return
 
-    // If focus is on a form element (input/textarea) that is NOT the search input,
-    // let it handle its own keyboard events (e.g. settings panel form fields)
+    // The content script owns the toggle shortcut, including during exit. / 切换快捷键由内容脚本处理，包括退场期间。
+    if (e.type === 'keydown' && opts.getToggleShortcut && isToggleShortcut(e, opts.getToggleShortcut())) return
+
+    // Preserve settings controls' native keys and route Tab/Escape to the modal.
+    // 保留设置控件的原生按键行为，并将 Tab 和 Escape 交给对话框。
     if (opts.getShadowRoot) {
       const shadowRoot = opts.getShadowRoot()
       const activeEl = shadowRoot?.activeElement
       const searchInput = opts.getInput()
+      const inSettings = activeEl && !searchInput && opts.getModal?.()?.contains(activeEl)
+      const settingsNavigation = inSettings && (e.key === 'Tab' || e.key === 'Escape')
       if (
         activeEl &&
         activeEl !== searchInput &&
-        (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
+        !settingsNavigation &&
+        (inSettings || activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
       ) {
         // Still block Salesforce page shortcuts from firing
         e.stopPropagation()
@@ -197,23 +211,28 @@ export function createKeyboardInterceptor(
       input.focus()
     }
 
+    const commandPrefix = input.dataset.commandPrefix ?? ''
     if (e.key === 'Backspace') {
+      if (commandPrefix && !input.value && input.selectionStart === 0) {
+        notifyValueChange(input, '')
+        return
+      }
       const newValue = deleteChar(input, 'backward')
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:backspace', { value: newValue })
       return
     }
 
     if (e.key === 'Delete') {
       const newValue = deleteChar(input, 'forward')
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:delete', { value: newValue })
       return
     }
 
     if (isPrintable(e.key) && !hasCtrlOrCmd) {
       const newValue = insertChar(input, e.key)
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:insert', { key: e.key, value: newValue })
     }
   }

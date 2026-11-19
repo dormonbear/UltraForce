@@ -15,6 +15,7 @@ test('built extension removes legacy diagnostics and never records request activ
   const launch = () =>
     chromium.launchPersistentContext(profile, {
       headless: false,
+      locale: 'en-US',
       args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`]
     })
   const context: BrowserContext = await launch()
@@ -125,9 +126,14 @@ test('built extension removes legacy diagnostics and never records request activ
     }).toPass({ timeout: 10000 })
     await input.fill(':private success')
     await expect(page.locator('[data-ultraforce-result-item] .result-name')).toHaveText(['Synthetic privacy result'])
-    await input.fill(':private fail')
+    await input.fill('fail')
     await expect(page.getByText(/PRIVATE-RESPONSE/)).toBeVisible()
-    await page.locator('[data-ultraforce-settings-button]').click()
+    await input.fill('')
+    await input.press('Backspace')
+    const settings = page.getByRole('button', { name: 'Settings', exact: true })
+    await expect(settings).toBeVisible()
+    await settings.click()
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible()
     await expect(page.getByText('API Statistics', { exact: true })).toHaveCount(0)
     expect(await worker.evaluate((keys) => chrome.storage.local.get(keys), legacyKeys)).toEqual({})
     diagnosticWrites.push(

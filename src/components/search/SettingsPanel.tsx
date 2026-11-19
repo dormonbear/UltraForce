@@ -13,6 +13,7 @@ import { getUnsupportedTypes, clearMetadataCache, warmupMetadataCache } from '~l
 import { logger } from '~lib/logger'
 
 interface SettingsPanelProps {
+  showHeader?: boolean
   onClose: () => void
   selectedTypes: string[]
   onToggleType: (type: string) => void
@@ -80,6 +81,7 @@ interface CommandFormState {
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  showHeader = true,
   onClose,
   selectedTypes,
   onToggleType,
@@ -418,14 +420,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   return (
     <div data-ultraforce-settings>
-      <div className="settings-header">
-        <button className="back-button" onClick={onClose} aria-label={t('Back')}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H6m0 0l6 6m-6-6l6-6" />
-          </svg>
-        </button>
-        <h2 className="settings-title">{t('Settings')}</h2>
-      </div>
+      {showHeader && (
+        <div className="settings-header">
+          <button className="back-button" onClick={onClose} aria-label={t('Back')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H6m0 0l6 6m-6-6l6-6" />
+            </svg>
+          </button>
+          <h2 className="settings-title">{t('Settings')}</h2>
+        </div>
+      )}
 
       <div className="settings-content">
         <div className="setting-section">

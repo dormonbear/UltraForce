@@ -31,6 +31,22 @@ describe('createKeyboardInterceptor', () => {
     getInput = () => input
   })
 
+  it.each([
+    ['b', { metaKey: true }, 'b'],
+    ['b', { ctrlKey: true }, 'b'],
+    ['i', { altKey: true }, 'alt+i']
+  ])(
+    'lets the configured %s shortcut reach the toggle handler / 将配置的快捷键交给切换处理器',
+    (key, modifiers, shortcut) => {
+      const handler = createKeyboardInterceptor({ getInput, getToggleShortcut: () => shortcut })
+      const event = createKeyEvent('keydown', key, modifiers)
+      handler(event)
+      expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
+      expect(event.preventDefault).not.toHaveBeenCalled()
+      expect(input.value).toBe('')
+    }
+  )
+
   describe('printable characters', () => {
     it('should intercept keydown, preventDefault, and insert character', () => {
       const handler = createKeyboardInterceptor(getInput)

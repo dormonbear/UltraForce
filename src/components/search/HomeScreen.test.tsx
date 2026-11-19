@@ -73,6 +73,15 @@ describe('HomeScreen', () => {
     expect(screen.getByText('CreateCase')).toBeTruthy()
   })
 
+  it('shows only favorites when selected / 选中收藏时只显示收藏', () => {
+    render(<HomeScreen {...defaultProps} section="favorites" />)
+
+    expect(screen.getByText('Favorites')).toBeInTheDocument()
+    expect(screen.getByText('Account')).toBeInTheDocument()
+    expect(screen.queryByText('Recent')).not.toBeInTheDocument()
+    expect(screen.queryByText('AccountService')).not.toBeInTheDocument()
+  })
+
   it('should order recent items by last visit time, most recent first', () => {
     render(<HomeScreen {...defaultProps} />)
     const names = screen.getAllByText(/AccountService|CreateCase/).map((el) => el.textContent)
@@ -116,7 +125,11 @@ describe('HomeScreen empty state', () => {
     vi.resetModules()
   })
 
-  it('should render empty state when no items', async () => {
+  it.each([
+    [undefined, 'Start searching'],
+    ['history', 'No recent items'],
+    ['favorites', 'No favorites yet']
+  ] as const)('shows the empty state for %s / 显示 %s 的空状态', async (section, message) => {
     vi.doMock('~stores/history-store', () => ({
       useHistoryStore: (selector: (s: { items: never[] }) => unknown) => selector({ items: [] }),
       sortByLastVisited: (arr: never[]) => arr
@@ -129,8 +142,15 @@ describe('HomeScreen empty state', () => {
 
     const { default: HomeScreenEmpty } = await import('./HomeScreen')
 
-    render(<HomeScreenEmpty onNavigate={vi.fn()} onToggleFavorite={vi.fn()} onRemoveHistoryItem={vi.fn()} />)
+    render(
+      <HomeScreenEmpty
+        section={section}
+        onNavigate={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onRemoveHistoryItem={vi.fn()}
+      />
+    )
 
-    expect(screen.getByText('Start searching')).toBeTruthy()
+    expect(screen.getByText(message)).toBeInTheDocument()
   })
 })

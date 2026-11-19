@@ -2,33 +2,16 @@ import { t } from '~lib/i18n'
 // HomeScreen - Replaces the empty state when query is empty.
 // Shows pinned favorites and recent history ordered by last visit time.
 
-import React, { useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback, useState } from 'react'
 import { useHistoryStore, sortByLastVisited } from '~stores/history-store'
 import { useFavoritesStore, type FavoriteItem } from '~stores/favorites-store'
 import type { HistoryItem } from '~stores/history-store'
+import type { HomeSection } from './SearchBarActions'
+import TypeBadge from './TypeBadge'
+import { useSlidingHighlight } from './motion/useSlidingHighlight'
 
 const MAX_RECENT_ITEMS = 8
 const MAX_FAVORITE_ITEMS = 10
-
-const TYPE_ICONS: Record<string, string> = {
-  ApexClass: '</>',
-  ApexTrigger: '</>',
-  CustomObject: 'O',
-  CustomField: 'F',
-  Flow: 'FL',
-  User: 'U',
-  PermissionSet: 'PS',
-  Profile: 'PR',
-  LightningComponentBundle: 'LW',
-  AuraDefinitionBundle: 'AU',
-  ApexPage: 'VF',
-  ApexComponent: 'VC',
-  CustomLabel: 'CL',
-  Record: 'R',
-  SetupShortcut: 'S',
-  CustomMetadataType: 'CM',
-  CustomSetting: 'CS'
-}
 
 interface HomeScreenProps {
   /** Navigate to a URL directly. */
@@ -39,11 +22,7 @@ interface HomeScreenProps {
   onRemoveHistoryItem: (id: string) => void
   /** Selected types hint for the search tips. */
   selectedTypes?: string[]
-}
-
-/** Get a short type icon/label for the item badge. */
-function getTypeIcon(type: string): string {
-  return TYPE_ICONS[type] || type.charAt(0).toUpperCase()
+  section?: HomeSection
 }
 
 /** Format relative time like "2m ago", "3h ago", "5d ago". */
@@ -59,11 +38,38 @@ function formatRelativeTime(timestamp: number): string {
   return t('{count}mo ago', { count: Math.floor(days / 30) })
 }
 
+function HomeItems({ children, items }: { children: React.ReactNode; items: readonly (FavoriteItem | HistoryItem)[] }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const [focus, setFocus] = useState<string | null>(null)
+  const selected = hover ?? focus
+  const { listRef, highlightStyle, noAnimate } = useSlidingHighlight(selected, items)
+
+  function getRowSelector(target: EventTarget | null) {
+    const row = target instanceof Element ? target.closest<HTMLElement>('[data-home-row]') : null
+    return row && listRef.current?.contains(row) ? `[data-home-row="${row.dataset.homeRow}"]` : null
+  }
+
+  return (
+    <div
+      className="home-items"
+      ref={listRef}
+      onMouseOver={(event) => setHover(getRowSelector(event.target))}
+      onMouseLeave={() => setHover(null)}
+      onFocus={(event) => setFocus(getRowSelector(event.target))}
+      onBlur={(event) => setFocus(getRowSelector(event.relatedTarget))}
+    >
+      <div className="sliding-highlight" aria-hidden="true" data-snap={noAnimate} style={highlightStyle} />
+      {children}
+    </div>
+  )
+}
+
 const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate,
   onToggleFavorite,
   onRemoveHistoryItem,
-  selectedTypes
+  selectedTypes,
+  section
 }) => {
   const favorites = useFavoritesStore((s) => s.items)
   const historyItems = useHistoryStore((s) => s.items)
@@ -105,7 +111,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     [onRemoveHistoryItem]
   )
 
-  const hasContent = visibleFavorites.length > 0 || recentItems.length > 0
+  const showFavorites = section !== 'history' && visibleFavorites.length > 0
+  const showHistory = section !== 'favorites' && recentItems.length > 0
+  const hasContent = showFavorites || showHistory
+
+  if (!hasContent && section) {
+    return (
+      <div className="home-screen">
+        <div className="home-empty">
+          <div className="home-empty-title">{t(section === 'history' ? 'No recent items' : 'No favorites yet')}</div>
+        </div>
+      </div>
+    )
+  }
 
   if (!hasContent) {
     return (
@@ -132,7 +150,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <div className="home-screen">
-      {visibleFavorites.length > 0 && (
+      {showFavorites && (
         <div className="home-section">
           <div className="home-section-header">
             <span className="home-section-icon">
@@ -142,19 +160,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
             {t('Favorites')}
           </div>
-          <div className="home-items">
-            {visibleFavorites.map((item) => (
+          <HomeItems items={visibleFavorites}>
+            {visibleFavorites.map((item, index) => (
               <div
                 key={item.id}
                 className="home-item"
+                data-home-row={index}
                 onClick={() => handleItemClick(item.url)}
                 role="button"
                 tabIndex={0}
                 title={`${item.name} (${item.type})`}
               >
-                <span className="home-item-badge" data-type={item.type}>
-                  {getTypeIcon(item.type)}
-                </span>
+                <TypeBadge type={item.type} />
                 <span className="home-item-name">
                   {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
                     ? t(item.name)
@@ -178,11 +195,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 </button>
               </div>
             ))}
-          </div>
+          </HomeItems>
         </div>
       )}
 
-      {recentItems.length > 0 && (
+      {showHistory && (
         <div className="home-section">
           <div className="home-section-header">
             <span className="home-section-icon">
@@ -193,11 +210,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
             {t('Recent')}
           </div>
-          <div className="home-items">
-            {recentItems.map((item) => (
+          <HomeItems items={recentItems}>
+            {recentItems.map((item, index) => (
               <div
                 key={`${item.id}-${item.type}`}
                 className="home-item"
+                data-home-row={index}
                 onClick={() => handleItemClick(item.url)}
                 role="button"
                 tabIndex={0}
@@ -207,9 +225,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                   count: item.visitCount
                 })}
               >
-                <span className="home-item-badge" data-type={item.type}>
-                  {getTypeIcon(item.type)}
-                </span>
+                <TypeBadge type={item.type} />
                 <span className="home-item-name">
                   {['ProfileSubMenu', 'ProfileSetupLink', 'SetupShortcut'].includes(item.type)
                     ? t(item.name)
@@ -244,7 +260,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 </button>
               </div>
             ))}
-          </div>
+          </HomeItems>
         </div>
       )}
     </div>
