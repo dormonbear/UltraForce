@@ -32,6 +32,8 @@ test('shields host keyboard listeners and preserves their lifecycle / 屏蔽宿�
     const calls = await page.evaluate(() => {
       const first = new EventTarget()
       const second = new EventTarget()
+      const iframe = document.body.appendChild(document.createElement('iframe'))
+      const otherRealm = iframe.contentWindow as Window & typeof globalThis
       const counts = { first: 0, second: 0, object: 0 }
       function listener(this: EventTarget) {
         if (this === first) counts.first++
@@ -48,7 +50,8 @@ test('shields host keyboard listeners and preserves their lifecycle / 屏蔽宿�
       }
       first.addEventListener('keydown', listener)
       first.addEventListener('keydown', listener)
-      first.addEventListener('keydown', object)
+      const boxedType = Object('keydown')
+      Reflect.apply(first.addEventListener, first, [boxedType, object])
       second.addEventListener('keydown', listener)
 
       document.documentElement.setAttribute('data-ultraforce-modal-open', '')
@@ -59,19 +62,23 @@ test('shields host keyboard listeners and preserves their lifecycle / 屏蔽宿�
       const closed = { ...counts }
 
       first.removeEventListener('keydown', listener)
-      first.removeEventListener('keydown', object)
+      Reflect.apply(first.removeEventListener, first, [boxedType, object])
       dispatch()
       const firstRemoved = { ...counts }
+      otherRealm.EventTarget.prototype.addEventListener.call(second, 'keydown', listener)
+      dispatch()
+      const bothRegistered = { ...counts }
       second.removeEventListener('keydown', listener)
       dispatch()
-      return { open, closed, firstRemoved, allRemoved: counts }
+      return { open, closed, firstRemoved, bothRegistered, allRemoved: counts }
     })
 
     expect(calls).toEqual({
       open: { first: 0, second: 0, object: 0 },
       closed: { first: 1, second: 1, object: 1 },
       firstRemoved: { first: 1, second: 2, object: 1 },
-      allRemoved: { first: 1, second: 2, object: 1 }
+      bothRegistered: { first: 1, second: 4, object: 1 },
+      allRemoved: { first: 1, second: 4, object: 1 }
     })
   } finally {
     await context.close()

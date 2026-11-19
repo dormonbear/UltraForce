@@ -49,6 +49,8 @@ export const config: PlasmoCSConfig = {
 
 const shieldWindow = window as Window & { __ultraForceKeyboardShield?: boolean }
 
+// Tabs open before an extension update keep their previous shield until reloaded.
+// 扩展更新前已打开的标签页会继续使用旧版键盘屏蔽，直到重新加载。
 if (!shieldWindow.__ultraForceKeyboardShield) {
   shieldWindow.__ultraForceKeyboardShield = true
   const KEYBOARD_EVENTS = new Set(['keydown', 'keyup', 'keypress'])
@@ -69,14 +71,23 @@ if (!shieldWindow.__ultraForceKeyboardShield) {
     listener: EventListenerOrEventListenerObject | null,
     options?: boolean | AddEventListenerOptions
   ) {
-    if (!KEYBOARD_EVENTS.has(type) || (typeof listener !== 'function' && typeof listener !== 'object') || !listener) {
-      return origAdd.call(this, type, listener, options)
+    if (typeof type === 'symbol') return origAdd.call(this, type, listener, options)
+
+    const eventType = String(type)
+    if (
+      !KEYBOARD_EVENTS.has(eventType) ||
+      (typeof listener !== 'function' && typeof listener !== 'object') ||
+      !listener
+    ) {
+      return origAdd.call(this, eventType, listener, options)
     }
 
     let wrapped = wrappedListeners.get(listener)
     if (!wrapped) {
       const original = listener
       wrapped = function (this: EventTarget, event: Event) {
+        // A once listener is consumed even if the modal is open when it fires.
+        // 即使事件触发时弹窗处于打开状态，once 监听器也会被消耗。
         if (isModalOpen()) return
         if (typeof original === 'function') {
           Reflect.apply(original, this, [event])
@@ -86,7 +97,7 @@ if (!shieldWindow.__ultraForceKeyboardShield) {
       }
       wrappedListeners.set(original, wrapped)
     }
-    return origAdd.call(this, type, wrapped, options)
+    return origAdd.call(this, eventType, wrapped, options)
   }
 
   EventTarget.prototype.removeEventListener = function (
@@ -94,7 +105,19 @@ if (!shieldWindow.__ultraForceKeyboardShield) {
     listener: EventListenerOrEventListenerObject | null,
     options?: boolean | EventListenerOptions
   ) {
-    const wrapped = KEYBOARD_EVENTS.has(type) && listener ? wrappedListeners.get(listener) : undefined
-    return origRemove.call(this, type, wrapped ?? listener, options)
+    if (typeof type === 'symbol') return origRemove.call(this, type, listener, options)
+
+    const eventType = String(type)
+    const wrapped = KEYBOARD_EVENTS.has(eventType) && listener ? wrappedListeners.get(listener) : undefined
+    if (!wrapped) return origRemove.call(this, eventType, listener, options)
+
+    // Reuse the capture flag for wrapped and raw registrations, reading any getter once.
+    // 包装后的注册和原始注册使用同一捕获标志，且只调用一次 getter。
+    const capture =
+      options !== null && (typeof options === 'object' || typeof options === 'function')
+        ? Boolean(options.capture)
+        : options
+    origRemove.call(this, eventType, wrapped, capture)
+    return origRemove.call(this, eventType, listener, capture)
   }
 }

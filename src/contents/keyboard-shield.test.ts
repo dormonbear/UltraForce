@@ -43,6 +43,25 @@ it('removes the same listener independently on different targets / 可在不同�
   expect(listener).toHaveBeenCalledOnce()
 })
 
+it('removes both wrapped and raw keyboard registrations / 同时移除包装后的和原始的键盘监听器注册', () => {
+  const target = new EventTarget()
+  const listener = vi.fn()
+  target.addEventListener('keydown', listener, true)
+  nativeAdd.call(target, 'keydown', listener, true)
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  expect(listener).toHaveBeenCalledTimes(2)
+
+  const capture = vi.fn(() => true)
+  target.removeEventListener('keydown', listener, {
+    get capture() {
+      return capture()
+    }
+  })
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  expect(listener).toHaveBeenCalledTimes(2)
+  expect(capture).toHaveBeenCalledOnce()
+})
+
 it('removes the same listener independently for each keyboard type / 可按键盘事件类型独立移除同一监听器', () => {
   const target = new EventTarget()
   const listener = vi.fn()
@@ -149,6 +168,32 @@ it('passes non-keyboard callbacks through with their original identity / 以原�
   target.removeEventListener('click', listener)
   target.dispatchEvent(new MouseEvent('click'))
   expect(listener).toHaveBeenCalledOnce()
+})
+
+it('shields and removes boxed keyboard event types / 对包装为对象的键盘事件类型执行屏蔽和移除', () => {
+  const target = new EventTarget()
+  const listener = vi.fn()
+  const type = Object('keydown')
+  Reflect.apply(target.addEventListener, target, [type, listener])
+
+  document.documentElement.setAttribute(modalAttribute, '')
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  expect(listener).not.toHaveBeenCalled()
+
+  document.documentElement.removeAttribute(modalAttribute)
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  expect(listener).toHaveBeenCalledOnce()
+  Reflect.apply(target.removeEventListener, target, [type, listener])
+  target.dispatchEvent(new KeyboardEvent('keydown'))
+  expect(listener).toHaveBeenCalledOnce()
+})
+
+it('preserves native rejection of Symbol event types / 保留原生接口对 Symbol 事件类型的拒绝行为', () => {
+  const target = new EventTarget()
+  const args = [Symbol('keydown'), vi.fn()]
+  const typeError = expect.objectContaining({ name: 'TypeError' })
+  expect(() => Reflect.apply(target.addEventListener, target, args)).toThrow(typeError)
+  expect(() => Reflect.apply(target.removeEventListener, target, args)).toThrow(typeError)
 })
 
 it('keeps one keyboard wrapper across reinjection / 重新注入时沿用同一层键盘监听器包装', async () => {
