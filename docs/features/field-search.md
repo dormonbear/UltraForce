@@ -41,9 +41,9 @@ Contact.mail      # MailingStreet, MailingCity, Email
 
 ## Autocomplete
 
-Press `Tab` to autocomplete the selected field into the search input.
+With search text entered, press `Tab` to autocomplete the selected field into the search input. With the search text empty, `Tab` opens the scope picker.
 
-This is useful for building queries or copying field API names.
+输入搜索文本后，按 `Tab` 可将选中的字段自动补全到搜索框，方便构建查询或复制字段 API 名称。搜索文本为空时，按 `Tab` 会打开范围选择器。
 
 ## Navigation
 

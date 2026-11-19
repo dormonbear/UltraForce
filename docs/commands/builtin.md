@@ -2,6 +2,10 @@
 
 These commands are always available and cannot be overridden.
 
+Type a command followed by a space to apply it as a scope chip, then enter your search text. You can also pick a command by pressing `Tab` when the search text is empty. See [Scope Picker and Chips](./index#scope-picker-and-chips).
+
+输入命令并按空格可将其应用为范围标签，然后输入搜索词。搜索文本为空时，也可按 `Tab` 选择命令。详见[范围选择器和范围标签](./index#scope-picker-and-chips)。
+
 ## :o - Objects & Fields
 
 Search objects and fields.

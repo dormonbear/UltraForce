@@ -48,7 +48,9 @@ Salesforce record IDs have 3-character prefixes that identify the object:
 
 ## Org Type Indicator
 
-The search modal shows your current environment:
+The floating search bar shows your current environment with an org badge.
+
+悬浮搜索栏中的组织徽标会显示当前环境。
 
 | Indicator | Environment |
 |-----------|-------------|
@@ -58,6 +60,10 @@ The search modal shows your current environment:
 | SCRATCH | Scratch org |
 
 ## Navigation Actions
+
+Salesforce tabs opened by UltraForce use your existing Salesforce session. You can open search in those tabs as soon as the page is ready.
+
+UltraForce 打开的 Salesforce 标签页会使用当前 Salesforce 会话。页面就绪后，即可在这些标签页中打开搜索。
 
 From a record page, you can:
 

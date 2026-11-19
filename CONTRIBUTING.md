@@ -5,7 +5,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (ESM project)
-- [pnpm](https://pnpm.io/) package manager
+- [pnpm](https://pnpm.io/) 9.15.9, pinned in `package.json` via `packageManager` / `package.json` 的 `packageManager` 字段固定 pnpm 版本为 9.15.9
 - Chrome or Chromium browser
 - (Optional) A Salesforce org for E2E testing
 
