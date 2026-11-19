@@ -10,7 +10,7 @@ const setupFixture = `
   <button type="button">Back to fields / 返回字段列表</button>
   <p role="status">Fields / 字段</p>
   <div class="viewport scroller" role="region" aria-label="Fields / 字段" style="height:100px;overflow:auto">
-    <div style="height:1000px"></div>
+    <div data-row-key-value="field-1" style="height:1000px"></div>
   </div>
   <script>
     const fields = document.querySelector('[role="region"]')
@@ -156,4 +156,36 @@ test('Setup retries scrolling after navigation interrupts a run / 导航中断�
   await expect(status).toHaveText('Fields / 字段')
   const fields = page.getByRole('region', { name: 'Fields / 字段' })
   await expect.poll(() => fields.evaluate((element) => element.scrollTop), { timeout: 7000 }).toBeGreaterThan(0)
+})
+
+test('Setup protects the retained list on return to a completed page / 返回已完成的设置页后继续保护保留的列表', async ({
+  salesforcePage: page
+}) => {
+  await page.goto(`${origin}${fieldsPath}`)
+  await expect(page).toHaveURL(`${origin}${detailsPath}`)
+  const back = page.getByRole('button', { name: 'Back to fields / 返回字段列表' })
+  await back.click()
+  await expect(page).toHaveURL(`${origin}${fieldsPath}`)
+  const fields = page.getByRole('region', { name: 'Fields / 字段' })
+  const scrollTop = () => fields.evaluate((element) => element.scrollTop)
+  await expect.poll(scrollTop).toBeGreaterThan(0)
+  await expect.poll(scrollTop).toBe(0)
+
+  await page.goForward()
+  await expect(page).toHaveURL(`${origin}${detailsPath}`)
+  await back.click()
+  await expect(page).toHaveURL(`${origin}${fieldsPath}`)
+
+  await expect
+    .poll(() =>
+      fields.locator('[data-row-key-value="field-1"]').evaluate(async (row) => {
+        const duplicate = row.cloneNode()
+        row.after(duplicate)
+        await Promise.resolve()
+        const removed = !duplicate.isConnected
+        if (!removed) duplicate.parentNode?.removeChild(duplicate)
+        return removed
+      })
+    )
+    .toBe(true)
 })

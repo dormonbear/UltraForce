@@ -329,6 +329,34 @@ describe('setup-enhancer', () => {
     expect(urlWatcher.disconnect).not.toHaveBeenCalled()
   })
 
+  it('removes duplicate rows on return without repeating a completed auto-load / 返回页面后去除重复行且不重复执行已完成的自动加载', async () => {
+    global.MutationObserver = RealMutationObserver
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    const original = document.createElement('div')
+    original.setAttribute('data-row-key-value', 'field-1')
+    container.append(original)
+    document.body.append(container)
+    await loadModule()
+    await vi.advanceTimersByTimeAsync(4000)
+    const writesAfterCompletion = container.scrollTopWrites.slice()
+    expect(writesAfterCompletion).toContain(1000)
+    expect(container.scrollTop).toBe(0)
+
+    setLocation(detailsUrl)
+    window.dispatchEvent(new Event('popstate'))
+    await vi.advanceTimersByTimeAsync(1000)
+    setLocation(fieldsUrl)
+    window.dispatchEvent(new Event('popstate'))
+    await vi.advanceTimersByTimeAsync(1000)
+
+    const duplicate = original.cloneNode()
+    container.append(duplicate)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect([...container.children]).toEqual([original])
+    expect(container.scrollTopWrites).toEqual(writesAfterCompletion)
+  })
+
   it('disconnects the duplicate observer on discard / 丢弃页面时断开去重观察器', async () => {
     setLocation(
       'https://example.salesforce-setup.com/lightning/setup/ObjectManager/Account/FieldsAndRelationships/view'

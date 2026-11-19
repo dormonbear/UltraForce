@@ -90,6 +90,8 @@ class SetupEnhancer {
     const urlKey = this.getUrlKey()
 
     if (this.completedUrls.has(urlKey)) {
+      const scrollContainer = this.findScrollContainer()
+      if (scrollContainer) this.disableInfiniteScroll(scrollContainer)
       logger.debug('Page already processed, skipping auto-load')
       return
     }
