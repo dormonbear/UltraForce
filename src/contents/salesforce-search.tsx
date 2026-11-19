@@ -4,6 +4,7 @@ import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermission
 import { getSfHost, getSession } from '~lib/auth'
 import { claimExtensionScript, isExtensionContextValid } from '~lib/extension-context'
 import { scheduleExtensionUpdatedNotice } from '~lib/extension-updated-notice'
+import { isToggleShortcut } from '~lib/keyboard-interceptor'
 import { logger } from '~lib/logger'
 import { useSettingsStore } from '~stores/settings-store'
 
@@ -60,7 +61,6 @@ class UltraForceContentScript {
 
     const start = () => {
       if (!this.checkContext()) return
-      document.dispatchEvent(new Event(SEARCH_START_EVENT))
       const options = { capture: true, passive: false, signal }
       // Opening at window capture bypasses the old document listener. / 在 window 捕获阶段打开可绕过旧版文档监听器。
       window.addEventListener('keydown', this.handleOpeningShortcut, options)
@@ -93,11 +93,7 @@ class UltraForceContentScript {
   }
 
   private matchesShortcut(event: KeyboardEvent): boolean {
-    const shortcutKey = useSettingsStore.getState().shortcutKey.toLowerCase()
-    const key = event.key.toLowerCase()
-    if (shortcutKey === 'escape') return key === 'escape'
-    if (shortcutKey.startsWith('alt+')) return event.altKey && key === shortcutKey.slice(4)
-    return (event.ctrlKey || event.metaKey) && key === shortcutKey
+    return isToggleShortcut(event, useSettingsStore.getState().shortcutKey)
   }
 
   private readonly handleOpeningShortcut = (event: KeyboardEvent): void => {
@@ -213,6 +209,7 @@ class UltraForceContentScript {
   }
 }
 
+document.dispatchEvent(new Event(SEARCH_START_EVENT))
 const release = claimExtensionScript('search')
 if (release) {
   const debugWindow = window as Window & { ultraForceDebug?: () => object }

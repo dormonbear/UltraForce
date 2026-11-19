@@ -31,7 +31,6 @@ class SetupEnhancer {
 
     const start = () => {
       if (!this.checkContext()) return
-      document.dispatchEvent(new Event(SETUP_START_EVENT))
       if (useSettingsStore.getState().autoLoadFields === false) return
       this.setupUrlWatcher()
       this.checkAndEnhancePage()
@@ -243,5 +242,6 @@ class SetupEnhancer {
   }
 }
 
+document.dispatchEvent(new Event(SETUP_START_EVENT))
 const release = claimExtensionScript('setup-enhancer')
 if (release) new SetupEnhancer(release)

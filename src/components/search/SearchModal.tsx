@@ -18,6 +18,7 @@ import { getScopeDetails } from './command-scope'
 import { RecordActions, SearchFooter, StorageWarning, type RecordAction } from './SearchChrome'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
+import { isToggleShortcut } from '~lib/keyboard-interceptor'
 import { logger } from '~lib/logger'
 import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
 import { splitCommandChip } from '~lib/command-chip'
@@ -478,7 +479,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return
     }
 
-    // When query is empty and we have record actions, handle navigation for record actions
     const isInRecordActionsMode = !query.trim() && recordActions.length > 0 && hasSession && !isLoading
 
     switch (event.key) {
@@ -529,7 +529,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         break
 
       default:
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
+        if (isToggleShortcut(event, shortcutKey)) {
           event.preventDefault()
           event.stopPropagation()
           void close()
@@ -601,6 +601,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         <div
           className="ultraforce-search-modal"
           data-ultraforce-modal
+          data-escape-dismisses-panel={showSettings || pickerOpen || undefined}
           data-ui-mode={hasText ? 'results' : 'idle'}
           ref={modalRef}
           tabIndex={-1}

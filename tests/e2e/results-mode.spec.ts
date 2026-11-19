@@ -68,6 +68,14 @@ test('widens the input while hiding the round buttons / 隐藏圆形按钮并加
     await input.press('Escape')
     await expect(backdrop).toHaveAttribute('data-closing', 'true')
     await expect(dialog).toHaveCount(0)
+
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
+    await expect(input).toBeFocused()
+    const root = page.locator('html')
+    await expect(root).toHaveAttribute('data-ultraforce-modal-open', '')
+    await page.locator('[id^="ultraforce-modal"]').evaluate((host) => host.remove())
+    await page.keyboard.press('Escape')
+    await expect(root).not.toHaveAttribute('data-ultraforce-modal-open', '')
   } finally {
     await context.close()
     rmSync(profile, { recursive: true, force: true })

@@ -1,7 +1,7 @@
 import { splitCommandChip } from '~lib/command-chip'
 import { t } from '~lib/i18n'
 import type { SearchCommand } from '~types'
-import React, { forwardRef, useEffect, useId, useRef, useCallback } from 'react'
+import React, { forwardRef, useEffect, useLayoutEffect, useId, useRef, useCallback } from 'react'
 import { ActionIcon } from './SearchChrome'
 import { getScopeDetails } from './command-scope'
 
@@ -111,6 +111,33 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     // Internal ref to attach native event listener
     const internalRef = useRef<HTMLInputElement | null>(null)
 
+    const pendingSelection = useRef<{
+      value: string
+      start: number
+      end: number
+      direction: HTMLInputElement['selectionDirection']
+    } | null>(null)
+    const rememberSelection = useCallback((input: HTMLInputElement, value: string) => {
+      const { selectionStart: start, selectionEnd: end, selectionDirection: direction } = input
+      pendingSelection.current =
+        input.value === value && value.startsWith(':') && start !== null && end !== null
+          ? { value, start, end, direction }
+          : null
+    }, [])
+
+    useLayoutEffect(() => {
+      const selection = pendingSelection.current
+      pendingSelection.current = null
+      if (!chip || selection?.value !== query) return
+
+      const prefixLength = query.length - remainder.length
+      internalRef.current?.setSelectionRange(
+        Math.max(0, selection.start - prefixLength),
+        Math.max(0, selection.end - prefixLength),
+        selection.direction ?? undefined
+      )
+    }, [chip, query, remainder])
+
     // Stable callback ref to avoid re-registering listener on every render
     const onQueryChangeRef = useRef(onQueryChange)
     useEffect(() => {
@@ -139,12 +166,13 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 
       const handler = (e: Event) => {
         const value = (e as CustomEvent).detail?.value ?? ''
+        rememberSelection(el, value)
         onQueryChangeRef.current(value)
       }
 
       el.addEventListener('ultraforce-input', handler)
       return () => el.removeEventListener('ultraforce-input', handler)
-    }, [])
+    }, [rememberSelection])
 
     return (
       <div className="search-input-section">
@@ -174,7 +202,11 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           ref={setRefs}
           type="text"
           value={remainder}
-          onChange={(e) => onQueryChange((scope?.prefix ?? '') + e.target.value)}
+          onChange={(e) => {
+            const value = (scope?.prefix ?? '') + e.currentTarget.value
+            rememberSelection(e.currentTarget, value)
+            onQueryChange(value)
+          }}
           onKeyDown={(e) => {
             e.stopPropagation()
             e.nativeEvent.stopImmediatePropagation()

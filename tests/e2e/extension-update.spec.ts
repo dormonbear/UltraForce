@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { waitForContentScript } from './helpers/content-script'
 
-test('search reattaches after the extension reloads / 扩展重新加载后搜索接管已打开页面', async () => {
+test('search reattaches after two extension reloads / 扩展重载两次后搜索仍能接管已打开页面', async () => {
   const profile = mkdtempSync(path.join(tmpdir(), 'ultraforce-update-'))
   const extensionPath = path.resolve('build/chrome-mv3-prod')
   const context = await chromium.launchPersistentContext(profile, {
@@ -36,7 +36,6 @@ test('search reattaches after the extension reloads / 扩展重新加载后搜�
     await page.goto(homeUrl)
     await waitForContentScript(context, page)
     const containers = page.locator('[id^="ultraforce-modal"]')
-    await containers.evaluate((container) => container.setAttribute('data-original-instance', ''))
     await page.evaluate(() => document.body.setAttribute('data-original-document', ''))
     const shortcut = process.platform === 'darwin' ? 'Meta+b' : 'Control+b'
     const dialog = page.getByRole('dialog', { name: 'UltraForce search' })
@@ -45,21 +44,40 @@ test('search reattaches after the extension reloads / 扩展重新加载后搜�
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
 
-    await Promise.all([
-      context.waitForEvent('serviceworker', (candidate) => candidate !== worker && candidate.url() === worker.url()),
-      worker.evaluate(() => chrome.runtime.reload())
-    ])
-    await waitForContentScript(context, page)
-    await page.keyboard.press(shortcut)
-    await expect(dialog).toBeVisible()
     const input = page.getByRole('combobox', { name: 'Search Salesforce metadata' })
-    await expect(input).toBeVisible()
-    await page.keyboard.type('account')
-    await expect(input).toHaveValue('account')
-    await expect(page.getByText('UltraForce encountered an error')).toBeHidden()
+    const notice = page.getByText('UltraForce was updated')
+    const extensionId = new URL(worker.url()).hostname
+    const extensionsPage = await context.newPage()
+    await extensionsPage.goto('chrome://extensions')
+    await extensionsPage.locator('#devMode').click()
+    const extensionCard = extensionsPage.locator(`extensions-item[id="${extensionId}"]`)
+    const reload = extensionCard.getByRole('button', { name: /reload/i })
+    for (const query of ['account', 'contact']) {
+      await containers.evaluate((container) => container.setAttribute('data-original-instance', ''))
+      await reload.click()
+      await page.bringToFront()
+      await expect(page.locator('[data-original-instance]')).toHaveCount(0)
+      await waitForContentScript(context, page)
+      await page.keyboard.press(shortcut)
+      await expect(dialog).toBeVisible()
+      await expect(input).toBeVisible()
+      await page.keyboard.type(query)
+      await expect(input).toHaveValue(query)
+      await expect(notice).toBeHidden()
+      await expect(page.getByText('UltraForce encountered an error')).toBeHidden()
+      await expect(page.locator('body')).toHaveAttribute('data-original-document', '')
+      await expect(containers).toHaveCount(1)
+      await page.keyboard.press('Escape')
+      await expect(dialog).toBeHidden()
+    }
+
+    await extensionCard.locator('#enableToggle').click()
+    await page.bringToFront()
+    await page.keyboard.press(shortcut)
+    await expect(notice).toBeVisible()
+    await page.getByRole('button', { name: 'Dismiss', exact: true }).click()
+    await expect(notice).toHaveCount(0)
     await expect(page.locator('body')).toHaveAttribute('data-original-document', '')
-    await expect(containers).toHaveCount(1)
-    await expect(page.locator('[data-original-instance]')).toHaveCount(0)
   } finally {
     await context.close()
     rmSync(profile, { recursive: true, force: true })

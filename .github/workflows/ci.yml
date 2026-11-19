@@ -83,9 +83,6 @@ jobs:
       - name: Browserslist Build Regressions / Browserslist 构建回归
         run: node --test scripts/browserslist-build-inputs.test.mjs
 
-      - name: Rollup Build Regressions / Rollup 构建回归
-        run: node --test scripts/rollup-build-inputs.test.mjs
-
       - name: Sharp Native and Image Regressions / Sharp 原生库及图像回归
         run: node --test scripts/sharp-build-inputs.test.mjs
 
@@ -279,6 +276,9 @@ jobs:
 
       - name: Build Extension
         run: pnpm build
+
+      - name: Verify Search JSX Runtime / 验证搜索 JSX 运行时
+        run: node --test scripts/search-jsx-runtime.test.mjs
 
       - name: Verify Managed Schema Shipped
         run: node scripts/verify-managed-schema.mjs

@@ -1,6 +1,7 @@
 import React from 'react'
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { act, render, screen, fireEvent, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { BUILTIN_COMMANDS } from '~lib/command-parser'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import SearchInput from './SearchInput'
@@ -36,6 +37,40 @@ describe('SearchInput', () => {
       fireEvent.change(input, { target: { value: 'create caseX' } })
       expect(onQueryChange).toHaveBeenCalledWith(':f create caseX')
     })
+
+    it.each(['native', 'intercepted'])(
+      'keeps the caret before the existing text after a %s edit creates a scope / 编辑生成范围标签后将光标保留在原有文本前',
+      async (mode) => {
+        function ControlledInput() {
+          const [query, setQuery] = React.useState('account')
+          return (
+            <SearchInput
+              query={query}
+              commands={BUILTIN_COMMANDS}
+              onQueryChange={setQuery}
+              onKeyDown={vi.fn()}
+              sfHost={null}
+            />
+          )
+        }
+
+        render(<ControlledInput />)
+        const input = screen.getByRole<HTMLInputElement>('combobox')
+        input.setSelectionRange(0, 0)
+        if (mode === 'native') {
+          await userEvent.type(input, ':f ', { skipClick: true })
+        } else {
+          const intercept = createKeyboardInterceptor(() => input)
+          act(() => {
+            for (const key of ':f ') intercept(new KeyboardEvent('keydown', { key }))
+          })
+        }
+        expect(screen.getByTitle('Flows')).toBeVisible()
+        expect(input).toHaveValue('account')
+        expect(input.selectionStart).toBe(0)
+        expect(input.selectionEnd).toBe(0)
+      }
+    )
 
     it.each([
       ['en-US', 'Custom Codes', 'Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)'],

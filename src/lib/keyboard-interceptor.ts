@@ -95,11 +95,15 @@ function notifyValueChange(input: HTMLInputElement, value: string): void {
   )
 }
 
-export function isToggleShortcut(event: KeyboardEvent, shortcut: string): boolean {
+export function isToggleShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey'>,
+  shortcut: string
+): boolean {
   const key = event.key.toLowerCase()
-  return shortcut.startsWith('alt+')
-    ? event.altKey && key === shortcut.slice(4)
-    : (event.ctrlKey || event.metaKey) && key === shortcut.toLowerCase()
+  const normalized = shortcut.toLowerCase()
+  if (normalized === 'escape') return key === 'escape'
+  if (normalized.startsWith('alt+')) return event.altKey && key === normalized.slice(4)
+  return (event.ctrlKey || event.metaKey) && key === normalized
 }
 
 export interface KeyboardInterceptorOptions {
@@ -123,8 +127,16 @@ export function createKeyboardInterceptor(
     // Never intercept modifier-only keys
     if (MODIFIER_KEYS.has(e.key)) return
 
-    // The content script owns the toggle shortcut, including during exit. / 切换快捷键由内容脚本处理，包括退场期间。
-    if (e.type === 'keydown' && opts.getToggleShortcut && isToggleShortcut(e, opts.getToggleShortcut())) return
+    // Open panels get Escape first. The content script owns the remaining toggle shortcuts.
+    // 已打开的面板优先处理 Escape，其余切换快捷键由内容脚本处理。
+    if (
+      e.type === 'keydown' &&
+      opts.getToggleShortcut &&
+      isToggleShortcut(e, opts.getToggleShortcut()) &&
+      !(e.key === 'Escape' && opts.getModal?.()?.hasAttribute('data-escape-dismisses-panel'))
+    ) {
+      return
+    }
 
     // Preserve settings controls' native keys and route Tab/Escape to the modal.
     // 保留设置控件的原生按键行为，并将 Tab 和 Escape 交给对话框。

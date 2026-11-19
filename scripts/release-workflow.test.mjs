@@ -111,6 +111,38 @@ test('lint failure blocks downstream CI and release steps', () => {
     })
 })
 
+for (const hasTargetPlaceholder of [true, false]) {
+  const name = hasTargetPlaceholder
+    ? 'rejects a placeholder in the target release / 拒绝目标版本中的发布说明占位文本'
+    : 'ignores placeholders in other versions / 忽略其他版本中的发布说明占位文本'
+  test(name, () =>
+    fixture(({ cwd }) => {
+      mkdirSync(join(cwd, 'scripts'))
+      mkdirSync(join(cwd, 'docs', 'guide'), { recursive: true })
+      writeFileSync(
+        join(cwd, 'scripts', 'extract-release-notes.mjs'),
+        readFileSync(new URL('./extract-release-notes.mjs', import.meta.url))
+      )
+      const targetNotes = hasTargetPlaceholder ? '- (describe improvements here)' : 'Tagged notes / 标签版本说明'
+      writeFileSync(
+        join(cwd, 'docs', 'guide', 'release-notes.md'),
+        `## v0.4.10\n- (describe new features here)\n## v0.4.1\n${targetNotes}\n`
+      )
+      const step = steps.find((candidate) => candidate.name === 'Extract Release Notes')
+      const result = execute(step, cwd, { 'steps.target.outputs.version': '0.4.1' })
+      const body = readFileSync(join(cwd, 'release-body.md'), 'utf8').trim()
+      if (hasTargetPlaceholder) {
+        assert.equal(result.status, 1)
+        assert.match(result.stderr, /v0\.4\.1.*placeholder/i)
+        assert.match(result.stderr, /占位/)
+        assert.equal(body, '')
+      } else {
+        assert.equal(result.status, 0, result.stderr)
+        assert.equal(body, targetNotes)
+      }
+    }))
+}
+
 for (const event of ['workflow_dispatch', 'push']) {
   for (const tag of ['v0.4.1', 'v0.4.0']) {
     test(`${event} ${tag === 'v0.4.0' ? 'rejects source-version mismatch for' : 'binds source, ZIP, notes and explicit release tag for'} ${tag}`, () =>

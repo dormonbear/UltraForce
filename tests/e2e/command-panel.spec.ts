@@ -30,11 +30,14 @@ test('chooses Flows from the Tab scope picker / 从 Tab 搜索范围面板选择
       }
     })
 
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'))
+    await worker.evaluate(() => chrome.storage.local.set({ ultraforce_search_settings: { shortcutKey: 'AlT+K' } }))
+
     const page = await context.newPage()
     await page.goto(`${baseUrl}/lightning/page/home`)
     await expect(page.locator('[id^="ultraforce-modal"]')).toBeAttached()
     await waitForContentScript(context, page)
-    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
+    await page.keyboard.press('Alt+k')
 
     const dialog = page.getByRole('dialog', { name: 'UltraForce search' })
     const input = dialog.getByRole('combobox')
@@ -51,6 +54,38 @@ test('chooses Flows from the Tab scope picker / 从 Tab 搜索范围面板选择
     await expect(dialog.getByTitle('Flows', { exact: true })).toBeVisible()
     await expect(input).toHaveValue('')
     await expect(input).toBeFocused()
+    await input.press('Backspace')
+    await input.pressSequentially('account')
+    await input.evaluate((element: HTMLInputElement) => element.setSelectionRange(0, 0))
+    await input.pressSequentially(':f ')
+    await expect(dialog.getByTitle('Flows', { exact: true })).toBeVisible()
+    await expect(input).toHaveValue('account')
+    await expect(input).toHaveJSProperty('selectionStart', 0)
+
+    await input.press('Alt+k')
+    await expect(dialog).toHaveCount(0)
+
+    await worker.evaluate(() => chrome.storage.local.set({ ultraforce_search_settings: { shortcutKey: 'escape' } }))
+    await page.reload()
+    await waitForContentScript(context, page)
+    await page.keyboard.press('Escape')
+    await expect(input).toBeFocused()
+
+    await dialog.getByRole('button', { name: 'Settings', exact: true }).click()
+    const settings = dialog.getByRole('heading', { name: 'Settings', exact: true })
+    await expect(settings).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(settings).toBeHidden()
+    await expect(input).toBeFocused()
+
+    await input.press('Tab')
+    await expect(heading).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(heading).toBeHidden()
+    await expect(input).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
   } finally {
     await context.close()
     rmSync(profile, { recursive: true, force: true })
