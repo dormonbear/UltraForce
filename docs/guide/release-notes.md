@@ -1,5 +1,33 @@
 # Release Notes
 
+## v0.6.1
+
+Release Date: 2026-11-19 / 发布日期：2026-11-19
+
+### Reliability / 可靠性
+
+- The search shortcut keeps working if you cancel a page-leave prompt or Chrome restores the page from its back/forward cache. If an extension update prevents search from resuming on a restored page, pressing the shortcut shows an **UltraForce was updated** notice with an option to refresh. ([#81](https://github.com/dormonbear/UltraForce/issues/81))
+  取消离开页面的提示后，或 Chrome 从往返缓存恢复页面后，搜索快捷键仍可使用。如果扩展更新导致搜索无法在恢复的页面上继续运行，按下快捷键会显示 **UltraForce 已更新** 提示，并提供刷新选项。([#81](https://github.com/dormonbear/UltraForce/issues/81))
+- Setup’s Fields & Relationships lists retry auto-loading when you return to a page where navigation interrupted loading. Duplicate rows are still removed, including when you return to a list that already finished loading. ([#80](https://github.com/dormonbear/UltraForce/issues/80))
+  如果导航中断了设置页“字段和关系”列表的自动加载，返回该页面时会重试。列表仍会去除重复行，返回已完成加载的列表时也会去重。([#80](https://github.com/dormonbear/UltraForce/issues/80))
+
+### Keyboard handling / 键盘处理
+
+- Salesforce keyboard listeners follow the browser’s native registration and removal rules. Duplicate registrations no longer cause double firing, and listeners can be removed independently from different targets. Listeners registered as functions or as objects with `handleEvent` are both shielded while UltraForce search is open. Tabs that were already open before the update keep the previous keyboard shield until you reload them. ([#79](https://github.com/dormonbear/UltraForce/issues/79))
+  Salesforce 键盘监听器遵循浏览器原生的注册和移除规则。重复注册不再导致重复触发，同一监听器可从不同目标独立移除。UltraForce 搜索打开时，函数监听器和带 `handleEvent` 的对象监听器都会被屏蔽。更新前已打开的标签页会继续使用旧版键盘屏蔽，直到重新加载。([#79](https://github.com/dormonbear/UltraForce/issues/79))
+
+### Documentation / 文档
+
+- The contributor guide now appears in English and Simplified Chinese, with corrected setup, lint, formatting, test, and logging guidance. ([#77](https://github.com/dormonbear/UltraForce/issues/77))
+  贡献指南现提供英文和简体中文，修正了环境配置、代码检查、格式化、测试和日志说明。([#77](https://github.com/dormonbear/UltraForce/issues/77))
+- The privacy policy is fully bilingual. The documentation clarifies that custom SOQL commands send queries to your own Salesforce org. UltraForce continues to operate without analytics, telemetry, or automatic error reports. ([#76](https://github.com/dormonbear/UltraForce/issues/76))
+  隐私政策全文提供中英双语。文档明确说明，自定义 SOQL 命令会将查询发送到你自己的 Salesforce 组织。UltraForce 仍不收集分析数据或遥测数据，也不自动发送错误报告。([#76](https://github.com/dormonbear/UltraForce/issues/76))
+
+### Privacy / 隐私
+
+- This release adds no data collection. Extension permissions and host permissions are unchanged.
+  此版本不新增数据收集。扩展权限和主机权限保持不变。
+
 ## v0.6.0
 
 Release Date: 2026-11-19 / 发布日期：2026-11-19
