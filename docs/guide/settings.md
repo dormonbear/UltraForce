@@ -1,6 +1,8 @@
 # Settings
 
-Open settings by clicking the gear icon in the search modal.
+Click the round **Settings** button next to the empty search bar. The icon changes to an **X** while Settings is open. Click the same button or press `Esc` to return to search.
+
+点击空搜索栏旁的圆形 **设置** 按钮。设置打开时，按钮图标变为 **X**。再次点击同一个按钮或按 `Esc` 可返回搜索。
 
 ## Search Settings
 

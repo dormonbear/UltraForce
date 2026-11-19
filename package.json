@@ -1,14 +1,15 @@
 {
   "name": "ultraforce-plasmo",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
   "author": "UltraForce Team",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "build:e2e": "PLASMO_PUBLIC_E2E=true plasmo build",
+    "build:e2e": "node scripts/build-e2e.mjs",
     "package": "plasmo package",
     "build:package": "pnpm build && pnpm package",
     "lint": "oxlint src",
@@ -51,6 +52,7 @@
       }
     },
     "permissions": [
+      "scripting",
       "storage",
       "activeTab",
       "tabs",
@@ -117,8 +119,21 @@
   },
   "pnpm": {
     "overrides": {
+      "@svgr/plugin-svgo@6.5.1>deepmerge": "-",
+      "@plasmohq/parcel-resolver-post@0.4.5>tsup": "-",
+      "@babel/core@7.28.3": "7.29.6",
+      "plasmo@0.90.5>sharp": "0.35.5",
+      "tsup@7.2.0>rollup": "3.30.0",
+      "browserslist@4.22.1": "4.28.7",
+      "browserslist@4.25.2": "4.28.7",
+      "sass@1.90.0>immutable": "5.1.8",
+      "svgo@2.8.0": "2.8.4",
       "lmdb@2.7.11>msgpackr": "1.11.5",
       "@vue/compiler-sfc@3.3.4>postcss": "8.5.31",
+      "@vue/compiler-sfc@3.5.42>postcss": "8.5.31",
+      "@plasmohq/parcel-transformer-vue@0.5.0>vue": "3.5.42",
+      "@plasmohq/parcel-transformer-vue@0.5.0>@vue/compiler-sfc": "3.5.42",
+      "@plasmohq/parcel-transformer-svelte@0.6.0>svelte": "4.2.20",
       "@plasmohq/parcel-config@0.42.0>@plasmohq/parcel-transformer-manifest": "0.21.1",
       "cosmiconfig@9.0.0>js-yaml": "4.3.2",
       "plasmo@0.90.5>fflate": "0.8.3",
@@ -127,7 +142,8 @@
       "minimatch@9.0.7>brace-expansion": "5.0.12"
     },
     "patchedDependencies": {
-      "@plasmohq/parcel-transformer-manifest@0.21.1": "patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch"
+      "@plasmohq/parcel-transformer-manifest@0.21.1": "patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch",
+      "http-cache-semantics@4.2.0": "patches/http-cache-semantics@4.2.0.patch"
     }
   },
   "devDependencies": {
@@ -145,6 +161,7 @@
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
     "typescript": "^7.0.2",
+    "vite": "7.3.7",
     "vitest": "5.0.5",
     "vitest-chrome": "0.1.0",
     "yaml": "2.9.1"

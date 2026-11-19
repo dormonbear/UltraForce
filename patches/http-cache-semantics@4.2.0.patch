@@ -1,0 +1,28 @@
+diff --git a/index.js b/index.js
+index f01e9a16b4781dc24c8f43dc7a4c8e6d1e4ae5eb..43e82c1fc5e704f704583fab77a6b0ca1e00c28f 100644
+--- a/index.js
++++ b/index.js
+@@ -394,6 +394,11 @@ module.exports = class CachePolicy {
+     evaluateRequest(req) {
+         this._assertRequestHasHeaders(req);
+ 
++        // Response no-cache requires validation even when max-stale permits reuse. / 响应 no-cache 要求验证，即使 max-stale 允许复用。
++        if (this._rescc['no-cache']) {
++            return this._evaluateRequestMissResult(req);
++        }
++
+         // In all circumstances, a cache MUST NOT ignore the must-revalidate directive
+         if (this._rescc['must-revalidate']) {
+             return this._evaluateRequestMissResult(req);
+@@ -423,6 +428,11 @@ module.exports = class CachePolicy {
+         // the stored response is either:
+         // fresh, or allowed to be served stale
+         if (this.stale()) {
++            // Shared stale responses must honor proxy-revalidate and s-maxage. / 共享过期响应必须遵守 proxy-revalidate 及 s-maxage。
++            if (this._isShared && (this._rescc['proxy-revalidate'] || 's-maxage' in this._rescc)) {
++                return this._evaluateRequestMissResult(req);
++            }
++
+             // If a value is present, then the client is willing to accept a response that has
+             // exceeded its freshness lifetime by no more than the specified number of seconds
+             const allowsStaleWithoutRevalidation = 'max-stale' in requestCC &&

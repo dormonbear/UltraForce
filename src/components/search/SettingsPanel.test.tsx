@@ -50,6 +50,16 @@ async function openAddForm() {
   await screen.findByPlaceholderText('e.g. log')
 }
 
+it('shows a heading and back button by default / 默认显示标题和返回按钮', async () => {
+  const onClose = vi.fn()
+  await act(async () => {
+    renderPanel({ onClose })
+  })
+  expect(screen.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+  expect(onClose).toHaveBeenCalledOnce()
+})
+
 describe('SettingsPanel privacy', () => {
   it('does not offer automatic API request statistics', async () => {
     await act(async () => {

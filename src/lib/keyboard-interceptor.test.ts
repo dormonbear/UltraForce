@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createKeyboardInterceptor } from './keyboard-interceptor'
+import { createKeyboardInterceptor, isToggleShortcut } from './keyboard-interceptor'
 
 function createMockInput(value = '', selectionStart = 0, selectionEnd = 0): HTMLInputElement {
   const input = document.createElement('input')
@@ -22,6 +22,21 @@ function createKeyEvent(type: string, key: string, opts: Partial<KeyboardEventIn
   return event
 }
 
+describe('isToggleShortcut / 切换快捷键匹配', () => {
+  it.each([
+    ['B', { ctrlKey: true }, 'b', true],
+    ['b', { metaKey: true }, 'B', true],
+    ['b', {}, 'b', false],
+    ['i', { altKey: true }, 'AlT+I', true],
+    ['I', { altKey: true }, 'alt+i', true],
+    ['i', { ctrlKey: true }, 'alt+i', false],
+    ['Escape', {}, 'EsCaPe', true],
+    ['e', {}, 'escape', false]
+  ])('matches %s with %j and shortcut %s / 匹配按键、修饰键和快捷键', (key, modifiers, shortcut, matches) => {
+    expect(isToggleShortcut(createKeyEvent('keydown', key, modifiers), shortcut)).toBe(matches)
+  })
+})
+
 describe('createKeyboardInterceptor', () => {
   let input: HTMLInputElement
   let getInput: () => HTMLInputElement | null
@@ -29,6 +44,37 @@ describe('createKeyboardInterceptor', () => {
   beforeEach(() => {
     input = createMockInput()
     getInput = () => input
+  })
+
+  it.each([
+    ['b', { metaKey: true }, 'b'],
+    ['b', { ctrlKey: true }, 'b'],
+    ['i', { altKey: true }, 'alt+i'],
+    ['Escape', {}, 'escape']
+  ])(
+    'lets the configured %s shortcut reach the toggle handler / 将配置的快捷键交给切换处理器',
+    (key, modifiers, shortcut) => {
+      const handler = createKeyboardInterceptor({ getInput, getToggleShortcut: () => shortcut })
+      const event = createKeyEvent('keydown', key, modifiers)
+      handler(event)
+      expect(event.stopImmediatePropagation).not.toHaveBeenCalled()
+      expect(event.preventDefault).not.toHaveBeenCalled()
+      expect(input.value).toBe('')
+    }
+  )
+
+  it('routes the Escape shortcut to the open panel / 将 Escape 快捷键交给已打开的面板', () => {
+    const modal = document.createElement('div')
+    modal.setAttribute('data-escape-dismisses-panel', '')
+    const onKeyDown = vi.fn()
+    modal.addEventListener('keydown', onKeyDown)
+    const handler = createKeyboardInterceptor({ getInput, getModal: () => modal, getToggleShortcut: () => 'escape' })
+    const event = createKeyEvent('keydown', 'Escape')
+
+    handler(event)
+
+    expect(event.stopImmediatePropagation).toHaveBeenCalledOnce()
+    expect(onKeyDown).toHaveBeenCalledWith(expect.objectContaining({ key: 'Escape' }))
   })
 
   describe('printable characters', () => {

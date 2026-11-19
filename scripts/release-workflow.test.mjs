@@ -10,7 +10,11 @@ import { parse } from 'yaml'
 const workflow = parse(readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8'))
 const steps = workflow.jobs.release.steps
 const git = (cwd, ...args) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe']
+  }).trim()
 
 function fixture(run) {
   const cwd = mkdtempSync(join(tmpdir(), 'ultraforce-release-binding-'))
@@ -106,6 +110,38 @@ test('lint failure blocks downstream CI and release steps', () => {
       assert.notEqual(lint['continue-on-error'], true, 'Runner would continue past failed lint')
     })
 })
+
+for (const hasTargetPlaceholder of [true, false]) {
+  const name = hasTargetPlaceholder
+    ? 'rejects a placeholder in the target release / 拒绝目标版本中的发布说明占位文本'
+    : 'ignores placeholders in other versions / 忽略其他版本中的发布说明占位文本'
+  test(name, () =>
+    fixture(({ cwd }) => {
+      mkdirSync(join(cwd, 'scripts'))
+      mkdirSync(join(cwd, 'docs', 'guide'), { recursive: true })
+      writeFileSync(
+        join(cwd, 'scripts', 'extract-release-notes.mjs'),
+        readFileSync(new URL('./extract-release-notes.mjs', import.meta.url))
+      )
+      const targetNotes = hasTargetPlaceholder ? '- (describe improvements here)' : 'Tagged notes / 标签版本说明'
+      writeFileSync(
+        join(cwd, 'docs', 'guide', 'release-notes.md'),
+        `## v0.4.10\n- (describe new features here)\n## v0.4.1\n${targetNotes}\n`
+      )
+      const step = steps.find((candidate) => candidate.name === 'Extract Release Notes')
+      const result = execute(step, cwd, { 'steps.target.outputs.version': '0.4.1' })
+      const body = readFileSync(join(cwd, 'release-body.md'), 'utf8').trim()
+      if (hasTargetPlaceholder) {
+        assert.equal(result.status, 1)
+        assert.match(result.stderr, /v0\.4\.1.*placeholder/i)
+        assert.match(result.stderr, /占位/)
+        assert.equal(body, '')
+      } else {
+        assert.equal(result.status, 0, result.stderr)
+        assert.equal(body, targetNotes)
+      }
+    }))
+}
 
 for (const event of ['workflow_dispatch', 'push']) {
   for (const tag of ['v0.4.1', 'v0.4.0']) {
@@ -314,6 +350,19 @@ test('all version guards precede publication and inputs are not interpolated int
   assert.ok(!steps.find((step) => step.id === 'target').run.includes('${{'))
 })
 
+test('production builds check the search JSX runtime before packaging / 正式构建在打包前检查搜索 JSX 运行时', () => {
+  const ci = parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'))
+  for (const job of [ci.jobs.build, ci.jobs['windows-build'], workflow.jobs.release]) {
+    const buildIndex = job.steps.findIndex((step) => step.run === 'pnpm build')
+    const packageIndex = job.steps.findIndex((step) => step.run === 'pnpm package')
+    assert.ok(buildIndex >= 0 && buildIndex + 1 < packageIndex)
+    const check = job.steps[buildIndex + 1]
+    assert.equal(check.run, 'node --test scripts/search-jsx-runtime.test.mjs')
+    assert.equal(check.if, undefined)
+    assert.notEqual(check['continue-on-error'], true)
+  }
+})
+
 test('packed production UI gates publication / 打包后正式界面验证阻止无效发布', () => {
   const index = (name) => steps.findIndex((step) => step.name === name)
   const smokeIndex = index('Verify Packaged UI / 验证打包后的界面')
@@ -328,3 +377,59 @@ test('packed production UI gates publication / 打包后正式界面验证阻止
   assert.match(smoke.run, /EXTENSION_PATH=.*node scripts\/smoke-test\.mjs/)
   assert.equal(smoke.env.ZIP_PATH, '${{ steps.pkg.outputs.zip_path }}')
 })
+
+test('publisher regressions gate CI and release / 发布器回归阻止无效 CI 和发布', () => {
+  const ci = parse(readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'))
+  for (const job of [ci.jobs['lint-and-typecheck'], workflow.jobs.release]) {
+    const regression = job.steps.find((step) => step.run === 'node --test scripts/cws-publish.test.mjs')
+    assert.ok(regression, 'Missing publisher regression gate / 缺失发布器回归门槛')
+    assert.notEqual(regression['continue-on-error'], true)
+  }
+})
+
+test('publish requires this upload to succeed / 发布要求本次上传成功', () => {
+  const upload = steps.find((step) => step.name === 'Upload to Chrome Web Store')
+  const publish = steps.find((step) => step.name === 'Publish to Chrome Web Store')
+  assert.equal(upload.id, 'cws_upload')
+  assert.equal(publish.if, "env.CWS_PUBLISH == 'true' && steps.cws_upload.outcome == 'success'")
+  for (const enabled of ['true', 'false']) {
+    for (const outcome of ['success', 'failure', 'skipped', 'cancelled']) {
+      const condition = publish.if
+        .replaceAll('env.CWS_PUBLISH', JSON.stringify(enabled))
+        .replaceAll('steps.cws_upload.outcome', JSON.stringify(outcome))
+      assert.equal(Function(`return (${condition})`)(), enabled === 'true' && outcome === 'success')
+    }
+  }
+})
+
+test('publisher failures preserve exit codes and always clean the key / 发布器失败保留退出码并始终清理密钥', () =>
+  fixture(({ cwd }) => {
+    const bin = join(cwd, 'bin')
+    mkdirSync(bin)
+    writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit "$CWS_TEST_EXIT"\n', { mode: 0o755 })
+    const upload = steps.find((step) => step.name === 'Upload to Chrome Web Store')
+    const publish = steps.find((step) => step.name === 'Publish to Chrome Web Store')
+    assert.equal(upload.env.CWS_SERVICE_ACCOUNT_KEY, '${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}')
+    assert.match(upload.run, /printf '%s' "\$CWS_SERVICE_ACCOUNT_KEY"/)
+    assert.match(upload.run, /umask 077/)
+    assert.ok(!upload.run.includes('${{'), 'No shell interpolation of secrets / 不将秘密插入 Shell 源码')
+    assert.ok(!publish.run.includes('${{'), 'No shell interpolation of secrets / 不将秘密插入 Shell 源码')
+    const cleanup = steps.find((step) => step.name === 'Clean Chrome Web Store Key / 清理 Chrome 应用商店密钥')
+    assert.ok(cleanup, 'Missing always-run cleanup / 缺失始终执行的清理')
+    assert.equal(cleanup.if, "always() && env.CWS_PUBLISH == 'true'")
+    assert.ok(steps.indexOf(cleanup) > steps.indexOf(publish))
+    const context = {
+      'secrets.CWS_SERVICE_ACCOUNT_KEY': 'synthetic-key',
+      'secrets.CWS_EXTENSION_ID': 'fixture-id',
+      'steps.pkg.outputs.zip_path': 'fixture.zip'
+    }
+    const keyPath = join(cwd, 'cws-key.json')
+    for (const exit of [0, 23]) {
+      const env = { PATH: `${bin}:${process.env.PATH}`, CWS_TEST_EXIT: String(exit) }
+      assert.equal(execute(upload, cwd, context, env).status, exit)
+      assert.equal(readFileSync(keyPath, 'utf8'), 'synthetic-key')
+      assert.equal(execute(publish, cwd, context, env).status, exit)
+      assert.equal(execute(cleanup, cwd, context, env).status, 0)
+      assert.equal(spawnSync('test', ['-e', keyPath]).status, 1)
+    }
+  }))

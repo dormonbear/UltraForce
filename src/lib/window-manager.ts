@@ -1,7 +1,10 @@
 import React from 'react'
 import { t } from './i18n'
+import { isExtensionContextValid } from './extension-context'
+import { MODAL_CONTAINER_PREFIX, MODAL_CONTAINER_SELECTOR } from './extension-updated-notice'
 import { createPrivateRoot } from './react-root'
 import SearchModal from '~components/search/SearchModal'
+import type { ExitAnimationControl } from '~components/search/motion/useExitAnimation'
 import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
@@ -13,25 +16,20 @@ import { useHistoryStore, setHistoryOrgScope } from '~stores/history-store'
 import { setFavoritesOrgScope } from '~stores/favorites-store'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
-import {
-  buildSetupUrl,
-  resolveSetupShortcutPath,
-  getCurrentRecordFromUrl,
-  shouldUseLightning,
-  isChinaDomain
-} from '~lib/url-builder'
+import { buildSetupUrl, resolveSetupShortcutPath, getCurrentRecordFromUrl, shouldUseLightning } from '~lib/url-builder'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 import { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl } from '~lib/navigation'
 import type { NavigationContext } from '~lib/navigation'
 import { fetchRecordPreview } from '~lib/record-preview'
 import {
-  fetchRecordTypeId as fetchRecordTypeIdFn,
-  resolveObjectApiNameFromRecord as resolveObjectApiNameFromRecordFn,
-  getCurrentRecordLayoutInfo as getCurrentRecordLayoutInfoFn,
-  getUserLightningPreference as getUserLightningPreferenceFn,
-  handleFieldsNavigation as handleFieldsNavigationFn,
-  handleRecordTypeNavigation as handleRecordTypeNavigationFn
-} from '~lib/record-context'
+  fetchRecordTypeId,
+  resolveObjectApiNameFromRecord,
+  getCurrentRecordLayoutUrl,
+  fetchLightningPreference,
+  handleFieldsNavigation,
+  handlePageLayoutNavigation,
+  handleRecordTypeNavigation
+} from './record-setup-navigation'
 import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
@@ -59,17 +57,15 @@ interface WindowManagerOptions {
   containerId?: string
   useShadowDOM?: boolean
   debugMode?: boolean
+  isContextActive?: (event?: KeyboardEvent) => boolean
 }
-
-const CONTAINER_PREFIX = 'ultraforce-modal'
-const CLEANUP_DELAY = 100
-const MAX_CLEANUP_ATTEMPTS = 3
 
 class UltraForceWindowManager {
   private static instance: UltraForceWindowManager | null = null
   private static initializationPromise: Promise<UltraForceWindowManager> | null = null
 
   private reactRoot: any = null
+  private exitControl: { current: ExitAnimationControl | null } = { current: null }
   private containerElement: HTMLElement | null = null
   private shadowRoot: ShadowRoot | null = null
   private cleanupFunctions: (() => void)[] = []
@@ -77,9 +73,10 @@ class UltraForceWindowManager {
   private _isInitialized = false
 
   private options: Required<WindowManagerOptions> = {
-    containerId: `${CONTAINER_PREFIX}-${Date.now()}`,
+    containerId: `${MODAL_CONTAINER_PREFIX}-${Date.now()}`,
     useShadowDOM: true,
-    debugMode: false
+    debugMode: false,
+    isContextActive: isExtensionContextValid
   }
 
   private eventEmitter = new TypedEventEmitter<Record<string, any>>()
@@ -128,24 +125,20 @@ class UltraForceWindowManager {
       UltraForceWindowManager.instance = null
     }
 
-    let attempt = 0
-    while (attempt < MAX_CLEANUP_ATTEMPTS) {
-      const existingContainers = document.querySelectorAll(`[id^="${CONTAINER_PREFIX}"]`)
-      if (existingContainers.length === 0) break
-
-      existingContainers.forEach((container) => {
-        try {
-          container.remove()
-        } catch (error) {
-          logger.warn('Failed to remove container:', error)
+    const staleContainers = document.querySelectorAll(MODAL_CONTAINER_SELECTOR)
+    staleContainers.forEach((container) => {
+      try {
+        // Close pre-update modals so they release their keyboard interceptors. / 关闭旧版对话框以释放键盘拦截器。
+        if (container instanceof HTMLElement) {
+          const shadow = container.shadowRoot ?? chrome.dom?.openOrClosedShadowRoot(container)
+          shadow?.querySelector('.ultraforce-backdrop')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         }
-      })
-
-      attempt++
-      if (attempt < MAX_CLEANUP_ATTEMPTS) {
-        await new Promise((resolve) => setTimeout(resolve, CLEANUP_DELAY))
+      } catch {
+        // The stale host can still be removed. / 仍可移除旧容器。
       }
-    }
+      container.remove()
+    })
+    if (staleContainers.length) document.documentElement.removeAttribute('data-ultraforce-modal-open')
   }
 
   private async initialize(): Promise<void> {
@@ -198,15 +191,6 @@ class UltraForceWindowManager {
   }
 
   private setupEventListeners(): void {
-    const handleBeforeUnload = () => {
-      this.destroy()
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    this.cleanupFunctions.push(() => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    })
-
     const handleVisibilityChange = () => {
       if (document.hidden && useSearchStore.getState().isVisible) {
         this.log('Page hidden, keeping modal state')
@@ -236,7 +220,7 @@ class UltraForceWindowManager {
         this.log('Session status:', hasSession ? 'Active' : 'None')
 
         if (hasSession) {
-          this.fetchLightningPreference().catch((error) => logger.warn('fetchLightningPreference failed', { error }))
+          fetchLightningPreference().catch((error) => logger.warn('fetchLightningPreference failed', { error }))
         }
       }
     } catch (error) {
@@ -246,7 +230,7 @@ class UltraForceWindowManager {
 
   public async toggle(): Promise<void> {
     if (useSearchStore.getState().isVisible) {
-      await this.hide()
+      if (!this.exitControl.current?.cancel()) await this.hide()
     } else {
       await this.show()
     }
@@ -258,10 +242,12 @@ class UltraForceWindowManager {
     }
 
     if (useSearchStore.getState().isVisible) {
+      this.exitControl.current?.cancel()
       this.log('Modal already visible')
       return
     }
 
+    if (!this.options.isContextActive()) return
     await this.loadSession()
 
     // Detect record context
@@ -269,18 +255,19 @@ class UltraForceWindowManager {
     if (recordId) {
       let objectApiName = urlObjectApiName
       if (!objectApiName) {
-        objectApiName = await this.resolveObjectApiNameFromRecord(recordId)
+        objectApiName = await resolveObjectApiNameFromRecord(recordId)
         this.log('Resolved objectApiName from recordId:', objectApiName)
       }
       useSearchStore.getState().setRecordContext({ objectApiName, recordId })
       if (objectApiName) {
-        this.fetchRecordTypeId(objectApiName, recordId)
+        fetchRecordTypeId(objectApiName, recordId)
       }
       this.log('Record context detected:', useSearchStore.getState().recordContext)
     } else {
       useSearchStore.getState().setRecordContext(null)
     }
 
+    if (!this._isInitialized || !this.options.isContextActive()) return
     useSearchStore.getState().show()
     this.log('Showing modal')
 
@@ -289,12 +276,16 @@ class UltraForceWindowManager {
 
     // A failing interceptor must never break the host page; degrade gracefully.
     try {
-      this.keyboardInterceptor = createKeyboardInterceptor({
+      const intercept = createKeyboardInterceptor({
         getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
         getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
-        getShadowRoot: () => this.shadowRoot ?? null
+        getShadowRoot: () => this.shadowRoot ?? null,
+        getToggleShortcut: () => useSettingsStore.getState().shortcutKey
       })
 
+      this.keyboardInterceptor = (event) => {
+        if (this.options.isContextActive(event)) intercept(event)
+      }
       window.addEventListener('keydown', this.keyboardInterceptor, true)
       window.addEventListener('keyup', this.keyboardInterceptor, true)
       window.addEventListener('keypress', this.keyboardInterceptor, true)
@@ -309,6 +300,14 @@ class UltraForceWindowManager {
   }
 
   public async hide(): Promise<void> {
+    if (this.exitControl.current) {
+      await this.exitControl.current.close()
+    } else {
+      this.finishHide()
+    }
+  }
+
+  private finishHide(): void {
     if (!useSearchStore.getState().isVisible) {
       this.log('Modal already hidden')
       return
@@ -324,12 +323,15 @@ class UltraForceWindowManager {
       this.keyboardInterceptor = null
     }
 
-    document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    if (this.containerElement?.isConnected || !document.querySelector(MODAL_CONTAINER_SELECTOR)) {
+      document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    }
     logger.debug('keyboard:shield deactivated')
 
     if (this.reactRoot) {
-      this.reactRoot.unmount()
+      const root = this.reactRoot
       this.reactRoot = null
+      root.unmount()
     }
 
     this.emit('hide', this.getState())
@@ -341,6 +343,7 @@ class UltraForceWindowManager {
       throw new Error('Container element not available')
     }
 
+    const hide = () => this.hide()
     const mountPoint = this.shadowRoot || this.containerElement
     if (!this.reactRoot) {
       this.reactRoot = createPrivateRoot(mountPoint)
@@ -356,7 +359,8 @@ class UltraForceWindowManager {
           }
         },
         React.createElement(SearchModal, {
-          onClose: this.hide,
+          onClose: () => this.finishHide(),
+          exitControl: this.exitControl,
           onSearch: this.handleSearch.bind(this),
           onCustomSearch: this.handleCustomSearch.bind(this),
           onSetupSearch: this.handleSetupShortcutSearch.bind(this),
@@ -366,9 +370,9 @@ class UltraForceWindowManager {
           onNavigate: (url: string) => {
             this.handleDirectNavigate(url)
           },
-          onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
-          onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
-          onFieldsClick: this.handleFieldsNavigation.bind(this)
+          onPageLayoutClick: () => handlePageLayoutNavigation(this.getCurrentRecordLayoutUrl, hide),
+          onRecordTypeClick: () => handleRecordTypeNavigation(hide),
+          onFieldsClick: () => handleFieldsNavigation(hide)
         })
       )
     )
@@ -550,140 +554,7 @@ class UltraForceWindowManager {
     })
   }
 
-  private async fetchRecordTypeId(objectApiName: string | null, recordId: string): Promise<void> {
-    const { sfHost } = useSessionStore.getState()
-    if (!sfHost || !objectApiName) return
-    const recordTypeId = await fetchRecordTypeIdFn(sfHost, objectApiName, recordId)
-    if (recordTypeId) {
-      const ctx = useSearchStore.getState().recordContext
-      if (ctx) {
-        useSearchStore.getState().setRecordContext({ ...ctx, recordTypeId })
-      }
-    }
-  }
-
-  private async handleFieldsNavigation(): Promise<void> {
-    const { recordContext } = useSearchStore.getState()
-    if (!recordContext?.objectApiName) {
-      useSearchStore.getState().setError('No object found for this record.')
-      return
-    }
-    useSearchStore.getState().setLoading(true)
-    try {
-      const { sfHost } = useSessionStore.getState()
-      const { navigationMode } = useSettingsStore.getState()
-      const { userLightningPreference } = useSessionStore.getState()
-      const url = await handleFieldsNavigationFn(
-        sfHost!,
-        recordContext.objectApiName,
-        navigationMode,
-        userLightningPreference
-      )
-      if (url) {
-        useSearchStore.getState().setLoading(false)
-        window.open(url, '_blank')
-        if (useSettingsStore.getState().closeOnNavigate) {
-          this.hide()
-        }
-        return
-      }
-      useSearchStore.getState().setError('Could not determine Fields URL.')
-    } catch (error) {
-      logger.error('Failed to navigate to Fields:', error)
-      useSearchStore.getState().setError('Failed to load Fields information.')
-    }
-  }
-
-  private async handleRecordTypeNavigation(): Promise<void> {
-    const { recordContext } = useSearchStore.getState()
-    if (!recordContext?.recordTypeId || !recordContext?.objectApiName) {
-      useSearchStore.getState().setError('No RecordType found for this record.')
-      return
-    }
-    useSearchStore.getState().setLoading(true)
-    try {
-      const { sfHost } = useSessionStore.getState()
-      const { navigationMode } = useSettingsStore.getState()
-      const { userLightningPreference } = useSessionStore.getState()
-      const url = await handleRecordTypeNavigationFn(
-        sfHost!,
-        recordContext.objectApiName,
-        recordContext.recordTypeId,
-        navigationMode,
-        userLightningPreference
-      )
-      if (url) {
-        useSearchStore.getState().setLoading(false)
-        window.open(url, '_blank')
-        if (useSettingsStore.getState().closeOnNavigate) {
-          this.hide()
-        }
-        return
-      }
-      useSearchStore.getState().setError('Could not determine RecordType URL.')
-    } catch (error) {
-      logger.error('Failed to navigate to RecordType:', error)
-      useSearchStore.getState().setError('Failed to load RecordType information.')
-    }
-  }
-
-  private async handlePageLayoutNavigation(): Promise<void> {
-    useSearchStore.getState().setLoading(true)
-    try {
-      const result = await this.getCurrentRecordLayoutUrl()
-      if (result) {
-        useSearchStore.getState().setLoading(false)
-        window.open(result.url, '_blank')
-        if (useSettingsStore.getState().closeOnNavigate) {
-          this.hide()
-        }
-        return
-      }
-      useSearchStore.getState().setError('Could not determine page layout for this record.')
-    } catch (error) {
-      logger.error('Failed to navigate to page layout:', error)
-      useSearchStore.getState().setError('Failed to load page layout information.')
-    }
-  }
-
-  private async getCurrentRecordLayoutUrl(): Promise<{ objectApiName: string; url: string } | null> {
-    const { sfHost } = useSessionStore.getState()
-    const { navigationMode } = useSettingsStore.getState()
-    const { userLightningPreference } = useSessionStore.getState()
-
-    const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
-    const objectApiName =
-      fromUrlObject || (recordId && sfHost ? await resolveObjectApiNameFromRecordFn(sfHost, recordId) : null)
-    if (!sfHost || !objectApiName || !recordId) return null
-    const layoutInfo = await getCurrentRecordLayoutInfoFn(sfHost, objectApiName, recordId)
-    if (!layoutInfo) return null
-    // China (Alibaba) domains don't support Classic layout editor
-    const useLightning = shouldUseLightning(navigationMode, userLightningPreference) || isChinaDomain(sfHost)
-    const url = useLightning
-      ? buildSetupUrl(
-          sfHost,
-          `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`
-        )
-      : `https://${sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
-    if (!url) return null
-    return { objectApiName: layoutInfo.objectApiName, url }
-  }
-
-  private async resolveObjectApiNameFromRecord(recordId: string): Promise<string | null> {
-    const { sfHost } = useSessionStore.getState()
-    if (!sfHost) return null
-    return resolveObjectApiNameFromRecordFn(sfHost, recordId)
-  }
-
-  private async fetchLightningPreference(): Promise<boolean | null> {
-    const { sfHost } = useSessionStore.getState()
-    if (!sfHost) return null
-    const pref = await getUserLightningPreferenceFn(sfHost)
-    if (pref !== null) {
-      useSessionStore.getState().setLightningPreference(pref)
-    }
-    return pref
-  }
+  private getCurrentRecordLayoutUrl = getCurrentRecordLayoutUrl
 
   private handleResultClick(result: SearchResult): void {
     this.log(`Result clicked: ${result.name} (${result.type})`)
@@ -860,21 +731,18 @@ class UltraForceWindowManager {
 
   public async destroy(): Promise<void> {
     this.log('Destroying WindowManager...')
+    this._isInitialized = false
 
     try {
-      if (useSearchStore.getState().isVisible) {
-        await this.hide()
+      try {
+        if (useSearchStore.getState().isVisible) this.finishHide()
+        this.reactRoot?.unmount()
+      } catch (error) {
+        logger.error('Modal cleanup failed:', error)
       }
-
-      if (this.reactRoot) {
-        this.reactRoot.unmount()
-        this.reactRoot = null
-      }
-
-      if (this.containerElement) {
-        this.containerElement.remove()
-        this.containerElement = null
-      }
+      this.reactRoot = null
+      this.containerElement?.remove()
+      this.containerElement = null
 
       this.cleanupFunctions.forEach((cleanup) => {
         try {
@@ -889,7 +757,6 @@ class UltraForceWindowManager {
 
       useSearchStore.getState().reset()
       useSessionStore.getState().reset()
-      this._isInitialized = false
 
       this.log('WindowManager destroyed successfully')
     } catch (error) {

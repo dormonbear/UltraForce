@@ -95,10 +95,22 @@ function notifyValueChange(input: HTMLInputElement, value: string): void {
   )
 }
 
+export function isToggleShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey'>,
+  shortcut: string
+): boolean {
+  const key = event.key.toLowerCase()
+  const normalized = shortcut.toLowerCase()
+  if (normalized === 'escape') return key === 'escape'
+  if (normalized.startsWith('alt+')) return event.altKey && key === normalized.slice(4)
+  return (event.ctrlKey || event.metaKey) && key === normalized
+}
+
 export interface KeyboardInterceptorOptions {
   getInput: () => HTMLInputElement | null
   getModal?: () => HTMLElement | null
   getShadowRoot?: () => ShadowRoot | null
+  getToggleShortcut?: () => string
 }
 
 export function createKeyboardInterceptor(
@@ -115,16 +127,30 @@ export function createKeyboardInterceptor(
     // Never intercept modifier-only keys
     if (MODIFIER_KEYS.has(e.key)) return
 
-    // If focus is on a form element (input/textarea) that is NOT the search input,
-    // let it handle its own keyboard events (e.g. settings panel form fields)
+    // Open panels get Escape first. The content script owns the remaining toggle shortcuts.
+    // 已打开的面板优先处理 Escape，其余切换快捷键由内容脚本处理。
+    if (
+      e.type === 'keydown' &&
+      opts.getToggleShortcut &&
+      isToggleShortcut(e, opts.getToggleShortcut()) &&
+      !(e.key === 'Escape' && opts.getModal?.()?.hasAttribute('data-escape-dismisses-panel'))
+    ) {
+      return
+    }
+
+    // Preserve settings controls' native keys and route Tab/Escape to the modal.
+    // 保留设置控件的原生按键行为，并将 Tab 和 Escape 交给对话框。
     if (opts.getShadowRoot) {
       const shadowRoot = opts.getShadowRoot()
       const activeEl = shadowRoot?.activeElement
       const searchInput = opts.getInput()
+      const inSettings = activeEl && !searchInput && opts.getModal?.()?.contains(activeEl)
+      const settingsNavigation = inSettings && (e.key === 'Tab' || e.key === 'Escape')
       if (
         activeEl &&
         activeEl !== searchInput &&
-        (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
+        !settingsNavigation &&
+        (inSettings || activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
       ) {
         // Still block Salesforce page shortcuts from firing
         e.stopPropagation()
@@ -197,23 +223,28 @@ export function createKeyboardInterceptor(
       input.focus()
     }
 
+    const commandPrefix = input.dataset.commandPrefix ?? ''
     if (e.key === 'Backspace') {
+      if (commandPrefix && !input.value && input.selectionStart === 0) {
+        notifyValueChange(input, '')
+        return
+      }
       const newValue = deleteChar(input, 'backward')
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:backspace', { value: newValue })
       return
     }
 
     if (e.key === 'Delete') {
       const newValue = deleteChar(input, 'forward')
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:delete', { value: newValue })
       return
     }
 
     if (isPrintable(e.key) && !hasCtrlOrCmd) {
       const newValue = insertChar(input, e.key)
-      notifyValueChange(input, newValue)
+      notifyValueChange(input, commandPrefix + newValue)
       logger.debug('keyboard:insert', { key: e.key, value: newValue })
     }
   }

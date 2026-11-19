@@ -1,6 +1,7 @@
 /** Cookie authentication and extension keyboard actions. */
 import { STORAGE_KEYS, storageSet, storageRemove } from '~lib/storage-service'
 import { logger } from '~lib/logger'
+import { reinjectContentScripts } from './reinject'
 import { resolveDocumentSession, salesforceDocumentUrl, sessionTargetHost } from './session-resolution'
 
 // Remove deprecated diagnostics by key without inspecting their contents.
@@ -16,13 +17,20 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     await storageSet(STORAGE_KEYS.LEGACY_SETTINGS, { searchLimit: 1000, autoSearch: true, showDebug: false })
   }
+  await reinjectContentScripts(details.reason)
 })
 
 // Authenticate the document, not its top-level tab or a payload URL.
 // An opaque/missing document identity must fail closed.
 function trustedDocument(sender: chrome.runtime.MessageSender): URL | null {
   if (!sender.id || sender.id !== chrome.runtime.id) return null
-  const document = salesforceDocumentUrl(sender.url)
+  let url = sender.url
+  if (url === undefined) {
+    // Chrome can omit sender.url in tabs opened by the extension. / Chrome 可能省略扩展打开的标签页的 sender.url。
+    if (sender.frameId !== 0 || sender.origin === undefined) return null
+    url = sender.tab?.url
+  }
+  const document = salesforceDocumentUrl(url)
   if (!document) return null
   if (sender.origin !== undefined && sender.origin !== document.origin) return null
   return document
@@ -91,5 +99,3 @@ chrome.commands?.onCommand.addListener((command) => {
     })
   }
 })
-
-export {}

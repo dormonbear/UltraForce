@@ -72,6 +72,7 @@ async function loadModule(): Promise<void> {
 
 describe('setup-enhancer', () => {
   beforeEach(() => {
+    Object.assign(chrome.runtime, { id: 'fixture-extension' })
     vi.useFakeTimers()
     observers = []
     getState.mockReturnValue({ autoLoadFields: true })
@@ -81,6 +82,7 @@ describe('setup-enhancer', () => {
   })
 
   afterEach(() => {
+    window.dispatchEvent(new Event('beforeunload'))
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
     global.MutationObserver = RealMutationObserver
@@ -96,6 +98,27 @@ describe('setup-enhancer', () => {
     const urlWatcher = observers[0]
     expect(urlWatcher.observe).toHaveBeenCalled()
     expect(urlWatcher.observedTargets).toContain(document.body)
+  })
+
+  it('starts only one URL watcher when reinjected / 重复注入时只启动一个 URL 观察器', async () => {
+    await loadModule()
+    await loadModule()
+
+    expect(observers).toHaveLength(1)
+  })
+
+  it('lets the orphaned setup enhancer release its claim on same-version reload / 同版本重载时让孤立的设置增强脚本释放标记', async () => {
+    const { claimExtensionScript } = await import('~lib/extension-context')
+    const release = vi.fn(claimExtensionScript('setup-enhancer')!)
+    document.addEventListener('ultraforce:setup-start', release, { once: true })
+    try {
+      await loadModule()
+      expect(release).toHaveBeenCalledOnce()
+      expect(observers).toHaveLength(1)
+    } finally {
+      document.removeEventListener('ultraforce:setup-start', release)
+      if (!release.mock.calls.length) release()
+    }
   })
 
   it('does nothing when autoLoadFields is disabled', async () => {

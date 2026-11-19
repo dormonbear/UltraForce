@@ -1,24 +1,32 @@
 import { browserLocale, t } from '~lib/i18n'
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle, type Ref } from 'react'
 import type { SearchResult } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
+import SearchBarActions, { SettingsBarTitle, type HomeSection } from './SearchBarActions'
 import SearchResults from './SearchResults'
 import SettingsPanel from './SettingsPanel'
+import UpdateNotification from './UpdateNotification'
 import EmptyState from './EmptyState'
 import HomeScreen from './HomeScreen'
 import IdPreview from './IdPreview'
 import CommandHints from './CommandHints'
-import { ActionIcon, SearchFooter, StorageWarning } from './SearchChrome'
+import CommandPanel, { COMMAND_LISTBOX_ID, getCommandOptionId } from './CommandPanel'
+import { useCommandPanel } from './useCommandPanel'
+import { getAutocompleteQuery } from './autocomplete-query'
+import { getScopeDetails } from './command-scope'
+import { RecordActions, SearchFooter, StorageWarning, type RecordAction } from './SearchChrome'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
+import { isToggleShortcut } from '~lib/keyboard-interceptor'
 import { logger } from '~lib/logger'
-import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
+import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
+import { splitCommandChip } from '~lib/command-chip'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
 import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from '~lib/contextual-suggestions'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
-import { checkForUpdate, markNotificationAsShown } from '~lib/version-check'
+import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
@@ -26,20 +34,18 @@ import { useFavoritesStore } from '~stores/favorites-store'
 import { useHistoryStore } from '~stores/history-store'
 import { usePersistErrorStore, type PersistErrorSource } from '~stores/persist-error-store'
 import type { ObjectAction } from './ResultItem'
+import AnimatedPanel from './motion/AnimatedPanel'
+import { useExitAnimation, type ExitAnimationControl } from './motion/useExitAnimation'
 
 // Bound on refocus attempts per open so a host page that keeps re-focusing itself cannot start a fight.
 const MAX_FOCUS_RECLAIMS = 5
-
-const MODAL_INLINE_STYLE: React.CSSProperties = {
-  backdropFilter: 'blur(24px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(24px) saturate(180%)'
-}
 
 /** id of the results listbox; the combobox input references it via aria-controls. */
 const RESULTS_LISTBOX_ID = 'ultraforce-results-listbox'
 
 interface SearchModalProps {
   onClose: () => void
+  exitControl?: Ref<ExitAnimationControl>
   onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
   onCustomSearch?: (
     soqlTemplate: string,
@@ -60,6 +66,7 @@ interface SearchModalProps {
 
 const SearchModal: React.FC<SearchModalProps> = ({
   onClose,
+  exitControl,
   onSearch,
   onCustomSearch,
   onSetupSearch,
@@ -96,6 +103,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const { sfHost, hasSession } = useSessionStore()
   const { isVisible, searchResults, isLoading, searchError, recordContext } = useSearchStore()
   const clearResults = useSearchStore((s) => s.clearResults)
+
+  const { closing, close, cancel } = useExitAnimation(onClose)
+  useImperativeHandle(exitControl, () => ({ close, cancel }), [close, cancel])
 
   // --- HomeScreen integration ---
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite)
@@ -140,10 +150,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
         window.open(url, '_blank')
       }
       if (closeOnNavigate) {
-        onClose()
+        void close()
       }
     },
-    [onNavigate, closeOnNavigate, onClose]
+    [onNavigate, closeOnNavigate, close]
   )
 
   // Track whether settings store has hydrated from chrome.storage
@@ -156,11 +166,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   // --- Local UI state ---
   const [query, setQuery] = useState('')
+  const [activeSection, setActiveSection] = useState<HomeSection | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [previousResults, setPreviousResults] = useState(searchResults)
   const [showSettings, setShowSettings] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [_visibleItemCount, setVisibleItemCount] = useState(0)
-  const [showCommandHints, setShowCommandHints] = useState(false)
   const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
   const [showUpdateNotification, setShowUpdateNotification] = useState(false)
   const [updateVersion, setUpdateVersion] = useState('')
@@ -181,11 +192,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [previouslyFocused])
 
-  // Focus management
   useEffect(() => {
     if (isVisible) {
       if (showSettings && modalRef.current) {
-        modalRef.current.focus()
+        const firstSetting = modalRef.current.querySelector<HTMLElement>(
+          '.settings-content :is(input, select, button):not(:disabled)'
+        )
+        ;(firstSetting ?? modalRef.current).focus()
       } else if (inputRef.current) {
         inputRef.current.focus()
         inputRef.current.select()
@@ -258,7 +271,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Merge builtin and custom commands
   const allCommands = useMemo(() => mergeCommands(customCommands), [customCommands])
 
+  const commandPanel = useCommandPanel(query, allCommands, unsupportedTypes, handleQueryChange, inputRef)
+  const pickerOpen = commandPanel.isOpen
+  const hasText = !showSettings && !pickerOpen && query.trim() !== ''
+
   // Parse command from query
+  const { chip, remainder } = splitCommandChip(query, allCommands)
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(
     () => getMatchingCommands(query, allCommands, unsupportedTypes),
@@ -271,11 +289,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     []
   )
 
-  // Show/hide command hints
-  useEffect(() => {
-    const shouldShow = query === ':' && matchingCommands.length > 0
-    setShowCommandHints(shouldShow)
-  }, [query, matchingCommands.length])
+  const showCommandHints = /^:\S*$/.test(query) && matchingCommands.length > 0
 
   // Clear results when entering a new command
   const prevCommandKeyRef = useRef<string | null>(null)
@@ -300,6 +314,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }, [onSetupSearch])
 
   useEffect(() => {
+    if (pickerOpen) return
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
     const isSetupCommand = parsedCommand.isCommand && parsedCommand.command?.key === 'g'
 
@@ -345,13 +360,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
+  }, [pickerOpen, query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
 
-  // Reset selection and collapsed state when search results change
-  useEffect(() => {
+  if (previousResults !== searchResults) {
+    setPreviousResults(searchResults)
     setSelectedIndex(0)
     setCollapsedGroups({})
-  }, [searchResults])
+  }
 
   // Apply maxResultsPerType limit
   const limitedSearchResults = useMemo(() => {
@@ -388,7 +403,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Record actions available when on a record page
   const recordActions = useMemo(() => {
     if (!recordContext) return []
-    const actions: { id: string; name: string; handler: () => void; icon: string; description?: string }[] = []
+    const actions: RecordAction[] = []
     if (onPageLayoutClick) {
       actions.push({ id: 'page-layout', name: t('Page Layout'), handler: onPageLayoutClick, icon: 'layout' })
     }
@@ -433,9 +448,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
       modal.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )
-    ).filter((el) => !el.hidden && el.getAttribute('aria-hidden') !== 'true')
+    ).filter((el) => !el.hidden && el.getAttribute('aria-hidden') !== 'true' && !el.closest('[inert]'))
     if (focusables.length === 0) return
-    const currentIndex = focusables.indexOf(event.target as HTMLElement)
+    const focused = event.target === modal ? (modal.getRootNode() as Document | ShadowRoot).activeElement : event.target
+    const currentIndex = focusables.indexOf(focused as HTMLElement)
     const next = forward
       ? (focusables[currentIndex + 1] ?? focusables[0])
       : (focusables[currentIndex - 1] ?? focusables[focusables.length - 1])
@@ -457,14 +473,19 @@ const SearchModal: React.FC<SearchModalProps> = ({
       return
     }
 
-    // When query is empty and we have record actions, handle navigation for record actions
+    if (commandPanel.handleKeyDown(event)) return
+    if (pickerOpen && event.key === 'Tab') {
+      trapFocus(event, !event.shiftKey)
+      return
+    }
+
     const isInRecordActionsMode = !query.trim() && recordActions.length > 0 && hasSession && !isLoading
 
     switch (event.key) {
       case 'Escape':
         event.preventDefault()
         event.stopPropagation()
-        onClose()
+        void close()
         break
 
       case 'ArrowDown':
@@ -499,64 +520,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
       case 'Tab':
         if (visibleResults[selectedIndex]) {
           event.preventDefault()
-          const selectedResult = visibleResults[selectedIndex]
-          const prefix = getCommandPrefix(parsedCommand)
-          if (selectedResult.type === 'CustomObject') {
-            const objectApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-            setQuery(`${prefix}${objectApiName}.`)
-          } else if (selectedResult.type === 'CustomField') {
-            const objectApiName =
-              selectedResult.metadata?.ObjectApiName || selectedResult.metadata?.EntityDefinition?.QualifiedApiName
-            const fieldApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-            if (objectApiName) {
-              setQuery(`${prefix}${objectApiName}.${fieldApiName}`)
-            }
-          } else if (selectedResult.type === 'CustomMetadataType') {
-            if (selectedResult.metadata?._isTypeDefinition) {
-              const cmdtApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-              setQuery(`${prefix}${cmdtApiName}.`)
-            } else {
-              const parentType = selectedResult.metadata?._parentType
-              const recordName = selectedResult.metadata?.DeveloperName || selectedResult.name
-              if (parentType) {
-                setQuery(`${prefix}${parentType}.${recordName}`)
-              }
-            }
-          } else if (selectedResult.type === 'CustomSetting') {
-            if (selectedResult.metadata?._isSettingDefinition) {
-              const settingApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-              setQuery(`${prefix}${settingApiName}.`)
-            } else {
-              const parentType = selectedResult.metadata?._parentType
-              const recordName = selectedResult.metadata?.Name || selectedResult.name
-              if (parentType) {
-                setQuery(`${prefix}${parentType}.${recordName}`)
-              }
-            }
-          } else if (selectedResult.type === 'Profile') {
-            const profileName = selectedResult.name
-            setQuery(`${prefix}${profileName}.`)
-          } else if (selectedResult.type === 'ProfileSubMenu') {
-            const { profileName, subCategory } = selectedResult.metadata || {}
-            if (profileName && subCategory) {
-              setQuery(`${prefix}${profileName}.${subCategory}.`)
-            }
-          } else if (
-            selectedResult.type === 'ObjectPermission' ||
-            selectedResult.type === 'FieldPermission' ||
-            selectedResult.type === 'CustomPermissionAccess' ||
-            selectedResult.type === 'ApexClassAccess' ||
-            selectedResult.type === 'VFPageAccess' ||
-            selectedResult.type === 'ConnectedAppAccess' ||
-            selectedResult.type === 'AssignedAppAccess'
-          ) {
-            const { profileName, _subCategory } = selectedResult.metadata || {}
-            if (profileName && _subCategory) {
-              setQuery(`${prefix}${profileName}.${_subCategory}.${selectedResult.name}`)
-            }
-          } else if (selectedResult.type === 'ProfileSetupLink') {
-            // Navigate-only link: Enter navigates, Tab does nothing special
-          }
+          const completion = getAutocompleteQuery(visibleResults[selectedIndex], parsedCommand)
+          if (completion !== undefined) setQuery(completion)
         } else {
           // No highlighted result: Tab/Shift+Tab cycle the modal's focusable controls
           trapFocus(event, !event.shiftKey)
@@ -564,13 +529,25 @@ const SearchModal: React.FC<SearchModalProps> = ({
         break
 
       default:
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
+        if (isToggleShortcut(event, shortcutKey)) {
           event.preventDefault()
           event.stopPropagation()
-          onClose()
+          void close()
         }
         break
     }
+  }
+
+  function handleQueryChange(value: string) {
+    if (value) setActiveSection(null)
+    setQuery(value)
+  }
+
+  const handleToggleSection = (section: HomeSection) => {
+    commandPanel.close()
+    setActiveSection((previous) => (previous === section ? null : section))
+    setQuery('')
+    inputRef.current?.focus()
   }
 
   const handleTypeToggle = (type: string) => {
@@ -583,7 +560,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose()
+      void close()
     }
   }
 
@@ -606,6 +583,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         !searchError &&
         query.trim() !== '' &&
         !hasResults &&
+        !showCommandHints &&
         !extractedId &&
         !isCommandEmptyState
       ? t('No results')
@@ -619,10 +597,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
         {getInterFontFaces()}
         {SEARCH_MODAL_STYLES}
       </style>
-      <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
+      <div className="ultraforce-backdrop" data-closing={closing || undefined} onClick={handleBackdropClick}>
         <div
           className="ultraforce-search-modal"
           data-ultraforce-modal
+          data-escape-dismisses-panel={showSettings || pickerOpen || undefined}
+          data-ui-mode={hasText ? 'results' : 'idle'}
           ref={modalRef}
           tabIndex={-1}
           role="dialog"
@@ -631,39 +611,18 @@ const SearchModal: React.FC<SearchModalProps> = ({
           aria-label={t('UltraForce search')}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
-          style={MODAL_INLINE_STYLE}
         >
-          {showSettings ? (
-            <SettingsPanel
-              onClose={() => setShowSettings(false)}
-              selectedTypes={selectedTypes}
-              onToggleType={handleTypeToggle}
-              shortcutKey={shortcutKey}
-              onShortcutChange={(key) => updateSettings({ shortcutKey: key })}
-              closeOnNavigate={closeOnNavigate}
-              onCloseOnNavigateChange={(val) => updateSettings({ closeOnNavigate: val })}
-              autoLoadFields={autoLoadFields}
-              onAutoLoadFieldsChange={(val) => updateSettings({ autoLoadFields: val })}
-              fuzzySearch={fuzzySearch}
-              onFuzzySearchChange={(val) => storeSetFuzzy(val)}
-              hideManagedPackage={hideManagedPackage}
-              onHideManagedPackageChange={(val) => updateSettings({ hideManagedPackage: val })}
-              maxResultsPerType={maxResultsPerType}
-              onMaxResultsPerTypeChange={(val) => updateSettings({ maxResultsPerType: val })}
-              managedKeys={managedKeys}
-              navigationMode={navigationMode}
-              onNavigationModeChange={(mode) => storeSetNavMode(mode)}
-              sfHost={sfHost}
-              customCommands={customCommands}
-              onCustomCommandsChange={setCustomCommands}
-            />
-          ) : (
-            <>
-              <div className="search-container">
+          <div className="search-surface">
+            <div className="search-bar-row" data-settings-open={showSettings || undefined}>
+              {showSettings ? (
+                <SettingsBarTitle />
+              ) : (
                 <SearchInput
                   ref={inputRef}
                   query={query}
-                  onQueryChange={setQuery}
+                  commands={allCommands}
+                  scopeFilter={pickerOpen ? commandPanel.filter : undefined}
+                  onQueryChange={pickerOpen ? commandPanel.changeFilter : handleQueryChange}
                   onKeyDown={(e) => {
                     if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
                       handleKeyDown(e)
@@ -671,126 +630,168 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   }}
                   sfHost={sfHost}
                   pageHasFocus={pageHasFocus}
-                  expanded={showListbox}
-                  controlsId={RESULTS_LISTBOX_ID}
-                  activeDescendantId={activeDescendantId}
+                  expanded={pickerOpen || showListbox}
+                  controlsId={pickerOpen ? COMMAND_LISTBOX_ID : RESULTS_LISTBOX_ID}
+                  activeDescendantId={pickerOpen ? getCommandOptionId(commandPanel.selectedKey) : activeDescendantId}
                 />
-
-                {showCommandHints && <CommandHints commands={matchingCommands} />}
-
-                {!hasSession ? (
-                  <EmptyState type="no-session" />
-                ) : isLoading ? (
-                  <EmptyState type="loading" />
-                ) : searchError ? (
-                  <EmptyState type="error" errorMessage={searchError} />
-                ) : !query.trim() ? (
-                  <>
-                    {recordContext && recordActions.length > 0 && (
-                      <div className="record-actions">
-                        <div className="record-actions-header">
-                          {t('Record Actions')}
-                          {recordContext.objectApiName && (
-                            <span className="record-object-name">{recordContext.objectApiName}</span>
-                          )}
-                        </div>
-                        <div className="record-actions-list">
-                          {recordActions.map((action, index) => (
-                            <div
-                              key={action.id}
-                              className={`record-action-item${selectedRecordActionIndex === index ? ' selected' : ''}`}
-                              onClick={action.handler}
-                              role="button"
-                              tabIndex={0}
-                              title={t(action.name)}
-                              onKeyDown={(e) => e.key === 'Enter' && action.handler()}
-                            >
-                              <span className="record-action-icon">
-                                <ActionIcon icon={action.icon} />
-                              </span>
-                              <span className="record-action-text">{t(action.name)}</span>
-                              <span className="record-action-desc">{t(action.description ?? action.name)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <HomeScreen
-                      onNavigate={handleHomeNavigate}
-                      onToggleFavorite={handleToggleFavorite}
-                      onRemoveHistoryItem={handleRemoveHistoryItem}
-                      selectedTypes={selectedTypes}
-                    />
-                    {setupSuggestions.length > 0 && (
-                      <div className="setup-suggestions">
-                        <div className="setup-suggestions-header">{t('Related Setup Pages')}</div>
-                        <div className="setup-suggestions-list">
-                          {setupSuggestions.map((s) => (
-                            <div
-                              key={s.id}
-                              className="setup-suggestion-item"
-                              onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={(e) =>
-                                e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
-                              }
-                            >
-                              <span className="setup-suggestion-name">{t(s.name)}</span>
-                              <span className="setup-suggestion-category">{t(s.description)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
-                  <EmptyState
-                    type="command"
-                    commandTypes={parsedCommand.types || []}
-                    commandDescription={
-                      parsedCommand.command.isBuiltin
-                        ? t(parsedCommand.command.description)
-                        : parsedCommand.command.description
-                    }
-                  />
-                ) : !hasResults && extractedIds.length > 0 && sfHost ? (
-                  <div className="id-preview-list">
-                    {extractedIds.map((id) => (
-                      <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
-                    ))}
-                  </div>
-                ) : !hasResults && extractedId ? (
-                  <EmptyState type="id-navigation" query={extractedId} />
-                ) : !hasResults ? (
-                  <EmptyState type="empty" query={query} />
-                ) : (
-                  <SearchResults
-                    results={limitedSearchResults}
-                    selectedIndex={selectedIndex}
-                    onResultClick={onResultClick}
-                    onActionClick={onActionClick}
-                    onVisibleCountChange={handleVisibleCountChange}
-                    collapsedGroups={collapsedGroups}
-                    onToggleCollapse={handleToggleCollapse}
-                    onToggleFavorite={handleToggleFavorite}
-                    isFavorite={isFavoriteCheck}
-                    listboxId={RESULTS_LISTBOX_ID}
-                  />
-                )}
-              </div>
-
-              <SearchFooter
-                liveStatusText={liveStatusText}
-                onSettings={() => setShowSettings(true)}
-                showUpdateNotification={showUpdateNotification}
-                updateVersion={updateVersion}
-                onDismissUpdate={handleDismissUpdate}
+              )}
+              <SearchBarActions
+                activeSection={activeSection}
+                hidden={hasText}
+                settingsOpen={showSettings}
+                onToggleSection={handleToggleSection}
+                onSettings={() => {
+                  commandPanel.close()
+                  setShowSettings((open) => !open)
+                }}
               />
-            </>
-          )}
+            </div>
+            <AnimatedPanel
+              view={showSettings ? 'settings' : pickerOpen ? 'picker' : 'search'}
+              footer={<StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />}
+            >
+              {showSettings ? (
+                <SettingsPanel
+                  showHeader={false}
+                  onClose={() => setShowSettings(false)}
+                  selectedTypes={selectedTypes}
+                  onToggleType={handleTypeToggle}
+                  shortcutKey={shortcutKey}
+                  onShortcutChange={(key) => updateSettings({ shortcutKey: key })}
+                  closeOnNavigate={closeOnNavigate}
+                  onCloseOnNavigateChange={(val) => updateSettings({ closeOnNavigate: val })}
+                  autoLoadFields={autoLoadFields}
+                  onAutoLoadFieldsChange={(val) => updateSettings({ autoLoadFields: val })}
+                  fuzzySearch={fuzzySearch}
+                  onFuzzySearchChange={(val) => storeSetFuzzy(val)}
+                  hideManagedPackage={hideManagedPackage}
+                  onHideManagedPackageChange={(val) => updateSettings({ hideManagedPackage: val })}
+                  maxResultsPerType={maxResultsPerType}
+                  onMaxResultsPerTypeChange={(val) => updateSettings({ maxResultsPerType: val })}
+                  managedKeys={managedKeys}
+                  navigationMode={navigationMode}
+                  onNavigationModeChange={(mode) => storeSetNavMode(mode)}
+                  sfHost={sfHost}
+                  customCommands={customCommands}
+                  onCustomCommandsChange={setCustomCommands}
+                />
+              ) : pickerOpen ? (
+                <CommandPanel
+                  options={commandPanel.options}
+                  selectedKey={commandPanel.selectedKey}
+                  filter={commandPanel.filter}
+                  onHighlight={commandPanel.highlight}
+                  onChoose={commandPanel.choose}
+                  onBack={commandPanel.close}
+                />
+              ) : (
+                <>
+                  <div className="search-container">
+                    {showCommandHints && <CommandHints commands={matchingCommands} prefix={query} />}
 
-          <StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />
+                    {!hasSession && !activeSection ? (
+                      <EmptyState type="no-session" />
+                    ) : isLoading && !activeSection ? (
+                      <EmptyState type="loading" />
+                    ) : searchError && !activeSection ? (
+                      <EmptyState type="error" errorMessage={searchError} />
+                    ) : !query.trim() ? (
+                      <>
+                        {recordContext && recordActions.length > 0 && (
+                          <RecordActions
+                            actions={recordActions}
+                            objectApiName={recordContext.objectApiName}
+                            selectedIndex={selectedRecordActionIndex}
+                          />
+                        )}
+                        <HomeScreen
+                          onNavigate={handleHomeNavigate}
+                          onToggleFavorite={handleToggleFavorite}
+                          onRemoveHistoryItem={handleRemoveHistoryItem}
+                          selectedTypes={selectedTypes}
+                          section={activeSection ?? undefined}
+                        />
+                        {setupSuggestions.length > 0 && (
+                          <div className="setup-suggestions">
+                            <div className="setup-suggestions-header">{t('Related Setup Pages')}</div>
+                            <div className="setup-suggestions-list">
+                              {setupSuggestions.map((s) => (
+                                <div
+                                  key={s.id}
+                                  className="setup-suggestion-item"
+                                  onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) =>
+                                    e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
+                                  }
+                                >
+                                  <span className="setup-suggestion-name">{t(s.name)}</span>
+                                  <span className="setup-suggestion-category">{t(s.description)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
+                      <EmptyState
+                        type="command"
+                        commandTypes={parsedCommand.types || []}
+                        commandDescription={
+                          parsedCommand.command.isBuiltin
+                            ? t(parsedCommand.command.description)
+                            : parsedCommand.command.description
+                        }
+                      />
+                    ) : !hasResults && extractedIds.length > 0 && sfHost ? (
+                      <div className="id-preview-list">
+                        {extractedIds.map((id) => (
+                          <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
+                        ))}
+                      </div>
+                    ) : !hasResults && extractedId ? (
+                      <EmptyState type="id-navigation" query={extractedId} />
+                    ) : !hasResults ? (
+                      !showCommandHints && (
+                        <EmptyState
+                          type="empty"
+                          query={remainder}
+                          scope={chip ? getScopeDetails(chip).label : undefined}
+                        />
+                      )
+                    ) : (
+                      <SearchResults
+                        results={limitedSearchResults}
+                        selectedIndex={selectedIndex}
+                        onResultClick={onResultClick}
+                        onActionClick={onActionClick}
+                        onVisibleCountChange={handleVisibleCountChange}
+                        collapsedGroups={collapsedGroups}
+                        onToggleCollapse={handleToggleCollapse}
+                        onToggleFavorite={handleToggleFavorite}
+                        isFavorite={isFavoriteCheck}
+                        listboxId={RESULTS_LISTBOX_ID}
+                      />
+                    )}
+                  </div>
+
+                  <SearchFooter
+                    liveStatusText={liveStatusText}
+                    canOpenScopes={commandPanel.canOpen}
+                    resultsMode={hasText}
+                  />
+                </>
+              )}
+            </AnimatedPanel>
+          </div>
+          {!showSettings && showUpdateNotification && (
+            <UpdateNotification
+              version={updateVersion}
+              releaseNotesUrl={RELEASE_NOTES_URL}
+              onDismiss={handleDismissUpdate}
+            />
+          )}
         </div>
       </div>
     </>

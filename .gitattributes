@@ -1,0 +1,2 @@
+# Keep text checkouts LF for the formatter and frozen patches; preserve binary bytes. / 文本检出保持 LF 以适配格式器及冻结补丁，保留二进制字节。
+* text=auto eol=lf

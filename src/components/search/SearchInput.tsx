@@ -1,10 +1,16 @@
+import { splitCommandChip } from '~lib/command-chip'
 import { t } from '~lib/i18n'
-import React, { forwardRef, useEffect, useRef, useCallback } from 'react'
+import type { SearchCommand } from '~types'
+import React, { forwardRef, useEffect, useLayoutEffect, useId, useRef, useCallback } from 'react'
+import { ActionIcon } from './SearchChrome'
+import { getScopeDetails } from './command-scope'
 
 type OrgType = 'production' | 'sandbox' | 'scratch' | 'developer' | 'unknown'
 
 interface SearchInputProps {
   query: string
+  scopeFilter?: string
+  commands: Readonly<Record<string, SearchCommand>>
   onQueryChange: (query: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
   sfHost: string | null
@@ -71,13 +77,66 @@ function getOrgTypeLabel(orgType: OrgType): string {
   }
 }
 
+function getSearchPlaceholder(scope: string | null, displayName: string | null, pageHasFocus: boolean): string {
+  if (scope !== null) return t('Search {scope}...', { scope })
+  if (!pageHasFocus) return t('Click here to focus, then type to search')
+  if (displayName) return t('Search {org} metadata...', { org: displayName })
+  return t('Search Salesforce metadata...')
+}
+
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
-  ({ query, onQueryChange, onKeyDown, sfHost, pageHasFocus = true, expanded, controlsId, activeDescendantId }, ref) => {
+  (
+    {
+      query,
+      scopeFilter,
+      commands,
+      onQueryChange,
+      onKeyDown,
+      sfHost,
+      pageHasFocus = true,
+      expanded,
+      controlsId,
+      activeDescendantId
+    },
+    ref
+  ) => {
     const displayName = sfHost ? sfHost.split('.')[0] : null
     const orgType = detectOrgType(sfHost)
+    const inputId = useId()
+    const scopeId = `${inputId}-scope`
+    const { chip, remainder } =
+      scopeFilter === undefined ? splitCommandChip(query, commands) : { chip: null, remainder: scopeFilter }
+    const scope = chip && getScopeDetails(chip)
 
     // Internal ref to attach native event listener
     const internalRef = useRef<HTMLInputElement | null>(null)
+
+    const pendingSelection = useRef<{
+      value: string
+      start: number
+      end: number
+      direction: HTMLInputElement['selectionDirection']
+    } | null>(null)
+    const rememberSelection = useCallback((input: HTMLInputElement, value: string) => {
+      const { selectionStart: start, selectionEnd: end, selectionDirection: direction } = input
+      pendingSelection.current =
+        input.value === value && value.startsWith(':') && start !== null && end !== null
+          ? { value, start, end, direction }
+          : null
+    }, [])
+
+    useLayoutEffect(() => {
+      const selection = pendingSelection.current
+      pendingSelection.current = null
+      if (!chip || selection?.value !== query) return
+
+      const prefixLength = query.length - remainder.length
+      internalRef.current?.setSelectionRange(
+        Math.max(0, selection.start - prefixLength),
+        Math.max(0, selection.end - prefixLength),
+        selection.direction ?? undefined
+      )
+    }, [chip, query, remainder])
 
     // Stable callback ref to avoid re-registering listener on every render
     const onQueryChangeRef = useRef(onQueryChange)
@@ -107,12 +166,13 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
 
       const handler = (e: Event) => {
         const value = (e as CustomEvent).detail?.value ?? ''
+        rememberSelection(el, value)
         onQueryChangeRef.current(value)
       }
 
       el.addEventListener('ultraforce-input', handler)
       return () => el.removeEventListener('ultraforce-input', handler)
-    }, [])
+    }, [rememberSelection])
 
     return (
       <div className="search-input-section">
@@ -120,14 +180,41 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <circle cx="11" cy="11" r="8" />
           <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
+        {scope && (
+          <React.Fragment key={scope.prefix}>
+            <label
+              className="command-scope-chip"
+              htmlFor={inputId}
+              aria-hidden="false"
+              data-type={scope.type}
+              title={scope.title}
+            >
+              <ActionIcon icon={scope.icon} />
+              <span className="command-scope-text">{scope.label}</span>
+            </label>
+            <span id={scopeId} className="ultraforce-sr-only">
+              {t('Scope: {scope}', { scope: scope.label })}
+            </span>
+          </React.Fragment>
+        )}
         <input
+          id={inputId}
           ref={setRefs}
           type="text"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
+          value={remainder}
+          onChange={(e) => {
+            const value = (scope?.prefix ?? '') + e.currentTarget.value
+            rememberSelection(e.currentTarget, value)
+            onQueryChange(value)
+          }}
           onKeyDown={(e) => {
             e.stopPropagation()
             e.nativeEvent.stopImmediatePropagation()
+            if (scope && e.key === 'Backspace' && !e.currentTarget.value && e.currentTarget.selectionStart === 0) {
+              e.preventDefault()
+              onQueryChange('')
+              return
+            }
             onKeyDown(e)
           }}
           onKeyUp={(e) => {
@@ -139,13 +226,12 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             e.nativeEvent.stopImmediatePropagation()
           }}
           placeholder={
-            !pageHasFocus
-              ? t('Click here to focus, then type to search')
-              : displayName
-                ? t('Search {org} metadata...', { org: displayName })
-                : t('Search Salesforce metadata...')
+            scopeFilter === undefined
+              ? getSearchPlaceholder(scope?.label ?? null, displayName, pageHasFocus)
+              : t('Filter scopes...')
           }
           aria-label={t('Search Salesforce metadata')}
+          aria-describedby={scope ? scopeId : undefined}
           role="combobox"
           aria-expanded={expanded ? 'true' : 'false'}
           aria-controls={controlsId}
@@ -154,6 +240,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           autoComplete="off"
           className="search-input"
           data-ultraforce-input
+          data-command-prefix={scope?.prefix}
           autoFocus
         />
         {displayName && (

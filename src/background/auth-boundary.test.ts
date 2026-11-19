@@ -75,6 +75,42 @@ describe('authentication message boundary', () => {
   })
 
   it.each([
+    [{ message: 'getSfHost', url: documentUrl }, host],
+    [
+      { message: 'getSession', sfHost: host },
+      { key: `${orgId}!synthetic`, hostname: host }
+    ]
+  ])(
+    'accepts a matching top-level tab URL for $message / $message 接受同源顶层标签页 URL',
+    async (request, expected) => {
+      const sender = { url: undefined, frameId: 0, tab: { url: documentUrl } as chrome.tabs.Tab }
+      expect(await invoke(request, sender)).toEqual(expected)
+    }
+  )
+
+  it.each([
+    { frameId: 1 },
+    { tab: undefined },
+    { tab: { url: 'https://other.my.salesforce.com/' } as chrome.tabs.Tab },
+    { origin: undefined },
+    { origin: 'null' },
+    { origin: `http://${host}`, tab: { url: `http://${host}/` } as chrome.tabs.Tab },
+    { origin: 'https://example.invalid', tab: { url: 'https://example.invalid/' } as chrome.tabs.Tab },
+    { id: 'another-extension' },
+    { url: 'not a URL' }
+  ])(
+    'rejects an untrusted tab URL with sender overrides %j / 按消息发送者字段拒绝不可信的标签页 URL',
+    async (overrides) => {
+      const sender = { url: undefined, frameId: 0, tab: { url: documentUrl } as chrome.tabs.Tab, ...overrides }
+      const url = sender.tab?.url ?? documentUrl
+      expect(await invoke({ message: 'getSfHost', url }, sender)).toBeNull()
+      expect(await invoke({ message: 'getSession', sfHost: host }, sender)).toBeNull()
+      expect(chrome.cookies.get).not.toHaveBeenCalled()
+      expect(chrome.cookies.getAll).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
     'other.my.salesforce.com',
     'attacker.invalid',
     'acme.my.salesforce.com@attacker.invalid',
