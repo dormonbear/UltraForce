@@ -2,6 +2,7 @@ import React from 'react'
 import { t } from './i18n'
 import { createPrivateRoot } from './react-root'
 import SearchModal from '~components/search/SearchModal'
+import type { ExitAnimationControl } from '~components/search/motion/useExitAnimation'
 import ErrorBoundary from '~components/ErrorBoundary'
 import { searchSalesforceMetadata, executeCustomCommand, type CustomCommandOptions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
@@ -70,6 +71,7 @@ class UltraForceWindowManager {
   private static initializationPromise: Promise<UltraForceWindowManager> | null = null
 
   private reactRoot: any = null
+  private exitControl: { current: ExitAnimationControl | null } = { current: null }
   private containerElement: HTMLElement | null = null
   private shadowRoot: ShadowRoot | null = null
   private cleanupFunctions: (() => void)[] = []
@@ -246,7 +248,7 @@ class UltraForceWindowManager {
 
   public async toggle(): Promise<void> {
     if (useSearchStore.getState().isVisible) {
-      await this.hide()
+      if (!this.exitControl.current?.cancel()) await this.hide()
     } else {
       await this.show()
     }
@@ -258,6 +260,7 @@ class UltraForceWindowManager {
     }
 
     if (useSearchStore.getState().isVisible) {
+      this.exitControl.current?.cancel()
       this.log('Modal already visible')
       return
     }
@@ -292,7 +295,8 @@ class UltraForceWindowManager {
       this.keyboardInterceptor = createKeyboardInterceptor({
         getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
         getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
-        getShadowRoot: () => this.shadowRoot ?? null
+        getShadowRoot: () => this.shadowRoot ?? null,
+        getToggleShortcut: () => useSettingsStore.getState().shortcutKey
       })
 
       window.addEventListener('keydown', this.keyboardInterceptor, true)
@@ -309,6 +313,14 @@ class UltraForceWindowManager {
   }
 
   public async hide(): Promise<void> {
+    if (this.exitControl.current) {
+      await this.exitControl.current.close()
+    } else {
+      this.finishHide()
+    }
+  }
+
+  private finishHide(): void {
     if (!useSearchStore.getState().isVisible) {
       this.log('Modal already hidden')
       return
@@ -356,7 +368,8 @@ class UltraForceWindowManager {
           }
         },
         React.createElement(SearchModal, {
-          onClose: this.hide,
+          onClose: () => this.finishHide(),
+          exitControl: this.exitControl,
           onSearch: this.handleSearch.bind(this),
           onCustomSearch: this.handleCustomSearch.bind(this),
           onSetupSearch: this.handleSetupShortcutSearch.bind(this),
@@ -863,7 +876,7 @@ class UltraForceWindowManager {
 
     try {
       if (useSearchStore.getState().isVisible) {
-        await this.hide()
+        this.finishHide()
       }
 
       if (this.reactRoot) {

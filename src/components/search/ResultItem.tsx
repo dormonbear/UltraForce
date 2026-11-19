@@ -1,5 +1,5 @@
 import { t } from '~lib/i18n'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SearchResult } from '~types'
 import type { FavoriteItem } from '~stores/favorites-store'
 import TypeBadge from './TypeBadge'
@@ -16,6 +16,7 @@ interface ResultItemProps {
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
   /** Unique id for aria-activedescendant references from the combobox input. */
   optionId?: string
+  entranceIndex?: number
 }
 
 const ActionButton: React.FC<{
@@ -35,15 +36,22 @@ const ResultItem: React.FC<ResultItemProps> = ({
   onActionClick,
   isFavorite,
   onToggleFavorite,
-  optionId
+  optionId,
+  entranceIndex
 }) => {
   const itemRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
+  useLayoutEffect(() => {
+    const row = itemRef.current
+    // Keep the mount delay when a result moves. / 搜索结果换位时保留首次挂载的延迟。
+    if (row && entranceIndex !== undefined && !row.style.getPropertyValue('--i')) {
+      row.style.setProperty('--i', String(Math.min(entranceIndex, 10)))
+    }
+  }, [entranceIndex])
 
   useEffect(() => {
     if (isSelected && itemRef.current) {
       itemRef.current.scrollIntoView({
-        behavior: 'smooth',
         block: 'nearest'
       })
     }
@@ -93,6 +101,7 @@ const ResultItem: React.FC<ResultItemProps> = ({
     <div
       ref={itemRef}
       id={optionId}
+      data-row-entrance={entranceIndex !== undefined || undefined}
       className={`result-item ${isSelected ? 'selected' : ''}`}
       data-ultraforce-result-item
       data-selected={isSelected}

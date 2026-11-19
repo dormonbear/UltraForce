@@ -3,12 +3,13 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import type { SearchResult } from '~types'
 import type { FavoriteItem } from '~stores/favorites-store'
 import ResultItem, { type ObjectAction } from './ResultItem'
+import { useSlidingHighlight } from './motion/useSlidingHighlight'
 
 interface ResultRowProps {
   result: SearchResult
   isSelected: boolean
   isFavorite?: boolean
-  optionId?: string
+  optionIndex: number
   onResultClick: (result: SearchResult) => void
   onActionClick?: (result: SearchResult, action: ObjectAction) => void
   onToggleFavorite?: (item: Omit<FavoriteItem, 'pinnedAt'>) => void
@@ -18,7 +19,7 @@ interface ResultRowProps {
 // callback, so ResultItem's `onClick: () => void` interface stays intact while
 // avoiding a fresh closure each render.
 const ResultRow: React.FC<ResultRowProps> = React.memo(
-  ({ result, isSelected, isFavorite, optionId, onResultClick, onActionClick, onToggleFavorite }) => {
+  ({ result, isSelected, isFavorite, optionIndex, onResultClick, onActionClick, onToggleFavorite }) => {
     const handleClick = useCallback(() => onResultClick(result), [onResultClick, result])
     return (
       <ResultItem
@@ -28,7 +29,8 @@ const ResultRow: React.FC<ResultRowProps> = React.memo(
         onActionClick={onActionClick}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
-        optionId={optionId}
+        optionId={`ultraforce-option-${optionIndex}`}
+        entranceIndex={optionIndex}
       />
     )
   }
@@ -102,16 +104,22 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     onVisibleCountChange?.(visibleItems.length)
   }, [visibleItems.length, onVisibleCountChange])
 
+  const { listRef, highlightStyle, noAnimate } = useSlidingHighlight(
+    visibleItems[selectedIndex] ? `#ultraforce-option-${selectedIndex}` : null,
+    visibleItems
+  )
   let currentIndex = 0
 
   return (
     <div
       className="search-results"
+      ref={listRef}
       data-ultraforce-results
       id={listboxId}
       role="listbox"
       aria-label={t('Search results')}
     >
+      <div className="sliding-highlight" aria-hidden="true" data-snap={noAnimate} style={highlightStyle} />
       {Object.entries(results).map(([type, typeResults]) => {
         if (typeResults.length === 0) return null
 
@@ -128,7 +136,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                   result={result}
                   isSelected={globalIndex === selectedIndex}
                   isFavorite={isFavorite?.(result.id)}
-                  optionId={`ultraforce-option-${globalIndex}`}
+                  optionIndex={globalIndex}
                   onResultClick={onResultClick}
                   onActionClick={onActionClick}
                   onToggleFavorite={onToggleFavorite}

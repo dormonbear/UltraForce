@@ -77,6 +77,55 @@ describe('SearchModal', () => {
     })
   })
 
+  it.each(['picker', 'settings'])('keeps the outgoing %s mounted during exit / 退场期间保留该视图', async (view) => {
+    vi.useFakeTimers()
+    vi.stubGlobal('CSS', { supports: () => true })
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    try {
+      await act(async () => {
+        renderModal()
+      })
+      const input = screen.getByRole('combobox')
+      if (view === 'picker') fireEvent.keyDown(input, { key: 'Tab' })
+      else fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+
+      const heading = screen.getByRole('heading', { name: view === 'picker' ? 'Choose a scope' : 'Settings' })
+      fireEvent.keyDown(view === 'picker' ? input : screen.getByRole('dialog'), { key: 'Escape' })
+      expect(heading).toBeInTheDocument()
+      expect(heading.closest('[inert]')).not.toBeNull()
+      act(() => vi.advanceTimersByTime(139))
+      expect(heading).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1))
+      expect(heading).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('opens a favorite synchronously before the exit ends / 退场结束前立即打开收藏项', async () => {
+    await setFavoritesOrgScope('motion.my.salesforce.com')
+    useFavoritesStore
+      .getState()
+      .addFavorite({ id: 'motion-nav', name: 'Motion favorite', type: 'User', url: '/motion' })
+    vi.useFakeTimers()
+    vi.stubGlobal('CSS', { supports: () => true })
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    try {
+      const { props } = renderModal()
+      fireEvent.click(screen.getByTitle('Motion favorite (User)'))
+      expect(open).toHaveBeenCalledWith('/motion', '_blank')
+      expect(props.onClose).not.toHaveBeenCalled()
+      await act(async () => vi.advanceTimersByTime(140))
+      expect(props.onClose).toHaveBeenCalledOnce()
+    } finally {
+      open.mockRestore()
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
   describe('error logging', () => {
     it('logs a warning when getUnsupportedTypes rejects', async () => {
       vi.mocked(getUnsupportedTypes).mockRejectedValueOnce(new Error('boom'))
@@ -376,7 +425,7 @@ describe('SearchModal', () => {
 
       fireEvent.keyDown(input, { key: 'Escape' })
 
-      expect(props.onClose).toHaveBeenCalled()
+      await waitFor(() => expect(props.onClose).toHaveBeenCalled())
     })
 
     it('should navigate down with ArrowDown key', async () => {
@@ -843,7 +892,7 @@ describe('SearchModal', () => {
       expect(backdrop).toBeTruthy()
       fireEvent.click(backdrop!)
 
-      expect(props.onClose).toHaveBeenCalled()
+      await waitFor(() => expect(props.onClose).toHaveBeenCalled())
     })
   })
 })

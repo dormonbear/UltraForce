@@ -1,5 +1,5 @@
 import { browserLocale, t } from '~lib/i18n'
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle, type Ref } from 'react'
 import type { SearchResult } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
@@ -31,6 +31,8 @@ import { useFavoritesStore } from '~stores/favorites-store'
 import { useHistoryStore } from '~stores/history-store'
 import { usePersistErrorStore, type PersistErrorSource } from '~stores/persist-error-store'
 import type { ObjectAction } from './ResultItem'
+import AnimatedPanel from './motion/AnimatedPanel'
+import { useExitAnimation, type ExitAnimationControl } from './motion/useExitAnimation'
 
 // Bound on refocus attempts per open so a host page that keeps re-focusing itself cannot start a fight.
 const MAX_FOCUS_RECLAIMS = 5
@@ -40,6 +42,7 @@ const RESULTS_LISTBOX_ID = 'ultraforce-results-listbox'
 
 interface SearchModalProps {
   onClose: () => void
+  exitControl?: Ref<ExitAnimationControl>
   onSearch: (query: string, selectedTypes: string[], useFuzzy: boolean, hideManagedPkg: boolean) => void
   onCustomSearch?: (
     soqlTemplate: string,
@@ -60,6 +63,7 @@ interface SearchModalProps {
 
 const SearchModal: React.FC<SearchModalProps> = ({
   onClose,
+  exitControl,
   onSearch,
   onCustomSearch,
   onSetupSearch,
@@ -96,6 +100,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const { sfHost, hasSession } = useSessionStore()
   const { isVisible, searchResults, isLoading, searchError, recordContext } = useSearchStore()
   const clearResults = useSearchStore((s) => s.clearResults)
+
+  const { closing, close, cancel } = useExitAnimation(onClose)
+  useImperativeHandle(exitControl, () => ({ close, cancel }), [close, cancel])
 
   // --- HomeScreen integration ---
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite)
@@ -140,10 +147,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
         window.open(url, '_blank')
       }
       if (closeOnNavigate) {
-        onClose()
+        void close()
       }
     },
-    [onNavigate, closeOnNavigate, onClose]
+    [onNavigate, closeOnNavigate, close]
   )
 
   // Track whether settings store has hydrated from chrome.storage
@@ -158,6 +165,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [query, setQuery] = useState('')
   const [activeSection, setActiveSection] = useState<HomeSection | null>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [previousResults, setPreviousResults] = useState(searchResults)
   const [showSettings, setShowSettings] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [_visibleItemCount, setVisibleItemCount] = useState(0)
@@ -348,11 +356,11 @@ const SearchModal: React.FC<SearchModalProps> = ({
     return () => clearTimeout(debounceTimer)
   }, [pickerOpen, query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
 
-  // Reset selection and collapsed state when search results change
-  useEffect(() => {
+  if (previousResults !== searchResults) {
+    setPreviousResults(searchResults)
     setSelectedIndex(0)
     setCollapsedGroups({})
-  }, [searchResults])
+  }
 
   // Apply maxResultsPerType limit
   const limitedSearchResults = useMemo(() => {
@@ -471,7 +479,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
       case 'Escape':
         event.preventDefault()
         event.stopPropagation()
-        onClose()
+        void close()
         break
 
       case 'ArrowDown':
@@ -518,7 +526,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
           event.preventDefault()
           event.stopPropagation()
-          onClose()
+          void close()
         }
         break
     }
@@ -546,7 +554,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose()
+      void close()
     }
   }
 
@@ -583,7 +591,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         {getInterFontFaces()}
         {SEARCH_MODAL_STYLES}
       </style>
-      <div className="ultraforce-backdrop" onClick={handleBackdropClick}>
+      <div className="ultraforce-backdrop" data-closing={closing || undefined} onClick={handleBackdropClick}>
         <div
           className="ultraforce-search-modal"
           data-ultraforce-modal
@@ -628,7 +636,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 />
               </div>
             )}
-            <div className="search-floating-panel">
+            <AnimatedPanel
+              view={showSettings ? 'settings' : pickerOpen ? 'picker' : 'search'}
+              footer={<StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />}
+            >
               {showSettings ? (
                 <SettingsPanel
                   onClose={() => setShowSettings(false)}
@@ -653,114 +664,109 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   customCommands={customCommands}
                   onCustomCommandsChange={setCustomCommands}
                 />
+              ) : pickerOpen ? (
+                <CommandPanel
+                  options={commandPanel.options}
+                  selectedKey={commandPanel.selectedKey}
+                  filter={commandPanel.filter}
+                  onHighlight={commandPanel.highlight}
+                  onChoose={commandPanel.choose}
+                  onBack={commandPanel.close}
+                />
               ) : (
-                <div className="search-panel-views">
-                  <div className="search-panel-view" aria-hidden={pickerOpen} inert={pickerOpen}>
-                    <div className="search-container">
-                      {showCommandHints && <CommandHints commands={matchingCommands} prefix={query} />}
+                <>
+                  <div className="search-container">
+                    {showCommandHints && <CommandHints commands={matchingCommands} prefix={query} />}
 
-                      {!hasSession && !activeSection ? (
-                        <EmptyState type="no-session" />
-                      ) : isLoading && !activeSection ? (
-                        <EmptyState type="loading" />
-                      ) : searchError && !activeSection ? (
-                        <EmptyState type="error" errorMessage={searchError} />
-                      ) : !query.trim() ? (
-                        <>
-                          {recordContext && recordActions.length > 0 && (
-                            <RecordActions
-                              actions={recordActions}
-                              objectApiName={recordContext.objectApiName}
-                              selectedIndex={selectedRecordActionIndex}
-                            />
-                          )}
-                          <HomeScreen
-                            onNavigate={handleHomeNavigate}
-                            onToggleFavorite={handleToggleFavorite}
-                            onRemoveHistoryItem={handleRemoveHistoryItem}
-                            selectedTypes={selectedTypes}
-                            section={activeSection ?? undefined}
+                    {!hasSession && !activeSection ? (
+                      <EmptyState type="no-session" />
+                    ) : isLoading && !activeSection ? (
+                      <EmptyState type="loading" />
+                    ) : searchError && !activeSection ? (
+                      <EmptyState type="error" errorMessage={searchError} />
+                    ) : !query.trim() ? (
+                      <>
+                        {recordContext && recordActions.length > 0 && (
+                          <RecordActions
+                            actions={recordActions}
+                            objectApiName={recordContext.objectApiName}
+                            selectedIndex={selectedRecordActionIndex}
                           />
-                          {setupSuggestions.length > 0 && (
-                            <div className="setup-suggestions">
-                              <div className="setup-suggestions-header">{t('Related Setup Pages')}</div>
-                              <div className="setup-suggestions-list">
-                                {setupSuggestions.map((s) => (
-                                  <div
-                                    key={s.id}
-                                    className="setup-suggestion-item"
-                                    onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyDown={(e) =>
-                                      e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
-                                    }
-                                  >
-                                    <span className="setup-suggestion-name">{t(s.name)}</span>
-                                    <span className="setup-suggestion-category">{t(s.description)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
-                        <EmptyState
-                          type="command"
-                          commandTypes={parsedCommand.types || []}
-                          commandDescription={
-                            parsedCommand.command.isBuiltin
-                              ? t(parsedCommand.command.description)
-                              : parsedCommand.command.description
-                          }
-                        />
-                      ) : !hasResults && extractedIds.length > 0 && sfHost ? (
-                        <div className="id-preview-list">
-                          {extractedIds.map((id) => (
-                            <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
-                          ))}
-                        </div>
-                      ) : !hasResults && extractedId ? (
-                        <EmptyState type="id-navigation" query={extractedId} />
-                      ) : !hasResults ? (
-                        !showCommandHints && <EmptyState type="empty" query={query} />
-                      ) : (
-                        <SearchResults
-                          results={limitedSearchResults}
-                          selectedIndex={selectedIndex}
-                          onResultClick={onResultClick}
-                          onActionClick={onActionClick}
-                          onVisibleCountChange={handleVisibleCountChange}
-                          collapsedGroups={collapsedGroups}
-                          onToggleCollapse={handleToggleCollapse}
+                        )}
+                        <HomeScreen
+                          onNavigate={handleHomeNavigate}
                           onToggleFavorite={handleToggleFavorite}
-                          isFavorite={isFavoriteCheck}
-                          listboxId={RESULTS_LISTBOX_ID}
+                          onRemoveHistoryItem={handleRemoveHistoryItem}
+                          selectedTypes={selectedTypes}
+                          section={activeSection ?? undefined}
                         />
-                      )}
-                    </div>
-
-                    <SearchFooter
-                      liveStatusText={liveStatusText}
-                      canOpenScopes={commandPanel.canOpen}
-                      resultsMode={hasText}
-                    />
+                        {setupSuggestions.length > 0 && (
+                          <div className="setup-suggestions">
+                            <div className="setup-suggestions-header">{t('Related Setup Pages')}</div>
+                            <div className="setup-suggestions-list">
+                              {setupSuggestions.map((s) => (
+                                <div
+                                  key={s.id}
+                                  className="setup-suggestion-item"
+                                  onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) =>
+                                    e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
+                                  }
+                                >
+                                  <span className="setup-suggestion-name">{t(s.name)}</span>
+                                  <span className="setup-suggestion-category">{t(s.description)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
+                      <EmptyState
+                        type="command"
+                        commandTypes={parsedCommand.types || []}
+                        commandDescription={
+                          parsedCommand.command.isBuiltin
+                            ? t(parsedCommand.command.description)
+                            : parsedCommand.command.description
+                        }
+                      />
+                    ) : !hasResults && extractedIds.length > 0 && sfHost ? (
+                      <div className="id-preview-list">
+                        {extractedIds.map((id) => (
+                          <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
+                        ))}
+                      </div>
+                    ) : !hasResults && extractedId ? (
+                      <EmptyState type="id-navigation" query={extractedId} />
+                    ) : !hasResults ? (
+                      !showCommandHints && <EmptyState type="empty" query={query} />
+                    ) : (
+                      <SearchResults
+                        results={limitedSearchResults}
+                        selectedIndex={selectedIndex}
+                        onResultClick={onResultClick}
+                        onActionClick={onActionClick}
+                        onVisibleCountChange={handleVisibleCountChange}
+                        collapsedGroups={collapsedGroups}
+                        onToggleCollapse={handleToggleCollapse}
+                        onToggleFavorite={handleToggleFavorite}
+                        isFavorite={isFavoriteCheck}
+                        listboxId={RESULTS_LISTBOX_ID}
+                      />
+                    )}
                   </div>
-                  {commandPanel.hasOpened && (
-                    <CommandPanel
-                      options={commandPanel.options}
-                      selectedKey={commandPanel.selectedKey}
-                      onHighlight={commandPanel.highlight}
-                      onChoose={commandPanel.choose}
-                      onBack={commandPanel.close}
-                      isOpen={pickerOpen}
-                    />
-                  )}
-                </div>
-              )}
 
-              <StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />
-            </div>
+                  <SearchFooter
+                    liveStatusText={liveStatusText}
+                    canOpenScopes={commandPanel.canOpen}
+                    resultsMode={hasText}
+                  />
+                </>
+              )}
+            </AnimatedPanel>
           </div>
           {!showSettings && showUpdateNotification && (
             <UpdateNotification

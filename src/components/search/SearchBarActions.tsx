@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { t } from '~lib/i18n'
 import { ActionIcon } from './SearchChrome'
 
@@ -30,11 +31,12 @@ export default function SearchBarActions({
         if (e.key === 'Enter') e.stopPropagation()
       }}
     >
-      {sectionActions.map(({ section, label, icon }) => (
+      {sectionActions.map(({ section, label, icon }, index) => (
         <button
           key={section}
           type="button"
           className="search-bar-action"
+          style={{ '--i': index } as CSSProperties}
           aria-label={t(label)}
           aria-pressed={activeSection === section}
           onClick={() => onToggleSection(section)}
@@ -45,6 +47,7 @@ export default function SearchBarActions({
       <button
         type="button"
         className="search-bar-action"
+        style={{ '--i': sectionActions.length } as CSSProperties}
         data-ultraforce-settings-button
         aria-label={t('Settings')}
         onClick={onSettings}

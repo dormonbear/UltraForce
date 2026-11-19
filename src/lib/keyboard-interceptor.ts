@@ -95,10 +95,18 @@ function notifyValueChange(input: HTMLInputElement, value: string): void {
   )
 }
 
+export function isToggleShortcut(event: KeyboardEvent, shortcut: string): boolean {
+  const key = event.key.toLowerCase()
+  return shortcut.startsWith('alt+')
+    ? event.altKey && key === shortcut.slice(4)
+    : (event.ctrlKey || event.metaKey) && key === shortcut.toLowerCase()
+}
+
 export interface KeyboardInterceptorOptions {
   getInput: () => HTMLInputElement | null
   getModal?: () => HTMLElement | null
   getShadowRoot?: () => ShadowRoot | null
+  getToggleShortcut?: () => string
 }
 
 export function createKeyboardInterceptor(
@@ -114,6 +122,9 @@ export function createKeyboardInterceptor(
 
     // Never intercept modifier-only keys
     if (MODIFIER_KEYS.has(e.key)) return
+
+    // The content script owns the toggle shortcut, including during exit. / 切换快捷键由内容脚本处理，包括退场期间。
+    if (e.type === 'keydown' && opts.getToggleShortcut && isToggleShortcut(e, opts.getToggleShortcut())) return
 
     // If focus is on a form element (input/textarea) that is NOT the search input,
     // let it handle its own keyboard events (e.g. settings panel form fields)

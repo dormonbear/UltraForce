@@ -2,12 +2,13 @@ import { t } from '~lib/i18n'
 // HomeScreen - Replaces the empty state when query is empty.
 // Shows pinned favorites and recent history ordered by last visit time.
 
-import React, { useMemo, useCallback } from 'react'
+import React, { useMemo, useCallback, useState } from 'react'
 import { useHistoryStore, sortByLastVisited } from '~stores/history-store'
 import { useFavoritesStore, type FavoriteItem } from '~stores/favorites-store'
 import type { HistoryItem } from '~stores/history-store'
 import type { HomeSection } from './SearchBarActions'
 import TypeBadge from './TypeBadge'
+import { useSlidingHighlight } from './motion/useSlidingHighlight'
 
 const MAX_RECENT_ITEMS = 8
 const MAX_FAVORITE_ITEMS = 10
@@ -35,6 +36,32 @@ function formatRelativeTime(timestamp: number): string {
   const days = Math.floor(hours / 24)
   if (days < 30) return t('{count}d ago', { count: days })
   return t('{count}mo ago', { count: Math.floor(days / 30) })
+}
+
+function HomeItems({ children, items }: { children: React.ReactNode; items: readonly (FavoriteItem | HistoryItem)[] }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const [focus, setFocus] = useState<string | null>(null)
+  const selected = hover ?? focus
+  const { listRef, highlightStyle, noAnimate } = useSlidingHighlight(selected, items)
+
+  function getRowSelector(target: EventTarget | null) {
+    const row = target instanceof Element ? target.closest<HTMLElement>('[data-home-row]') : null
+    return row && listRef.current?.contains(row) ? `[data-home-row="${row.dataset.homeRow}"]` : null
+  }
+
+  return (
+    <div
+      className="home-items"
+      ref={listRef}
+      onMouseOver={(event) => setHover(getRowSelector(event.target))}
+      onMouseLeave={() => setHover(null)}
+      onFocus={(event) => setFocus(getRowSelector(event.target))}
+      onBlur={(event) => setFocus(getRowSelector(event.relatedTarget))}
+    >
+      <div className="sliding-highlight" aria-hidden="true" data-snap={noAnimate} style={highlightStyle} />
+      {children}
+    </div>
+  )
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -133,11 +160,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
             {t('Favorites')}
           </div>
-          <div className="home-items">
-            {visibleFavorites.map((item) => (
+          <HomeItems items={visibleFavorites}>
+            {visibleFavorites.map((item, index) => (
               <div
                 key={item.id}
                 className="home-item"
+                data-home-row={index}
                 onClick={() => handleItemClick(item.url)}
                 role="button"
                 tabIndex={0}
@@ -167,7 +195,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 </button>
               </div>
             ))}
-          </div>
+          </HomeItems>
         </div>
       )}
 
@@ -182,11 +210,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
             {t('Recent')}
           </div>
-          <div className="home-items">
-            {recentItems.map((item) => (
+          <HomeItems items={recentItems}>
+            {recentItems.map((item, index) => (
               <div
                 key={`${item.id}-${item.type}`}
                 className="home-item"
+                data-home-row={index}
                 onClick={() => handleItemClick(item.url)}
                 role="button"
                 tabIndex={0}
@@ -231,7 +260,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                 </button>
               </div>
             ))}
-          </div>
+          </HomeItems>
         </div>
       )}
     </div>

@@ -13,6 +13,54 @@
 }
 
 .ultraforce-search-modal {
+  --uf-spring: linear(
+    0,
+    0.027,
+    0.093,
+    0.184,
+    0.286,
+    0.392,
+    0.494,
+    0.589,
+    0.675,
+    0.75,
+    0.814,
+    0.867,
+    0.91,
+    0.944,
+    0.97,
+    0.989,
+    1.003,
+    1.012,
+    1.018,
+    1.021,
+    1.022,
+    1.022,
+    1.021,
+    1.019,
+    1.016,
+    1.014,
+    1.012,
+    1.01,
+    1.008,
+    1.006,
+    1.004,
+    1.003,
+    1.002,
+    1.001,
+    1.001,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  );
+  --uf-spring-duration: 420ms;
+  --uf-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --uf-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --uf-exit-duration: 140ms;
+  --uf-panel-max-height: calc(80vh - var(--search-bar-height) - 12px);
   --search-surface: rgba(16, 18, 24, 0.82);
   --search-surface-border: rgba(255, 255, 255, 0.1);
   --search-bar-height: clamp(40px, 8vw, 54px);
@@ -20,7 +68,7 @@
   position: fixed;
   top: 10%;
   left: 50%;
-  transform: translateX(-50%);
+  translate: -50%;
   width: 90%;
   max-width: 720px;
   min-height: 200px;
@@ -118,7 +166,6 @@
   gap: var(--search-bar-gap);
   overflow: clip;
   overflow-clip-margin: 4px;
-  transform-origin: right center;
 }
 
 [data-ui-mode='results'] .search-bar-row {
@@ -126,9 +173,9 @@
   column-gap: 0;
 }
 
-.search-bar-actions[inert] {
+.search-bar-actions[inert] .search-bar-action {
   opacity: 0;
-  transform: scale(0.9);
+  scale: 0.9;
   visibility: hidden;
 }
 
@@ -178,12 +225,23 @@
 }
 
 .search-floating-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
   min-height: 0;
   overflow: hidden;
   border-radius: 16px;
+}
+
+.search-panel-height {
+  overflow: hidden;
+}
+
+.search-panel-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--uf-panel-max-height);
+}
+
+.search-surface:has(> .search-floating-panel:first-child) {
+  --uf-panel-max-height: calc(80vh - 4px);
 }
 
 .search-icon {
@@ -407,6 +465,39 @@
 
 .result-item.selected {
   background: rgba(255, 255, 255, 0.08);
+}
+
+:is(.search-results, .command-panel-options, .home-items) {
+  position: relative;
+  isolation: isolate;
+}
+
+:is(.search-results, .command-panel-options) .result-item {
+  position: relative;
+}
+
+:is(.search-results, .command-panel-options) .result-item.selected:not(:hover) {
+  background: transparent;
+}
+
+:is(.search-results, .command-panel-options) .result-item.selected:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.sliding-highlight {
+  position: absolute;
+  top: 0;
+  inset-inline: 8px;
+  height: 1px;
+  z-index: -1;
+  border-radius: 10px / calc(10px / var(--uf-row-height, 1));
+  background: rgba(255, 255, 255, 0.08);
+  transform-origin: top center;
+  pointer-events: none;
+}
+
+.home-items .sliding-highlight {
+  inset-inline: 0;
 }
 
 .result-info {
@@ -744,7 +835,6 @@ kbd {
   z-index: 10;
   display: flex;
   flex-direction: column;
-  animation: fade-in 0.2s ease;
 }
 
 [data-ultraforce-settings] {
@@ -753,15 +843,6 @@ kbd {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .settings-header {
@@ -1025,105 +1106,6 @@ kbd {
 .command-hint-tag .command-desc {
   color: rgba(255, 255, 255, 0.64);
   overflow-wrap: anywhere;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .ultraforce-search-modal {
-    --search-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-    --search-morph: 180ms var(--search-ease-out);
-  }
-
-  .search-surface {
-    transition:
-      gap var(--search-morph),
-      background-color var(--search-morph),
-      border-color var(--search-morph),
-      box-shadow var(--search-morph);
-  }
-
-  .search-bar-row {
-    transition:
-      grid-template-columns var(--search-morph),
-      column-gap var(--search-morph);
-  }
-
-  .search-bar-actions {
-    transition:
-      opacity var(--search-morph),
-      transform var(--search-morph),
-      visibility var(--search-morph);
-  }
-
-  .search-input-section,
-  .search-floating-panel {
-    transition:
-      background-color var(--search-morph),
-      border-color var(--search-morph),
-      border-radius var(--search-morph),
-      box-shadow var(--search-morph);
-  }
-
-  .search-bar-row,
-  .search-floating-panel {
-    animation: search-surface-enter 180ms var(--search-ease-out) backwards;
-  }
-
-  .search-floating-panel {
-    animation-delay: 30ms;
-  }
-
-  @keyframes search-surface-enter {
-    from {
-      opacity: 0;
-      transform: translateY(-6px) scale(0.98);
-    }
-  }
-
-  .command-scope-chip {
-    animation: command-scope-enter 140ms var(--search-ease-out) backwards;
-  }
-
-  @keyframes command-scope-enter {
-    from {
-      opacity: 0;
-      transform: scale(0.92);
-    }
-  }
-
-  .command-hints,
-  .command-hint-tag {
-    transition:
-      opacity 120ms var(--search-ease-out),
-      transform 120ms var(--search-ease-out);
-  }
-
-  .command-hint-tag {
-    transition-delay: calc(min(var(--i), 7) * 20ms);
-  }
-
-  @starting-style {
-    .command-hints,
-    .command-hint-tag {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-  }
-
-  .result-item {
-    transition: background-color 100ms var(--search-ease-out);
-  }
-
-  .home-item::before {
-    transition: opacity 100ms var(--search-ease-out);
-  }
-
-  .search-bar-action {
-    transition: transform 120ms var(--search-ease-out);
-  }
-
-  .search-bar-action:active {
-    transform: scale(0.96);
-  }
 }
 
 /* Commands List in Settings */
@@ -2137,11 +2119,17 @@ kbd {
   min-height: 0;
 }
 
-.search-panel-view[aria-hidden='true'] {
+.search-panel-view[data-exiting] {
   position: absolute;
-  inset: 0;
-  visibility: hidden;
+  inset: 0 0 auto;
+  max-height: var(--uf-panel-max-height);
   pointer-events: none;
+}
+
+.command-panel-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .command-panel-header {
@@ -2250,26 +2238,139 @@ kbd {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .ultraforce-search-modal {
+    --uf-enter: var(--uf-spring-duration) var(--uf-spring);
+    --uf-exit: var(--uf-exit-duration) var(--uf-ease-in);
+    transform-origin: top center;
+    transition:
+      opacity var(--uf-enter),
+      transform var(--uf-enter);
+  }
+
+  [data-closing] > .ultraforce-search-modal {
+    transition:
+      opacity var(--uf-exit),
+      transform var(--uf-exit);
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+    pointer-events: none;
+  }
+
+  .search-surface {
+    transition:
+      gap var(--uf-enter),
+      background-color var(--uf-enter),
+      border-color var(--uf-enter);
+  }
+
+  .search-input-section,
+  .search-floating-panel {
+    transition:
+      border-color var(--uf-enter),
+      border-radius var(--uf-enter);
+  }
+
+  .search-bar-row {
+    --uf-entry-offset: -8px;
+    --uf-entry-scale: 0.97;
+    transition:
+      grid-template-columns var(--uf-enter),
+      column-gap var(--uf-enter);
+  }
+
+  [data-ui-mode='results'] .search-bar-row {
+    transition-delay: 60ms;
+  }
+
+  .search-floating-panel {
+    --uf-entry-offset: -6px;
+    --uf-entry-scale: 0.98;
+    --uf-entry-delay: 40ms;
+  }
+
+  .search-bar-row,
+  .search-floating-panel,
+  .command-scope-chip {
+    transform-origin: top center;
+    animation: uf-enter var(--uf-enter) var(--uf-entry-delay, 0ms) backwards;
+  }
+
+  .command-scope-chip {
+    --uf-entry-scale: 0.9;
+    transform-origin: left center;
+  }
+
+  .search-bar-action {
+    --uf-action-delay: calc(var(--i) * 30ms);
+    transform-origin: center;
+    transition:
+      opacity var(--uf-enter) var(--uf-action-delay),
+      scale var(--uf-enter) var(--uf-action-delay),
+      transform var(--uf-exit-duration) var(--uf-ease-out);
+  }
+
+  .search-bar-actions[inert] .search-bar-action {
+    --uf-action-delay: calc((2 - var(--i)) * 30ms);
+    transition:
+      opacity var(--uf-exit) var(--uf-action-delay),
+      scale var(--uf-exit) var(--uf-action-delay),
+      visibility var(--uf-exit) var(--uf-action-delay);
+  }
+
+  .search-bar-action:active {
+    transform: scale(0.96);
+  }
+
+  .search-panel-height {
+    transition: height var(--uf-enter);
+  }
+
   .search-panel-view {
     transition:
-      opacity 160ms var(--search-ease-out),
-      transform 160ms var(--search-ease-out),
-      visibility 160ms var(--search-ease-out);
+      opacity var(--uf-enter),
+      transform var(--uf-enter);
   }
 
-  .search-panel-view[aria-hidden='true'] {
+  .search-panel-view[data-exiting] {
     opacity: 0;
-    transform: translateX(-8px);
-  }
-
-  .command-panel-view[aria-hidden='true'] {
-    transform: translateX(8px);
+    transform: translateX(calc(-12px * var(--uf-direction)));
+    transition:
+      opacity var(--uf-exit),
+      transform var(--uf-exit);
   }
 
   @starting-style {
-    .command-panel-view[aria-hidden='false'] {
+    [data-switching] > .search-panel-view:not([data-exiting]) {
       opacity: 0;
-      transform: translateX(8px);
+      transform: translateX(calc(12px * var(--uf-direction)));
     }
+  }
+
+  .sliding-highlight:not([data-snap='true']) {
+    transition: transform var(--uf-enter);
+  }
+
+  [data-row-entrance],
+  .command-hint-tag {
+    --uf-entry-offset: 4px;
+    animation: uf-enter var(--uf-enter) calc(min(var(--i), 10) * 18ms) backwards;
+  }
+
+  @keyframes uf-enter {
+    from {
+      opacity: 0;
+      transform: translateY(var(--uf-entry-offset, 0px)) scale(var(--uf-entry-scale, 1));
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ultraforce-search-modal,
+  .ultraforce-search-modal *,
+  .ultraforce-search-modal *::before,
+  .ultraforce-search-modal *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

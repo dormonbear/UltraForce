@@ -11,20 +11,18 @@ export function useCommandPanel(
   onChoose: (query: string) => void,
   inputRef: RefObject<HTMLInputElement | null>
 ) {
-  const [view, setView] = useState<'unopened' | 'open' | 'closed'>('unopened')
+  const [isOpen, setIsOpen] = useState(false)
   const [filter, setFilter] = useState('')
   const [highlightedKey, highlight] = useState<string | null>(null)
-  const isOpen = view === 'open'
   const canOpen = splitCommandChip(query, commands).remainder === ''
   const needle = filter.trim().toLowerCase()
-  const options =
-    view === 'unopened'
-      ? []
-      : getMatchingCommands(':', commands, unsupportedTypes)
-          .map((command) => ({ command, ...getScopeDetails(command) }))
-          .filter(({ command, title, label }) =>
-            [`:${command.key}`, title, label].some((text) => text.toLowerCase().includes(needle))
-          )
+  const options = !isOpen
+    ? []
+    : getMatchingCommands(':', commands, unsupportedTypes)
+        .map((command) => ({ command, ...getScopeDetails(command) }))
+        .filter(({ command, title, label }) =>
+          [`:${command.key}`, title, label].some((text) => text.toLowerCase().includes(needle))
+        )
   const selectedIndex = Math.max(
     0,
     options.findIndex(({ command }) => command.key === highlightedKey)
@@ -34,13 +32,13 @@ export function useCommandPanel(
   function open() {
     setFilter('')
     highlight(null)
-    setView('open')
+    setIsOpen(true)
     inputRef.current?.focus()
   }
 
   function close() {
     if (!isOpen) return
-    setView('closed')
+    setIsOpen(false)
     inputRef.current?.focus()
   }
 
@@ -82,7 +80,6 @@ export function useCommandPanel(
   return {
     isOpen,
     canOpen,
-    hasOpened: view !== 'unopened',
     filter,
     options,
     selectedKey,

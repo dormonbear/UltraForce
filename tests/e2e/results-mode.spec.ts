@@ -57,6 +57,17 @@ test('widens the input while hiding the round buttons / 隐藏圆形按钮并加
     await input.press('Backspace')
     await expect(history).toBeVisible()
     await expect.poll(async () => Math.round((await input.boundingBox())!.width)).toBe(Math.round(idleWidth))
+
+    const backdrop = page.locator('.ultraforce-backdrop')
+    await input.press('Escape')
+    await expect(backdrop).toHaveAttribute('data-closing', 'true')
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+b' : 'Control+b')
+    await expect(backdrop).not.toHaveAttribute('data-closing', 'true')
+    await expect(input).toBeFocused()
+
+    await input.press('Escape')
+    await expect(backdrop).toHaveAttribute('data-closing', 'true')
+    await expect(dialog).toHaveCount(0)
   } finally {
     await context.close()
     rmSync(profile, { recursive: true, force: true })

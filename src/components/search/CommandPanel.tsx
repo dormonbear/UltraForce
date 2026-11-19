@@ -4,6 +4,7 @@ import type { SearchCommand } from '~types'
 import { ActionIcon, SearchFooter } from './SearchChrome'
 import type { getScopeDetails } from './command-scope'
 import { getMetadataTypeLabel } from './metadata-type-label'
+import { useSlidingHighlight } from './motion/useSlidingHighlight'
 
 export const COMMAND_LISTBOX_ID = 'ultraforce-command-listbox'
 
@@ -17,7 +18,7 @@ interface CommandPanelProps {
   onHighlight: (key: string) => void
   onChoose: (key: string) => void
   onBack: () => void
-  isOpen: boolean
+  filter: string
 }
 
 export default function CommandPanel({
@@ -26,18 +27,23 @@ export default function CommandPanel({
   onHighlight,
   onChoose,
   onBack,
-  isOpen
+  filter
 }: CommandPanelProps) {
   const selectedRow = useRef<HTMLDivElement>(null)
   const selected = options.find(({ command }) => command.key === selectedKey)
   const title = t('Choose a scope')
+  const { listRef, highlightStyle, noAnimate } = useSlidingHighlight(
+    selectedKey === null ? null : '[aria-selected="true"]',
+    `${filter}:${options.map(({ command }) => command.key).join(',')}`,
+    selectedKey
+  )
 
   useEffect(() => {
-    if (isOpen) selectedRow.current?.scrollIntoView?.({ block: 'nearest' })
-  }, [selectedKey, isOpen])
+    selectedRow.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [selectedKey, filter])
 
   return (
-    <div className="search-panel-view command-panel-view" aria-hidden={!isOpen} inert={!isOpen}>
+    <div className="command-panel-view">
       <div className="command-panel-header">
         <button type="button" className="command-panel-back" aria-label={t('Back to search')} onClick={onBack}>
           <ActionIcon icon="back" />
@@ -46,7 +52,14 @@ export default function CommandPanel({
       </div>
       <div className="command-panel-columns">
         <div className="command-panel-list">
-          <div id={COMMAND_LISTBOX_ID} role="listbox" aria-label={title}>
+          <div
+            id={COMMAND_LISTBOX_ID}
+            className="command-panel-options"
+            ref={listRef}
+            role="listbox"
+            aria-label={title}
+          >
+            <div className="sliding-highlight" aria-hidden="true" data-snap={noAnimate} style={highlightStyle} />
             {options.map(({ command, icon, label }) => {
               const active = command.key === selectedKey
               return (
