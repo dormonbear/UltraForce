@@ -184,6 +184,7 @@ export const chineseMessages: Readonly<Record<string, string>> = {
   'Max results per type': '每种类型的结果上限',
   'Navigation Mode': '导航模式',
   'Choose how to open Salesforce pages.': '选择打开 Salesforce 页面的方式。',
+  Commands: '命令',
   'Built-in Commands': '内置命令',
   'Type : followed by a command to filter search.': '输入 : 及命令以筛选搜索范围。',
   'Custom Commands': '自定义命令',

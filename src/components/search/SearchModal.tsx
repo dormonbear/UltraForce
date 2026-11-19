@@ -6,6 +6,7 @@ import SearchInput from './SearchInput'
 import SearchBarActions, { type HomeSection } from './SearchBarActions'
 import SearchResults from './SearchResults'
 import SettingsPanel from './SettingsPanel'
+import UpdateNotification from './UpdateNotification'
 import EmptyState from './EmptyState'
 import HomeScreen from './HomeScreen'
 import IdPreview from './IdPreview'
@@ -19,7 +20,7 @@ import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
 import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from '~lib/contextual-suggestions'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
-import { checkForUpdate, markNotificationAsShown } from '~lib/version-check'
+import { checkForUpdate, markNotificationAsShown, RELEASE_NOTES_URL } from '~lib/version-check'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
@@ -157,7 +158,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const [showSettings, setShowSettings] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
   const [_visibleItemCount, setVisibleItemCount] = useState(0)
-  const [showCommandHints, setShowCommandHints] = useState(false)
   const [unsupportedTypes, setUnsupportedTypes] = useState<string[]>([])
   const [showUpdateNotification, setShowUpdateNotification] = useState(false)
   const [updateVersion, setUpdateVersion] = useState('')
@@ -268,11 +268,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     []
   )
 
-  // Show/hide command hints
-  useEffect(() => {
-    const shouldShow = query === ':' && matchingCommands.length > 0
-    setShowCommandHints(shouldShow)
-  }, [query, matchingCommands.length])
+  const showCommandHints = /^:\S*$/.test(query) && matchingCommands.length > 0
 
   // Clear results when entering a new command
   const prevCommandKeyRef = useRef<string | null>(null)
@@ -614,6 +610,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         !searchError &&
         query.trim() !== '' &&
         !hasResults &&
+        !showCommandHints &&
         !extractedId &&
         !isCommandEmptyState
       ? t('No results')
@@ -692,7 +689,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
             ) : (
               <>
                 <div className="search-container">
-                  {showCommandHints && <CommandHints commands={matchingCommands} />}
+                  {showCommandHints && <CommandHints commands={matchingCommands} prefix={query} />}
 
                   {!hasSession && !activeSection ? (
                     <EmptyState type="no-session" />
@@ -758,7 +755,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   ) : !hasResults && extractedId ? (
                     <EmptyState type="id-navigation" query={extractedId} />
                   ) : !hasResults ? (
-                    <EmptyState type="empty" query={query} />
+                    !showCommandHints && <EmptyState type="empty" query={query} />
                   ) : (
                     <SearchResults
                       results={limitedSearchResults}
@@ -775,17 +772,19 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   )}
                 </div>
 
-                <SearchFooter
-                  liveStatusText={liveStatusText}
-                  showUpdateNotification={showUpdateNotification}
-                  updateVersion={updateVersion}
-                  onDismissUpdate={handleDismissUpdate}
-                />
+                <SearchFooter liveStatusText={liveStatusText} />
               </>
             )}
 
             <StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />
           </div>
+          {!showSettings && showUpdateNotification && (
+            <UpdateNotification
+              version={updateVersion}
+              releaseNotesUrl={RELEASE_NOTES_URL}
+              onDismiss={handleDismissUpdate}
+            />
+          )}
         </div>
       </div>
     </>

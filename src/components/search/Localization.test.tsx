@@ -53,6 +53,7 @@ describe('Chinese UI and content preservation / 中文界面及内容保留', ()
         ]}
       />
     )
+    expect(screen.getByRole('heading', { name: '命令' })).toBeInTheDocument()
     expect(screen.getByText('对象及字段')).toBeInTheDocument()
     expect(screen.getByText('Objects & Fields')).toBeInTheDocument()
   })

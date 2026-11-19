@@ -1,7 +1,5 @@
 import React from 'react'
 import { t } from '~lib/i18n'
-import UpdateNotification from './UpdateNotification'
-import { RELEASE_NOTES_URL } from '~lib/version-check'
 
 const ACTION_ICON_PROPS = {
   width: '16',
@@ -93,17 +91,7 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
   }
 }
 
-export function SearchFooter({
-  liveStatusText,
-  showUpdateNotification,
-  updateVersion,
-  onDismissUpdate
-}: {
-  liveStatusText: string
-  showUpdateNotification: boolean
-  updateVersion: string
-  onDismissUpdate: () => void
-}) {
+export function SearchFooter({ liveStatusText }: { liveStatusText: string }) {
   return (
     <>
       <div className="ultraforce-sr-only" role="status" aria-atomic="true">
@@ -126,10 +114,6 @@ export function SearchFooter({
           </div>
         </div>
       </div>
-
-      {showUpdateNotification && (
-        <UpdateNotification version={updateVersion} releaseNotesUrl={RELEASE_NOTES_URL} onDismiss={onDismissUpdate} />
-      )}
     </>
   )
 }
