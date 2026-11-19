@@ -29,15 +29,17 @@ Windows 执行全部前端单元测试并保留现有覆盖率阈值，同时执
 使用全新配置文件运行中英文浏览器冒烟测试并打包扩展。独立合成任务执行 localization、
 auth-boundary、privacy 及 setup-search-race 中相同六项用例，仅使用合成夹具，不接触真实组织。
 
-Ubuntu remains the execution platform for release-workflow and Chrome Web Store
-publisher contracts, matching the Bash/zip release workflow. The existing POSIX
-glob CLI metacharacter case stays POSIX-only: its filename contains characters
-Windows forbids. Its ZIP/glob/brace library siblings run on both platforms.
-No failing cross-platform test is excluded from Windows qualification.
+Ubuntu runs the release-workflow and Chrome Web Store publisher contracts,
+matching the Bash/zip release workflow. ZIP library regressions run on Ubuntu
+and Windows. The Plasmo resolver's tsup dependency was removed, so its glob and
+brace-expansion cases are skipped on both platforms. If that dependency returns,
+the glob CLI metacharacter case runs only on POSIX because its filename contains
+characters Windows forbids.
 
-Ubuntu 继续执行发布流程及 Chrome 应用商店发布器契约，与 Bash／zip 发布流程的平台一致。
-现有 POSIX glob CLI 元字符用例仍仅在 POSIX 执行，因为文件名含 Windows 禁用字符；
-同文件中的 ZIP／glob／花括号库用例在两平台均执行。不会从 Windows 验证排除失败的跨平台测试。
+Ubuntu 执行发布流程和 Chrome 应用商店发布器契约，与 Bash／zip 发布流程的平台一致。
+ZIP 库回归测试在 Ubuntu 和 Windows 上运行。Plasmo 解析器的 tsup 依赖已移除，
+因此两个平台都会跳过其 glob 和花括号展开用例。如果恢复该依赖，glob CLI 元字符用例
+仅在 POSIX 上运行，因为其文件名含 Windows 禁用字符。
 
 Production and E2E jobs use separate checkouts because both Plasmo commands write
 `build/chrome-mv3-prod`. Only production jobs upload extension build artifacts.
