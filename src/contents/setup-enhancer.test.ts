@@ -72,6 +72,7 @@ async function loadModule(): Promise<void> {
 
 describe('setup-enhancer', () => {
   beforeEach(() => {
+    Object.assign(chrome.runtime, { id: 'fixture-extension' })
     vi.useFakeTimers()
     observers = []
     getState.mockReturnValue({ autoLoadFields: true })
@@ -81,6 +82,7 @@ describe('setup-enhancer', () => {
   })
 
   afterEach(() => {
+    window.dispatchEvent(new Event('beforeunload'))
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
     global.MutationObserver = RealMutationObserver
@@ -96,6 +98,13 @@ describe('setup-enhancer', () => {
     const urlWatcher = observers[0]
     expect(urlWatcher.observe).toHaveBeenCalled()
     expect(urlWatcher.observedTargets).toContain(document.body)
+  })
+
+  it('starts only one URL watcher when reinjected / 重复注入时只启动一个 URL 观察器', async () => {
+    await loadModule()
+    await loadModule()
+
+    expect(observers).toHaveLength(1)
   })
 
   it('does nothing when autoLoadFields is disabled', async () => {

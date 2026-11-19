@@ -1,5 +1,7 @@
 import React from 'react'
 import { t } from './i18n'
+import { isExtensionContextValid } from './extension-context'
+import { MODAL_CONTAINER_PREFIX, MODAL_CONTAINER_SELECTOR } from './extension-updated-notice'
 import { createPrivateRoot } from './react-root'
 import SearchModal from '~components/search/SearchModal'
 import type { ExitAnimationControl } from '~components/search/motion/useExitAnimation'
@@ -60,11 +62,8 @@ interface WindowManagerOptions {
   containerId?: string
   useShadowDOM?: boolean
   debugMode?: boolean
+  isContextActive?: (event?: KeyboardEvent) => boolean
 }
-
-const CONTAINER_PREFIX = 'ultraforce-modal'
-const CLEANUP_DELAY = 100
-const MAX_CLEANUP_ATTEMPTS = 3
 
 class UltraForceWindowManager {
   private static instance: UltraForceWindowManager | null = null
@@ -79,9 +78,10 @@ class UltraForceWindowManager {
   private _isInitialized = false
 
   private options: Required<WindowManagerOptions> = {
-    containerId: `${CONTAINER_PREFIX}-${Date.now()}`,
+    containerId: `${MODAL_CONTAINER_PREFIX}-${Date.now()}`,
     useShadowDOM: true,
-    debugMode: false
+    debugMode: false,
+    isContextActive: isExtensionContextValid
   }
 
   private eventEmitter = new TypedEventEmitter<Record<string, any>>()
@@ -130,24 +130,20 @@ class UltraForceWindowManager {
       UltraForceWindowManager.instance = null
     }
 
-    let attempt = 0
-    while (attempt < MAX_CLEANUP_ATTEMPTS) {
-      const existingContainers = document.querySelectorAll(`[id^="${CONTAINER_PREFIX}"]`)
-      if (existingContainers.length === 0) break
-
-      existingContainers.forEach((container) => {
-        try {
-          container.remove()
-        } catch (error) {
-          logger.warn('Failed to remove container:', error)
+    const staleContainers = document.querySelectorAll(MODAL_CONTAINER_SELECTOR)
+    staleContainers.forEach((container) => {
+      try {
+        // Close pre-update modals so they release their keyboard interceptors. / 关闭旧版对话框以释放键盘拦截器。
+        if (container instanceof HTMLElement) {
+          const shadow = container.shadowRoot ?? chrome.dom?.openOrClosedShadowRoot(container)
+          shadow?.querySelector('.ultraforce-backdrop')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         }
-      })
-
-      attempt++
-      if (attempt < MAX_CLEANUP_ATTEMPTS) {
-        await new Promise((resolve) => setTimeout(resolve, CLEANUP_DELAY))
+      } catch {
+        // The stale host can still be removed. / 仍可移除旧容器。
       }
-    }
+      container.remove()
+    })
+    if (staleContainers.length) document.documentElement.removeAttribute('data-ultraforce-modal-open')
   }
 
   private async initialize(): Promise<void> {
@@ -200,15 +196,6 @@ class UltraForceWindowManager {
   }
 
   private setupEventListeners(): void {
-    const handleBeforeUnload = () => {
-      this.destroy()
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    this.cleanupFunctions.push(() => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    })
-
     const handleVisibilityChange = () => {
       if (document.hidden && useSearchStore.getState().isVisible) {
         this.log('Page hidden, keeping modal state')
@@ -265,6 +252,7 @@ class UltraForceWindowManager {
       return
     }
 
+    if (!this.options.isContextActive()) return
     await this.loadSession()
 
     // Detect record context
@@ -284,6 +272,7 @@ class UltraForceWindowManager {
       useSearchStore.getState().setRecordContext(null)
     }
 
+    if (!this._isInitialized || !this.options.isContextActive()) return
     useSearchStore.getState().show()
     this.log('Showing modal')
 
@@ -292,13 +281,16 @@ class UltraForceWindowManager {
 
     // A failing interceptor must never break the host page; degrade gracefully.
     try {
-      this.keyboardInterceptor = createKeyboardInterceptor({
+      const intercept = createKeyboardInterceptor({
         getInput: () => this.shadowRoot?.querySelector('[data-ultraforce-input]') as HTMLInputElement | null,
         getModal: () => this.shadowRoot?.querySelector('[data-ultraforce-modal]') as HTMLElement | null,
         getShadowRoot: () => this.shadowRoot ?? null,
         getToggleShortcut: () => useSettingsStore.getState().shortcutKey
       })
 
+      this.keyboardInterceptor = (event) => {
+        if (this.options.isContextActive(event)) intercept(event)
+      }
       window.addEventListener('keydown', this.keyboardInterceptor, true)
       window.addEventListener('keyup', this.keyboardInterceptor, true)
       window.addEventListener('keypress', this.keyboardInterceptor, true)
@@ -336,12 +328,13 @@ class UltraForceWindowManager {
       this.keyboardInterceptor = null
     }
 
-    document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    if (this.containerElement?.isConnected) document.documentElement.removeAttribute('data-ultraforce-modal-open')
     logger.debug('keyboard:shield deactivated')
 
     if (this.reactRoot) {
-      this.reactRoot.unmount()
+      const root = this.reactRoot
       this.reactRoot = null
+      root.unmount()
     }
 
     this.emit('hide', this.getState())
@@ -873,21 +866,18 @@ class UltraForceWindowManager {
 
   public async destroy(): Promise<void> {
     this.log('Destroying WindowManager...')
+    this._isInitialized = false
 
     try {
-      if (useSearchStore.getState().isVisible) {
-        this.finishHide()
+      try {
+        if (useSearchStore.getState().isVisible) this.finishHide()
+        this.reactRoot?.unmount()
+      } catch (error) {
+        logger.error('Modal cleanup failed:', error)
       }
-
-      if (this.reactRoot) {
-        this.reactRoot.unmount()
-        this.reactRoot = null
-      }
-
-      if (this.containerElement) {
-        this.containerElement.remove()
-        this.containerElement = null
-      }
+      this.reactRoot = null
+      this.containerElement?.remove()
+      this.containerElement = null
 
       this.cleanupFunctions.forEach((cleanup) => {
         try {
@@ -902,7 +892,6 @@ class UltraForceWindowManager {
 
       useSearchStore.getState().reset()
       useSessionStore.getState().reset()
-      this._isInitialized = false
 
       this.log('WindowManager destroyed successfully')
     } catch (error) {

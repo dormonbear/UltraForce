@@ -2,8 +2,9 @@ import type { PlasmoCSConfig } from 'plasmo'
 import UltraForceWindowManager from '~lib/window-manager'
 import { validateSalesforceSession, warmupMetadataCache, checkMetadataPermissions } from '~lib/salesforce-api'
 import { getSfHost, getSession } from '~lib/auth'
+import { claimExtensionScript, isExtensionContextValid } from '~lib/extension-context'
+import { scheduleExtensionUpdatedNotice } from '~lib/extension-updated-notice'
 import { logger } from '~lib/logger'
-import { isToggleShortcut } from '~lib/keyboard-interceptor'
 import { useSettingsStore } from '~stores/settings-store'
 
 export const config: PlasmoCSConfig = {
@@ -34,130 +35,125 @@ export const config: PlasmoCSConfig = {
   ]
 }
 
-/**
- * UltraForce Content Script
- * Cookie-based authentication (like Salesforce-Inspector-reloaded)
- */
-class UltraForceContentScript {
-  private windowManager: UltraForceWindowManager | null = null
-  private keyboardHandler: ((event: KeyboardEvent) => void) | null = null
-  private storeUnsub: (() => void) | null = null
-  private messageListener: ((request: any, sender: any, sendResponse: any) => void) | null = null
-  private isInitialized = false
+const SEARCH_START_EVENT = 'ultraforce:search-start'
 
-  constructor() {
-    this.initialize()
+class UltraForceContentScript {
+  private readonly listeners = new AbortController()
+  private windowManager: UltraForceWindowManager | null = null
+  private initialization?: Promise<void>
+  private removeMessageListener?: () => void
+  private warmupTimer?: ReturnType<typeof setTimeout>
+  private destroyed = false
+
+  constructor(private readonly release: () => void) {
+    const { signal } = this.listeners
+    window.addEventListener('beforeunload', () => this.destroy(), { signal })
+    window.addEventListener(
+      'unhandledrejection',
+      (event) => {
+        logger.error('Unhandled promise rejection')
+        event.preventDefault()
+      },
+      { signal }
+    )
+    document.addEventListener(SEARCH_START_EVENT, () => this.checkContext(), { signal })
+
+    const start = () => {
+      if (!this.checkContext()) return
+      document.dispatchEvent(new Event(SEARCH_START_EVENT))
+      const options = { capture: true, passive: false, signal }
+      // Opening at window capture bypasses the old document listener. / 在 window 捕获阶段打开可绕过旧版文档监听器。
+      window.addEventListener('keydown', this.handleOpeningShortcut, options)
+      document.addEventListener('keydown', this.handleKeydown, options)
+      this.initialization = this.initialize()
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', start, { once: true, signal })
+    } else {
+      start()
+    }
   }
 
   private async initialize(): Promise<void> {
     try {
-      await this.initializeSession()
-
-      this.windowManager = await UltraForceWindowManager.getInstance({
-        debugMode: false,
-        useShadowDOM: true
+      const manager = await UltraForceWindowManager.getInstance({
+        isContextActive: (event) => this.checkContext(event?.type === 'keydown' && this.matchesShortcut(event))
       })
-
-      this.setupKeyboardShortcuts()
-      this.setupStoreSubscription()
-      this.setupMessageListener()
-
-      this.isInitialized = true
-    } catch (error) {
-      logger.error('Content script initialization failed:', error)
-      this.setupMinimalFallback()
-    }
-  }
-
-  private getShortcutKey(): string {
-    return useSettingsStore.getState().shortcutKey
-  }
-
-  private setupKeyboardShortcuts(): void {
-    if (this.keyboardHandler) {
-      document.removeEventListener('keydown', this.keyboardHandler, true)
-    }
-
-    this.keyboardHandler = (event: KeyboardEvent) => {
-      const shortcutKey = this.getShortcutKey()
-
-      if (event.key === 'Escape') {
-        if (this.windowManager?.isVisible()) {
-          event.preventDefault()
-          event.stopPropagation()
-          this.windowManager?.hide()
-          return
-        }
-        if (shortcutKey.toLowerCase() === 'escape') {
-          event.preventDefault()
-          event.stopPropagation()
-          this.toggleModal()
-          return
-        }
-      }
-
-      if (isToggleShortcut(event, shortcutKey)) {
-        event.preventDefault()
-        event.stopPropagation()
-        this.toggleModal()
+      if (!this.checkContext()) {
+        await manager.destroy()
         return
       }
-    }
+      this.windowManager = manager
 
-    document.addEventListener('keydown', this.keyboardHandler, { capture: true, passive: false })
+      this.setupMessageListener()
+      void this.initializeSession()
+    } catch (error) {
+      logger.error('Content script initialization failed:', error)
+    }
   }
 
-  /** Re-register keyboard shortcuts when shortcutKey changes in settings store. */
-  private setupStoreSubscription(): void {
-    let prevKey = this.getShortcutKey()
-    this.storeUnsub = useSettingsStore.subscribe((state) => {
-      if (state.shortcutKey !== prevKey) {
-        prevKey = state.shortcutKey
-        this.setupKeyboardShortcuts()
-      }
-    })
+  private matchesShortcut(event: KeyboardEvent): boolean {
+    const shortcutKey = useSettingsStore.getState().shortcutKey.toLowerCase()
+    const key = event.key.toLowerCase()
+    if (shortcutKey === 'escape') return key === 'escape'
+    if (shortcutKey.startsWith('alt+')) return event.altKey && key === shortcutKey.slice(4)
+    return (event.ctrlKey || event.metaKey) && key === shortcutKey
+  }
+
+  private readonly handleOpeningShortcut = (event: KeyboardEvent): void => {
+    if (!this.windowManager?.isVisible()) this.handleKeydown(event)
+  }
+
+  private readonly handleKeydown = (event: KeyboardEvent): void => {
+    const close = event.key === 'Escape' && this.windowManager?.isVisible()
+    const toggle = this.matchesShortcut(event)
+    if ((!close && !toggle) || !this.checkContext(!close)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    if (close) void this.windowManager?.hide()
+    else void this.toggleModal()
+  }
+
+  private checkContext(opening = false): boolean {
+    if (this.destroyed) return false
+    if (isExtensionContextValid()) return true
+
+    this.destroy()
+    if (opening) scheduleExtensionUpdatedNotice()
+    return false
   }
 
   private setupMessageListener(): void {
-    this.messageListener = (
-      request: any,
-      _sender: chrome.runtime.MessageSender,
-      sendResponse: (response?: any) => void
-    ) => {
-      try {
-        switch (request.action) {
-          case 'ping':
-            sendResponse({ success: true, message: 'Content script is running' })
-            break
+    const onMessage = chrome.runtime.onMessage
+    const listener: Parameters<typeof onMessage.addListener>[0] = (request, _sender, sendResponse) => {
+      const action = request?.action
+      if (!this.checkContext(action === 'toggleModal' || action === 'toggleSearch')) return
 
-          case 'toggleModal':
-          case 'toggleSearch':
-            this.toggleModal()
-            sendResponse({ success: true })
-            break
-
-          case 'refreshSession':
-            this.initializeSession()
-            sendResponse({ success: true })
-            break
-
-          default:
-            sendResponse({ success: false, error: 'Unknown action' })
-        }
-      } catch (error: any) {
-        sendResponse({ success: false, error: error.message })
+      switch (action) {
+        case 'ping':
+          sendResponse({ success: true, message: 'Content script is running' })
+          break
+        case 'toggleModal':
+        case 'toggleSearch':
+          void this.toggleModal()
+          sendResponse({ success: true })
+          break
+        case 'refreshSession':
+          void this.initializeSession()
+          sendResponse({ success: true })
+          break
+        default:
+          sendResponse({ success: false, error: 'Unknown action' })
       }
-
-      return true
     }
-
-    chrome.runtime.onMessage.addListener(this.messageListener)
+    onMessage.addListener(listener)
+    this.removeMessageListener = () => onMessage.removeListener(listener)
   }
 
   private async toggleModal(): Promise<void> {
-    if (!this.windowManager) {
-      return
-    }
+    await this.initialization
+    if (!this.checkContext(true) || !this.windowManager) return
 
     try {
       await this.windowManager.toggle()
@@ -169,115 +165,62 @@ class UltraForceContentScript {
   private async initializeSession(): Promise<void> {
     try {
       const sfHost = await getSfHost(window.location.href)
-      if (!sfHost) {
-        return
-      }
+      if (!sfHost || this.destroyed || !isExtensionContextValid()) return
 
       const session = await getSession(sfHost)
-      if (!session) {
-        return
-      }
+      if (!session || this.destroyed || !isExtensionContextValid()) return
 
       const isValid = await validateSalesforceSession(sfHost)
+      if (this.destroyed || !isExtensionContextValid()) return
       if (isValid) {
-        setTimeout(() => {
-          warmupMetadataCache(sfHost).catch((error: any) => logger.warn('Cache warmup failed:', error))
+        clearTimeout(this.warmupTimer)
+        this.warmupTimer = setTimeout(() => {
+          if (isExtensionContextValid()) {
+            void warmupMetadataCache(sfHost).catch(() => logger.warn('Cache warmup failed'))
+          }
         }, 2000)
       } else {
-        checkMetadataPermissions(sfHost).catch((error: any) =>
-          logger.warn('metadata permission check failed', { error })
-        )
+        void checkMetadataPermissions(sfHost).catch(() => logger.warn('Metadata permission check failed'))
       }
     } catch (error) {
       logger.error('Failed to initialize session:', error)
     }
   }
 
-  private setupMinimalFallback(): void {
-    const fallbackHandler = (event: KeyboardEvent) => {
-      const shortcutKey = this.getShortcutKey()
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === shortcutKey.toLowerCase()) {
-        event.preventDefault()
-        logger.warn('WindowManager not available, please reload the page')
-      }
-    }
+  private destroy(): void {
+    if (this.destroyed) return
+    this.destroyed = true
+    this.listeners.abort()
+    this.release()
+    clearTimeout(this.warmupTimer)
 
-    document.addEventListener('keydown', fallbackHandler, { capture: true, passive: false })
-  }
-
-  public async destroy(): Promise<void> {
     try {
-      if (this.keyboardHandler) {
-        document.removeEventListener('keydown', this.keyboardHandler, true)
-        this.keyboardHandler = null
-      }
-
-      if (this.storeUnsub) {
-        this.storeUnsub()
-        this.storeUnsub = null
-      }
-
-      if (this.messageListener) {
-        chrome.runtime.onMessage.removeListener(this.messageListener)
-        this.messageListener = null
-      }
-
-      if (this.windowManager) {
-        await this.windowManager.destroy()
-        this.windowManager = null
-      }
-
-      this.isInitialized = false
-    } catch (error) {
-      logger.error('Error during content script destruction:', error)
+      this.removeMessageListener?.()
+    } catch {
+      // Chrome can invalidate the event binding. / Chrome 可能已将事件绑定作废。
     }
+    void this.windowManager?.destroy()
+    this.windowManager = null
   }
 
   public getDebugInfo(): object {
     return {
-      isInitialized: this.isInitialized,
-      shortcutKey: this.getShortcutKey(),
+      isInitialized: !!this.windowManager,
+      shortcutKey: useSettingsStore.getState().shortcutKey,
       hasWindowManager: !!this.windowManager,
       windowManagerDebug: this.windowManager?.getDebugInfo()
     }
   }
 }
 
-// Global instance management
-let globalContentScript: UltraForceContentScript | null = null
-
-function initializeContentScript(): void {
-  if (globalContentScript) {
-    return
-  }
-
-  globalContentScript = new UltraForceContentScript()
-}
-
-// Content scripts run in an isolated world: this listener only catches rejections
-// originating from the extension's own JS context, not the host page's. Logging and
-// preventing default ensures a stray rejection from our code can never surface as a
-// host-page error and break the user's Salesforce session.
-window.addEventListener('unhandledrejection', (event) => {
-  logger.error('unhandled promise rejection', { reason: event.reason })
-  event.preventDefault()
-})
-
-window.addEventListener('beforeunload', async () => {
-  if (globalContentScript) {
-    await globalContentScript.destroy()
-    globalContentScript = null
-  }
-})
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeContentScript)
-} else {
-  setTimeout(initializeContentScript, 100)
-}
-
-;(window as any).ultraForceDebug = () => {
-  return globalContentScript?.getDebugInfo()
+const release = claimExtensionScript('search')
+if (release) {
+  const debugWindow = window as Window & { ultraForceDebug?: () => object }
+  const contentScript = new UltraForceContentScript(() => {
+    release()
+    delete debugWindow.ultraForceDebug
+  })
+  debugWindow.ultraForceDebug = () => contentScript.getDebugInfo()
 }
 
 const UltraForceCSUI = () => null

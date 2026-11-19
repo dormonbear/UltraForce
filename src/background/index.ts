@@ -1,6 +1,7 @@
 /** Cookie authentication and extension keyboard actions. */
 import { STORAGE_KEYS, storageSet, storageRemove } from '~lib/storage-service'
 import { logger } from '~lib/logger'
+import { reinjectContentScripts } from './reinject'
 import { resolveDocumentSession, salesforceDocumentUrl, sessionTargetHost } from './session-resolution'
 
 // Remove deprecated diagnostics by key without inspecting their contents.
@@ -16,6 +17,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   if (details.reason === 'install') {
     await storageSet(STORAGE_KEYS.LEGACY_SETTINGS, { searchLimit: 1000, autoSearch: true, showDebug: false })
   }
+  await reinjectContentScripts(details.reason)
 })
 
 // Authenticate the document, not its top-level tab or a payload URL.
