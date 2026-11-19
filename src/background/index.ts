@@ -22,7 +22,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 // An opaque/missing document identity must fail closed.
 function trustedDocument(sender: chrome.runtime.MessageSender): URL | null {
   if (!sender.id || sender.id !== chrome.runtime.id) return null
-  const document = salesforceDocumentUrl(sender.url)
+  let url = sender.url
+  if (url === undefined) {
+    // Chrome can omit sender.url in tabs opened by the extension. / Chrome 可能省略扩展打开的标签页的 sender.url。
+    if (sender.frameId !== 0 || sender.origin === undefined) return null
+    url = sender.tab?.url
+  }
+  const document = salesforceDocumentUrl(url)
   if (!document) return null
   if (sender.origin !== undefined && sender.origin !== document.origin) return null
   return document
@@ -91,5 +97,3 @@ chrome.commands?.onCommand.addListener((command) => {
     })
   }
 })
-
-export {}
