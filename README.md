@@ -154,7 +154,7 @@ Paste one or more Salesforce record IDs (15 or 18 characters) or record URLs int
 | `Cmd/Ctrl + B` | Open/Close UltraForce |
 | `Up/Down` | Navigate results |
 | `Enter` | Open selected result (or navigate to record ID) |
-| `Tab` | Autocomplete (Object → `.` for fields, CMDT/Custom Setting → `.` for records) |
+| `Tab` | Autocomplete (Object -> `.` for fields, CMDT/Custom Setting -> `.` for records) |
 | `Esc` | Close |
 
 | 按键 | 操作 |
@@ -195,7 +195,7 @@ Click the gear icon to configure:
 
 **安全与隐私**
 
-UltraForce uses your existing browser session to send requests directly to your Salesforce org. UltraForce does not collect analytics or automatically upload error reports. Links you open are subject to the destination website’s privacy policy.
+UltraForce uses your existing browser session to send requests directly to your Salesforce org. UltraForce does not collect analytics or automatically upload error reports. Links you open are subject to the destination website's privacy policy.
 
 UltraForce 使用您现有的浏览器会话，将请求直接发送到您的 Salesforce 组织。UltraForce 不收集分析数据，也不会自动上传错误报告。您打开的链接适用目标网站的隐私政策。
 

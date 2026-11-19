@@ -72,6 +72,7 @@ Oxfmt 规定不使用分号、使用单引号、不保留尾随逗号，行宽�
 | `src/components/` | React UI, including the search modal and settings / React 界面，包括搜索窗口和设置 |
 | `src/contents/` | Content scripts injected into Salesforce pages / 注入 Salesforce 页面的内容脚本 |
 | `src/lib/` | Search, API, caching, and parsing / 搜索、API、缓存和解析 |
+| `src/stores/` | Zustand stores / Zustand 状态存储 |
 | `src/types/` | TypeScript types / TypeScript 类型 |
 | `tests/e2e/` | Playwright end-to-end tests / Playwright 端到端测试 |
 
@@ -121,6 +122,10 @@ pnpm exec playwright install chromium
 pnpm build:e2e
 pnpm exec playwright test tests/e2e/localization.spec.ts tests/e2e/auth-boundary.spec.ts tests/e2e/privacy.spec.ts tests/e2e/setup-search-race.spec.ts
 ```
+
+On Linux, you may need to use `pnpm exec playwright install --with-deps chromium` in place of the first command to install Chromium's system dependencies, as Ubuntu CI does.
+
+在 Linux 上，可能需要像 Ubuntu CI 一样，用 `pnpm exec playwright install --with-deps chromium` 替换第一条命令，以安装 Chromium 所需的系统依赖。
 
 Live-org specs that use the shared extension fixture need an authenticated Salesforce CLI org alias named `ultraforce`, with test data from [agent-script-recipes](https://github.com/trailheadapps/agent-script-recipes). The shared fixture uses full Chromium in new headless mode and runs headless by default. For visible debugging of those specs, set `E2E_VISIBLE=1` or pass `--headed`. Specs that explicitly set a browser mode keep their own setting.
 

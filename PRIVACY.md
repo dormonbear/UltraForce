@@ -154,8 +154,8 @@ preserves functional settings, history, favorites, and metadata caches.
 The former API Statistics UI and request tracking have been removed.
 
 旧版本曾在本地保存渲染诊断信息（`ultraforce_error_logs`）和 API 请求次数及时间戳
-（`ultraforce_api_stats`）。当前后台工作线程会在激活、浏览器启动以及安装或更新时删除
-这两个旧存储键。删除操作只按键名执行，不读取其中的内容，并保留功能设置、历史记录、
+（`ultraforce_api_stats`）。当前后台工作线程会在激活、浏览器启动以及安装或更新时
+删除且仅删除这两个旧存储键。删除操作只按键名执行，不读取其中的内容，并保留功能设置、历史记录、
 收藏和元数据缓存。旧版 API 统计界面及请求跟踪功能已移除。
 
 ## Permissions and verification limits
