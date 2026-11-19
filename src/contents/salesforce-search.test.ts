@@ -99,6 +99,20 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
     expect([...document.querySelectorAll(modalSelector)]).toEqual([container])
   })
 
+  it('lets an orphan release its claim before taking over / 接管前让孤立脚本释放标记', async () => {
+    const { claimExtensionScript } = await import('~lib/extension-context')
+    const release = claimExtensionScript('search')!
+    document.addEventListener('ultraforce:search-start', release, { once: true })
+    try {
+      await loadContentScript()
+      expect(shortcut().defaultPrevented).toBe(true)
+      await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    } finally {
+      document.removeEventListener('ultraforce:search-start', release)
+      if (!messages.hasListeners()) release()
+    }
+  })
+
   it('opens search before the legacy document shortcut runs / 在旧版文档快捷键监听器运行前打开搜索', async () => {
     const legacyShortcut = vi.fn()
     document.addEventListener('keydown', legacyShortcut, { capture: true, once: true })

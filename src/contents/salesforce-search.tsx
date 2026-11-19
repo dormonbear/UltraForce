@@ -60,7 +60,6 @@ class UltraForceContentScript {
 
     const start = () => {
       if (!this.checkContext()) return
-      document.dispatchEvent(new Event(SEARCH_START_EVENT))
       const options = { capture: true, passive: false, signal }
       // Opening at window capture bypasses the old document listener. / 在 window 捕获阶段打开可绕过旧版文档监听器。
       window.addEventListener('keydown', this.handleOpeningShortcut, options)
@@ -213,6 +212,7 @@ class UltraForceContentScript {
   }
 }
 
+document.dispatchEvent(new Event(SEARCH_START_EVENT))
 const release = claimExtensionScript('search')
 if (release) {
   const debugWindow = window as Window & { ultraForceDebug?: () => object }

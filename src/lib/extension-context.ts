@@ -14,7 +14,14 @@ export function claimExtensionScript(name: string): (() => void) | undefined {
   const id = extensionId()
   if (!id) return
 
-  const marker = Symbol.for(`ultraforce:${id}:${name}`)
+  let version: string
+  try {
+    version = chrome.runtime.getManifest().version
+  } catch {
+    return
+  }
+
+  const marker = Symbol.for(`ultraforce:${id}:${version}:${name}`)
   if (Reflect.has(window, marker)) return
 
   Reflect.set(window, marker, true)
