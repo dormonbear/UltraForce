@@ -8,8 +8,8 @@ Release Date: 2026-11-19 / 发布日期：2026-11-19
 
 - The search shortcut keeps working if you cancel a page-leave prompt or Chrome restores the page from its back/forward cache. If an extension update prevents search from resuming on a restored page, pressing the shortcut shows an **UltraForce was updated** notice with an option to refresh. ([#81](https://github.com/dormonbear/UltraForce/issues/81))
   取消离开页面的提示后，或 Chrome 从往返缓存恢复页面后，搜索快捷键仍可使用。如果扩展更新导致搜索无法在恢复的页面上继续运行，按下快捷键会显示 **UltraForce 已更新** 提示，并提供刷新选项。([#81](https://github.com/dormonbear/UltraForce/issues/81))
-- Setup’s Fields & Relationships lists retry auto-loading when you return to a page where navigation interrupted loading. Duplicate rows are still removed, including when you return to a list that already finished loading. ([#80](https://github.com/dormonbear/UltraForce/issues/80))
-  如果导航中断了设置页“字段和关系”列表的自动加载，返回该页面时会重试。列表仍会去除重复行，返回已完成加载的列表时也会去重。([#80](https://github.com/dormonbear/UltraForce/issues/80))
+- Auto-loading stops when you leave a Setup Fields & Relationships list. If loading was interrupted, it retries when you return. Duplicate rows are still removed, including when you return to a list that already finished loading. ([#80](https://github.com/dormonbear/UltraForce/issues/80))
+  离开设置页的“字段和关系”列表时，自动加载会停止。如果加载中断，返回该页面时会重试。列表仍会去除重复行，返回已完成加载的列表时也会去重。([#80](https://github.com/dormonbear/UltraForce/issues/80))
 
 ### Keyboard handling / 键盘处理
 
