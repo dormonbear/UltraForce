@@ -42,6 +42,7 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
     vi.unstubAllGlobals()
     runtime.id = undefined
     document.body.replaceChildren()
+    document.documentElement.removeAttribute('data-ultraforce-modal-open')
   })
 
   it('passes the first orphaned shortcut through and tears down once / 放行孤立脚本收到的首个快捷键并仅清理一次', async () => {
@@ -148,6 +149,20 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
     } finally {
       document.removeEventListener('click', hostClick, true)
     }
+  })
+
+  it('clears the keyboard shield on hide after external host removal / 容器被外部移除后关闭搜索会解除键盘屏蔽', async () => {
+    await loadContentScript()
+    shortcut()
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    expect(document.documentElement).toHaveAttribute('data-ultraforce-modal-open')
+
+    document.querySelector(modalSelector)!.remove()
+    const { default: WindowManager } = await import('~lib/window-manager')
+    const manager = await WindowManager.getInstance()
+    await manager.hide()
+
+    expect(document.documentElement).not.toHaveAttribute('data-ultraforce-modal-open')
   })
 
   it('suppresses the refresh notice if a replacement appears in time / 新实例及时接管时不显示刷新提示', async () => {

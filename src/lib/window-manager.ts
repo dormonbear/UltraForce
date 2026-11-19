@@ -16,25 +16,20 @@ import { useHistoryStore, setHistoryOrgScope } from '~stores/history-store'
 import { setFavoritesOrgScope } from '~stores/favorites-store'
 import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { TypedEventEmitter } from '~lib/typed-event-emitter'
-import {
-  buildSetupUrl,
-  resolveSetupShortcutPath,
-  getCurrentRecordFromUrl,
-  shouldUseLightning,
-  isChinaDomain
-} from '~lib/url-builder'
+import { buildSetupUrl, resolveSetupShortcutPath, getCurrentRecordFromUrl, shouldUseLightning } from '~lib/url-builder'
 import { SETUP_SHORTCUTS } from '~lib/setup-shortcuts'
 import { buildNavigationUrl, buildIdNavigationUrl, buildActionUrl } from '~lib/navigation'
 import type { NavigationContext } from '~lib/navigation'
 import { fetchRecordPreview } from '~lib/record-preview'
 import {
-  fetchRecordTypeId as fetchRecordTypeIdFn,
-  resolveObjectApiNameFromRecord as resolveObjectApiNameFromRecordFn,
-  getCurrentRecordLayoutInfo as getCurrentRecordLayoutInfoFn,
-  getUserLightningPreference as getUserLightningPreferenceFn,
-  handleFieldsNavigation as handleFieldsNavigationFn,
-  handleRecordTypeNavigation as handleRecordTypeNavigationFn
-} from '~lib/record-context'
+  fetchRecordTypeId,
+  resolveObjectApiNameFromRecord,
+  getCurrentRecordLayoutUrl,
+  fetchLightningPreference,
+  handleFieldsNavigation,
+  handlePageLayoutNavigation,
+  handleRecordTypeNavigation
+} from './record-setup-navigation'
 import type { SearchResult, NavigationMode, RecordContext } from '~types'
 import type { ObjectAction } from '~components/search/ResultItem'
 
@@ -225,7 +220,7 @@ class UltraForceWindowManager {
         this.log('Session status:', hasSession ? 'Active' : 'None')
 
         if (hasSession) {
-          this.fetchLightningPreference().catch((error) => logger.warn('fetchLightningPreference failed', { error }))
+          fetchLightningPreference().catch((error) => logger.warn('fetchLightningPreference failed', { error }))
         }
       }
     } catch (error) {
@@ -260,12 +255,12 @@ class UltraForceWindowManager {
     if (recordId) {
       let objectApiName = urlObjectApiName
       if (!objectApiName) {
-        objectApiName = await this.resolveObjectApiNameFromRecord(recordId)
+        objectApiName = await resolveObjectApiNameFromRecord(recordId)
         this.log('Resolved objectApiName from recordId:', objectApiName)
       }
       useSearchStore.getState().setRecordContext({ objectApiName, recordId })
       if (objectApiName) {
-        this.fetchRecordTypeId(objectApiName, recordId)
+        fetchRecordTypeId(objectApiName, recordId)
       }
       this.log('Record context detected:', useSearchStore.getState().recordContext)
     } else {
@@ -328,7 +323,9 @@ class UltraForceWindowManager {
       this.keyboardInterceptor = null
     }
 
-    if (this.containerElement?.isConnected) document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    if (this.containerElement?.isConnected || !document.querySelector(MODAL_CONTAINER_SELECTOR)) {
+      document.documentElement.removeAttribute('data-ultraforce-modal-open')
+    }
     logger.debug('keyboard:shield deactivated')
 
     if (this.reactRoot) {
@@ -346,6 +343,7 @@ class UltraForceWindowManager {
       throw new Error('Container element not available')
     }
 
+    const hide = () => this.hide()
     const mountPoint = this.shadowRoot || this.containerElement
     if (!this.reactRoot) {
       this.reactRoot = createPrivateRoot(mountPoint)
@@ -372,9 +370,9 @@ class UltraForceWindowManager {
           onNavigate: (url: string) => {
             this.handleDirectNavigate(url)
           },
-          onPageLayoutClick: this.handlePageLayoutNavigation.bind(this),
-          onRecordTypeClick: this.handleRecordTypeNavigation.bind(this),
-          onFieldsClick: this.handleFieldsNavigation.bind(this)
+          onPageLayoutClick: () => handlePageLayoutNavigation(this.getCurrentRecordLayoutUrl, hide),
+          onRecordTypeClick: () => handleRecordTypeNavigation(hide),
+          onFieldsClick: () => handleFieldsNavigation(hide)
         })
       )
     )
@@ -556,140 +554,7 @@ class UltraForceWindowManager {
     })
   }
 
-  private async fetchRecordTypeId(objectApiName: string | null, recordId: string): Promise<void> {
-    const { sfHost } = useSessionStore.getState()
-    if (!sfHost || !objectApiName) return
-    const recordTypeId = await fetchRecordTypeIdFn(sfHost, objectApiName, recordId)
-    if (recordTypeId) {
-      const ctx = useSearchStore.getState().recordContext
-      if (ctx) {
-        useSearchStore.getState().setRecordContext({ ...ctx, recordTypeId })
-      }
-    }
-  }
-
-  private async handleFieldsNavigation(): Promise<void> {
-    const { recordContext } = useSearchStore.getState()
-    if (!recordContext?.objectApiName) {
-      useSearchStore.getState().setError('No object found for this record.')
-      return
-    }
-    useSearchStore.getState().setLoading(true)
-    try {
-      const { sfHost } = useSessionStore.getState()
-      const { navigationMode } = useSettingsStore.getState()
-      const { userLightningPreference } = useSessionStore.getState()
-      const url = await handleFieldsNavigationFn(
-        sfHost!,
-        recordContext.objectApiName,
-        navigationMode,
-        userLightningPreference
-      )
-      if (url) {
-        useSearchStore.getState().setLoading(false)
-        window.open(url, '_blank')
-        if (useSettingsStore.getState().closeOnNavigate) {
-          this.hide()
-        }
-        return
-      }
-      useSearchStore.getState().setError('Could not determine Fields URL.')
-    } catch (error) {
-      logger.error('Failed to navigate to Fields:', error)
-      useSearchStore.getState().setError('Failed to load Fields information.')
-    }
-  }
-
-  private async handleRecordTypeNavigation(): Promise<void> {
-    const { recordContext } = useSearchStore.getState()
-    if (!recordContext?.recordTypeId || !recordContext?.objectApiName) {
-      useSearchStore.getState().setError('No RecordType found for this record.')
-      return
-    }
-    useSearchStore.getState().setLoading(true)
-    try {
-      const { sfHost } = useSessionStore.getState()
-      const { navigationMode } = useSettingsStore.getState()
-      const { userLightningPreference } = useSessionStore.getState()
-      const url = await handleRecordTypeNavigationFn(
-        sfHost!,
-        recordContext.objectApiName,
-        recordContext.recordTypeId,
-        navigationMode,
-        userLightningPreference
-      )
-      if (url) {
-        useSearchStore.getState().setLoading(false)
-        window.open(url, '_blank')
-        if (useSettingsStore.getState().closeOnNavigate) {
-          this.hide()
-        }
-        return
-      }
-      useSearchStore.getState().setError('Could not determine RecordType URL.')
-    } catch (error) {
-      logger.error('Failed to navigate to RecordType:', error)
-      useSearchStore.getState().setError('Failed to load RecordType information.')
-    }
-  }
-
-  private async handlePageLayoutNavigation(): Promise<void> {
-    useSearchStore.getState().setLoading(true)
-    try {
-      const result = await this.getCurrentRecordLayoutUrl()
-      if (result) {
-        useSearchStore.getState().setLoading(false)
-        window.open(result.url, '_blank')
-        if (useSettingsStore.getState().closeOnNavigate) {
-          this.hide()
-        }
-        return
-      }
-      useSearchStore.getState().setError('Could not determine page layout for this record.')
-    } catch (error) {
-      logger.error('Failed to navigate to page layout:', error)
-      useSearchStore.getState().setError('Failed to load page layout information.')
-    }
-  }
-
-  private async getCurrentRecordLayoutUrl(): Promise<{ objectApiName: string; url: string } | null> {
-    const { sfHost } = useSessionStore.getState()
-    const { navigationMode } = useSettingsStore.getState()
-    const { userLightningPreference } = useSessionStore.getState()
-
-    const { objectApiName: fromUrlObject, recordId } = getCurrentRecordFromUrl()
-    const objectApiName =
-      fromUrlObject || (recordId && sfHost ? await resolveObjectApiNameFromRecordFn(sfHost, recordId) : null)
-    if (!sfHost || !objectApiName || !recordId) return null
-    const layoutInfo = await getCurrentRecordLayoutInfoFn(sfHost, objectApiName, recordId)
-    if (!layoutInfo) return null
-    // China (Alibaba) domains don't support Classic layout editor
-    const useLightning = shouldUseLightning(navigationMode, userLightningPreference) || isChinaDomain(sfHost)
-    const url = useLightning
-      ? buildSetupUrl(
-          sfHost,
-          `/lightning/setup/ObjectManager/${layoutInfo.objectDurableId}/PageLayouts/${layoutInfo.layoutId}/view`
-        )
-      : `https://${sfHost}/layouteditor/layoutEditor.apexp?type=${layoutInfo.objectApiName}&lid=${layoutInfo.layoutId}&retURL=%2F${layoutInfo.recordId}`
-    if (!url) return null
-    return { objectApiName: layoutInfo.objectApiName, url }
-  }
-
-  private async resolveObjectApiNameFromRecord(recordId: string): Promise<string | null> {
-    const { sfHost } = useSessionStore.getState()
-    if (!sfHost) return null
-    return resolveObjectApiNameFromRecordFn(sfHost, recordId)
-  }
-
-  private async fetchLightningPreference(): Promise<boolean | null> {
-    const { sfHost } = useSessionStore.getState()
-    if (!sfHost) return null
-    const pref = await getUserLightningPreferenceFn(sfHost)
-    if (pref !== null) {
-      useSessionStore.getState().setLightningPreference(pref)
-    }
-    return pref
-  }
+  private getCurrentRecordLayoutUrl = getCurrentRecordLayoutUrl
 
   private handleResultClick(result: SearchResult): void {
     this.log(`Result clicked: ${result.name} (${result.type})`)
