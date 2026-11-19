@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import SearchModal from './SearchModal'
 import type { SearchResult } from '~types'
+import { createKeyboardInterceptor } from '~lib/keyboard-interceptor'
 import { useSettingsStore, SETTINGS_DEFAULTS } from '~stores/settings-store'
 import { useSessionStore } from '~stores/session-store'
 import { useSearchStore } from '~stores/search-store'
@@ -25,17 +26,6 @@ vi.mock('~lib/version-check', () => ({
   RELEASE_NOTES_URL: 'https://example.com/releases'
 }))
 
-vi.mock('~lib/command-parser', () => ({
-  parseCommand: vi.fn().mockReturnValue({ isCommand: false, query: '', types: null, commandKey: null }),
-  getMatchingCommands: vi.fn().mockReturnValue([]),
-  mergeCommands: vi.fn().mockReturnValue({}),
-  getCommandPrefix: vi.fn().mockReturnValue(''),
-  filterCommandsBySupported: vi.fn().mockReturnValue([]),
-  isKeyUnique: vi.fn().mockReturnValue(true),
-  validateCommandKey: vi.fn().mockReturnValue({ valid: true }),
-  BUILTIN_COMMANDS: {}
-}))
-
 vi.mock('./styles', () => ({
   SEARCH_MODAL_STYLES: ''
 }))
@@ -53,7 +43,7 @@ interface RenderOptions {
   onResultClick?: (result: SearchResult) => void
 }
 
-function renderModal(overrides: RenderOptions = {}) {
+function renderModal(overrides: RenderOptions = {}, container?: HTMLElement) {
   const defaultProps = {
     onClose: vi.fn(),
     onSearch: vi.fn(),
@@ -62,7 +52,7 @@ function renderModal(overrides: RenderOptions = {}) {
   }
 
   return {
-    ...render(<SearchModal {...defaultProps} />),
+    ...render(<SearchModal {...defaultProps} />, { container }),
     props: defaultProps
   }
 }
@@ -281,11 +271,12 @@ describe('SearchModal', () => {
       expect(screen.getByRole('status').textContent).toBe('2 results')
     })
 
-    it('keeps focus inside the dialog when Tab is pressed without a highlighted result', () => {
+    it('traps Tab with text and no highlighted result / 输入内容且无选中结果时将 Tab 焦点留在对话框内', () => {
       renderModal()
       const input = screen.getByRole('combobox')
       const modal = screen.getByRole('dialog')
       input.focus()
+      fireEvent.change(input, { target: { value: 'acc' } })
 
       fireEvent.keyDown(input, { key: 'Tab' })
       expect(modal.contains(document.activeElement)).toBe(true)
@@ -546,12 +537,252 @@ describe('SearchModal', () => {
   })
 
   describe('footer shortcuts', () => {
-    it('should display keyboard shortcuts in footer', () => {
+    it('shows the scope shortcut in the footer / 在页脚显示搜索范围快捷键', () => {
       renderModal()
       expect(screen.getByText('Navigate')).toBeInTheDocument()
-      expect(screen.getByText('Autocomplete')).toBeInTheDocument()
+      expect(screen.getByText('Scopes')).toBeInTheDocument()
       expect(screen.getByText('Open')).toBeInTheDocument()
       expect(screen.getByText('Close')).toBeInTheDocument()
+    })
+  })
+
+  describe('Tab scope picker / Tab 搜索范围选择面板', () => {
+    const custom = {
+      key: 'fixture',
+      description: 'Audit Records (recent changes)',
+      isBuiltin: false as const,
+      soql: 'SELECT Id FROM Account WHERE Name = {query}',
+      useToolingApi: false,
+      nameField: 'Name'
+    }
+
+    function openPicker() {
+      const input = screen.getByRole('combobox')
+      fireEvent.keyDown(input, { key: 'Tab' })
+      expect(screen.getByRole('heading', { name: 'Choose a scope' })).toBeVisible()
+      return input
+    }
+
+    it('opens on empty text and keeps Shift+Tab focus navigation / 空输入时打开面板并保留 Shift+Tab 焦点导航', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(input).not.toHaveFocus()
+
+      openPicker()
+      expect(input).toHaveFocus()
+      const list = screen.getByRole('listbox')
+      expect(input).toHaveAttribute('aria-controls', list.id)
+      expect(input).toHaveAttribute('aria-activedescendant', within(list).getAllByRole('option')[0].id)
+    })
+
+    it('hides an empty chip while filtering and restores it on Back / 筛选时隐藏空范围标签，返回时恢复', () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      fireEvent.change(input, { target: { value: ':f ' } })
+      expect(input).toHaveAccessibleDescription('Scope: Flows')
+      openPicker()
+      expect(input).toHaveValue('')
+      expect(input).not.toHaveAccessibleDescription()
+      fireEvent.change(input, { target: { value: ':o ' } })
+      expect(input).toHaveValue(':o ')
+      expect(input).not.toHaveAccessibleDescription()
+      fireEvent.click(screen.getByRole('button', { name: 'Back to search' }))
+      expect(input).toHaveAccessibleDescription('Scope: Flows')
+      expect(input).toHaveValue('')
+      expect(input).toHaveFocus()
+    })
+
+    it.each([':f', ':f record', ':f  ', ':unknown ', ' '])(
+      'keeps Tab in search for visible text "%s" / 有可见文本时保留 Tab 搜索行为',
+      (query) => {
+        renderModal()
+        const input = screen.getByRole('combobox')
+        fireEvent.change(input, { target: { value: query } })
+        fireEvent.keyDown(input, { key: 'Tab' })
+        expect(screen.queryByRole('heading', { name: 'Choose a scope' })).not.toBeInTheDocument()
+        expect(screen.getByText('Autocomplete')).toBeVisible()
+      }
+    )
+
+    it('lists supported built-ins in order before custom commands / 按顺序列出支持的内置指令，再列出自定义指令', async () => {
+      useSettingsStore.setState({ customCommands: { fixture: custom } })
+      vi.mocked(getUnsupportedTypes).mockResolvedValueOnce(['User', 'ApexClass'])
+      renderModal()
+      openPicker()
+      await waitFor(() => expect(screen.queryByRole('option', { name: 'Users :u' })).not.toBeInTheDocument())
+      const options = screen.getAllByRole('option')
+      expect(options.map((option) => option.querySelector('kbd')?.textContent).join(' ')).toBe(
+        ':o :c :f :p :l :m :q :r :g :fixture'
+      )
+      expect(options.at(-1)).toHaveAccessibleName('Audit Records :fixture')
+    })
+
+    it('filters by label, description, and key without searching / 按标签、说明和指令筛选且不发起搜索', async () => {
+      useSettingsStore.setState({ customCommands: { fixture: custom } })
+      const { props } = renderModal()
+      const input = openPicker()
+      vi.useFakeTimers()
+      try {
+        for (const [filter, label] of [
+          ['fLo', 'Flows :f'],
+          ['recent changes', 'Audit Records :fixture'],
+          [':fixture', 'Audit Records :fixture']
+        ]) {
+          fireEvent.change(input, { target: { value: filter } })
+          expect(screen.getAllByRole('option')).toHaveLength(1)
+          expect(screen.getByRole('option', { name: label, selected: true })).toBeVisible()
+          await act(() => vi.advanceTimersByTimeAsync(350))
+        }
+        expect(props.onSearch).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('wraps selection and chooses a scope with Enter / 循环移动选项并用 Enter 选择搜索范围', () => {
+      renderModal()
+      const input = openPicker()
+      fireEvent.keyDown(input, { key: 'ArrowUp' })
+      expect(screen.getByRole('option', { name: 'Go to Setup :g', selected: true })).toBeVisible()
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      fireEvent.keyDown(input, { key: 'ArrowDown' })
+      expect(screen.getByRole('option', { name: 'Custom Codes :c', selected: true })).toBeVisible()
+      fireEvent.keyDown(input, { key: 'Enter' })
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(input).toHaveAccessibleDescription('Scope: Custom Codes')
+      expect(input).toHaveAttribute('data-command-prefix', ':c ')
+      expect(input).toHaveValue('')
+      expect(input).toHaveFocus()
+    })
+
+    it.each(['Escape', 'Tab'])('%s returns to search / 返回搜索', (key) => {
+      const { props } = renderModal()
+      const input = openPicker()
+      fireEvent.change(input, { target: { value: 'flo' } })
+      fireEvent.keyDown(input, { key })
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(screen.getByRole('dialog')).toBeVisible()
+      expect(input).toHaveValue('')
+      expect(props.onClose).not.toHaveBeenCalled()
+    })
+
+    it('shows details on hover and chooses on click / 悬停时显示详情，点击时选择', () => {
+      useSettingsStore.setState({ customCommands: { fixture: custom } })
+      renderModal()
+      const input = openPicker()
+      fireEvent.mouseEnter(screen.getByRole('option', { name: 'Custom Codes :c' }))
+      expect(screen.getByText('Custom Codes (Apex/Trigger/Visualforce/LWC/Aura)')).toBeVisible()
+      expect(screen.getByText('Apex Classes')).toBeVisible()
+      expect(screen.getByText('Visualforce Pages')).toBeVisible()
+      fireEvent.mouseEnter(screen.getByRole('option', { name: 'Go to Setup :g' }))
+      expect(screen.getByText('Setup pages')).toBeVisible()
+
+      const option = screen.getByRole('option', { name: 'Audit Records :fixture' })
+      fireEvent.mouseEnter(option)
+      expect(screen.getByText('Custom SOQL command')).toBeVisible()
+      fireEvent.click(option)
+      expect(input).toHaveAttribute('data-command-prefix', ':fixture ')
+      expect(input).toHaveFocus()
+    })
+
+    it.each([
+      ['en-US', 'Choose a scope', 'Filter scopes...', 'Scopes', 'Choose', 'Back'],
+      ['zh-CN', '选择搜索范围', '筛选搜索范围...', '搜索范围', '选择', '返回']
+    ])(
+      'localizes picker and footer in %s / 本地化选择面板及页脚',
+      (locale, title, placeholder, scopes, choose, back) => {
+        const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+        try {
+          renderModal()
+          const dialog = screen.getByRole('dialog')
+          const input = screen.getByRole('combobox')
+          expect(within(dialog).getByText(scopes)).toBeVisible()
+          fireEvent.keyDown(input, { key: 'Tab' })
+          expect(screen.getByRole('heading', { name: title })).toBeVisible()
+          expect(input).toHaveAttribute('placeholder', placeholder)
+          expect(screen.getByText(choose)).toBeVisible()
+          expect(screen.getByText(back)).toBeVisible()
+        } finally {
+          languages.mockRestore()
+        }
+      }
+    )
+
+    it.each([false, true])('preserves Tab autocomplete with the interceptor set to %s / 保留 Tab 补全', (intercept) => {
+      useSearchStore.setState({
+        searchResults: { CustomObject: [{ id: 'account', name: 'Account', type: 'CustomObject' }] }
+      })
+      renderModal()
+      const input = screen.getByRole('combobox')
+      const tab = createKeyboardInterceptor(
+        () => input,
+        () => screen.getByRole('dialog')
+      )
+      const pressTab = () => {
+        if (intercept) {
+          act(() => tab(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true })))
+        } else {
+          fireEvent.keyDown(input, { key: 'Tab' })
+        }
+      }
+
+      fireEvent.change(input, { target: { value: 'acc' } })
+      expect(screen.getByText('Autocomplete')).toBeVisible()
+      pressTab()
+      expect(input).toHaveValue('Account.')
+      expect(screen.queryByRole('heading', { name: 'Choose a scope' })).not.toBeInTheDocument()
+
+      act(() =>
+        useSearchStore.setState({
+          searchResults: {
+            CustomField: [
+              {
+                id: 'name',
+                name: 'Name',
+                type: 'CustomField',
+                metadata: { ObjectApiName: 'Account' }
+              }
+            ]
+          }
+        })
+      )
+      pressTab()
+      expect(input).toHaveValue('Account.Name')
+    })
+
+    it.each(['', ':f '])('redirects host-page Tab for query "%s" / 转发主页面 Tab', (query) => {
+      const host = document.createElement('div')
+      const hostButton = document.createElement('button')
+      document.body.append(host, hostButton)
+      const shadowRoot = host.attachShadow({ mode: 'open' })
+      const container = document.createElement('div')
+      shadowRoot.append(container)
+      const { getByRole, queryByRole, unmount } = renderModal({}, container)
+      const input = getByRole('combobox')
+      fireEvent.change(input, { target: { value: query } })
+      const modal = getByRole('dialog')
+      const interceptor = createKeyboardInterceptor({
+        getInput: () => input,
+        getModal: () => modal,
+        getShadowRoot: () => shadowRoot
+      })
+      window.addEventListener('keydown', interceptor, true)
+      try {
+        hostButton.focus()
+        expect(fireEvent.keyDown(hostButton, { key: 'Tab', composed: true })).toBe(false)
+        expect(getByRole('heading', { name: 'Choose a scope' })).toBeVisible()
+        expect(shadowRoot.activeElement).toBe(input)
+        hostButton.focus()
+        fireEvent.keyDown(hostButton, { key: 'Tab', composed: true })
+        expect(queryByRole('heading', { name: 'Choose a scope' })).not.toBeInTheDocument()
+      } finally {
+        window.removeEventListener('keydown', interceptor, true)
+        unmount()
+        host.remove()
+        hostButton.remove()
+      }
     })
   })
 

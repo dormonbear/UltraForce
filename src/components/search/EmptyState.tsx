@@ -1,5 +1,6 @@
 import { t } from '~lib/i18n'
 import React, { useState } from 'react'
+import { getMetadataTypeLabel } from './metadata-type-label'
 
 interface EmptyStateProps {
   type: 'loading' | 'empty' | 'no-session' | 'start' | 'command' | 'error' | 'id-navigation'
@@ -22,24 +23,6 @@ const SEARCH_HINTS = [
   'Toggle fuzzy search in Settings for typo-tolerant matching',
   'Hide managed package items in Settings'
 ]
-
-const TYPE_LABELS: Record<string, string> = {
-  ApexClass: 'Apex Classes',
-  ApexTrigger: 'Apex Triggers',
-  ApexPage: 'Visualforce Pages',
-  ApexComponent: 'Visualforce Components',
-  LightningComponentBundle: 'Lightning Web Components',
-  AuraDefinitionBundle: 'Aura Components',
-  CustomObject: 'Objects',
-  CustomField: 'Fields',
-  Flow: 'Flows',
-  User: 'Users',
-  PermissionSet: 'Permission Sets',
-  Profile: 'Profiles',
-  CustomLabel: 'Custom Labels',
-  CustomMetadataType: 'Custom Metadata Types',
-  CustomSetting: 'Custom Settings'
-}
 
 const EmptyState: React.FC<EmptyStateProps> = ({
   type,
@@ -65,7 +48,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   if (type === 'command') {
     const title =
       commandTypes && commandTypes.length > 0
-        ? t('Searching {types}', { types: commandTypes.map((name) => t(TYPE_LABELS[name] || name)).join(', ') })
+        ? t('Searching {types}', { types: commandTypes.map(getMetadataTypeLabel).join(', ') })
         : commandDescription || t('Custom Search')
     return (
       <div className="search-empty">
@@ -90,7 +73,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   }
 
   if (type === 'start') {
-    const typeLabels = selectedTypes?.map((name) => t(TYPE_LABELS[name] || name)).join(', ') || t('metadata')
+    const typeLabels = selectedTypes?.map(getMetadataTypeLabel).join(', ') || t('metadata')
     return (
       <div className="search-empty">
         <div className="empty-title">{t('Searching {types}', { types: typeLabels })}</div>

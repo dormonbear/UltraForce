@@ -13,6 +13,12 @@ const ACTION_ICON_PROPS = {
 
 export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
   switch (icon) {
+    case 'back':
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )
     case 'layout':
       return (
         <svg {...ACTION_ICON_PROPS}>
@@ -97,26 +103,38 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
   }
 }
 
-export function SearchFooter({ liveStatusText }: { liveStatusText: string }) {
+export function SearchFooter({
+  liveStatusText = '',
+  canOpenScopes = false,
+  pickerOpen = false
+}: {
+  liveStatusText?: string
+  canOpenScopes?: boolean
+  pickerOpen?: boolean
+}) {
   return (
     <>
-      <div className="ultraforce-sr-only" role="status" aria-atomic="true">
-        {liveStatusText}
-      </div>
+      {!pickerOpen && (
+        <div className="ultraforce-sr-only" role="status" aria-atomic="true">
+          {liveStatusText}
+        </div>
+      )}
 
       <div className="search-footer">
         <div className="shortcuts">
           <div className="shortcut-item">
             <kbd>{t('Up/Down')}</kbd> {t('Navigate')}
           </div>
+          {!pickerOpen && (
+            <div className="shortcut-item">
+              <kbd>Tab</kbd> {t(canOpenScopes ? 'Scopes' : 'Autocomplete')}
+            </div>
+          )}
           <div className="shortcut-item">
-            <kbd>Tab</kbd> {t('Autocomplete')}
+            <kbd>Enter</kbd> {t(pickerOpen ? 'Choose' : 'Open')}
           </div>
           <div className="shortcut-item">
-            <kbd>Enter</kbd> {t('Open')}
-          </div>
-          <div className="shortcut-item">
-            <kbd>Esc</kbd> {t('Close')}
+            <kbd>Esc</kbd> {t(pickerOpen ? 'Back' : 'Close')}
           </div>
         </div>
       </div>

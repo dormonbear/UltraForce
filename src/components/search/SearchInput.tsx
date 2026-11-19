@@ -3,11 +3,13 @@ import { t } from '~lib/i18n'
 import type { SearchCommand } from '~types'
 import React, { forwardRef, useEffect, useId, useRef, useCallback } from 'react'
 import { ActionIcon } from './SearchChrome'
+import { getScopeDetails } from './command-scope'
 
 type OrgType = 'production' | 'sandbox' | 'scratch' | 'developer' | 'unknown'
 
 interface SearchInputProps {
   query: string
+  scopeFilter?: string
   commands: Readonly<Record<string, SearchCommand>>
   onQueryChange: (query: string) => void
   onKeyDown: (e: React.KeyboardEvent) => void
@@ -20,14 +22,6 @@ interface SearchInputProps {
   controlsId?: string
   /** id of the highlighted option; drives aria-activedescendant. */
   activeDescendantId?: string | null
-}
-
-const SCOPE_ICONS: Readonly<Record<string, string>> = {
-  CustomObject: 'layout',
-  Flow: 'flow',
-  User: 'sharing',
-  Profile: 'sharing',
-  SetupShortcut: 'setup'
 }
 
 function detectOrgType(sfHost: string | null): OrgType {
@@ -90,24 +84,11 @@ function getSearchPlaceholder(scope: string | null, displayName: string | null, 
   return t('Search Salesforce metadata...')
 }
 
-function getScopeDetails(chip: SearchCommand | null) {
-  if (!chip) return null
-  const type = chip.isBuiltin ? (chip.types[0] ?? 'SetupShortcut') : undefined
-  const title = chip.isBuiltin ? t(chip.description) : chip.description
-  return {
-    type,
-    prefix: `:${chip.key} `,
-    title,
-    // Drop parenthetical details to keep the chip compact. / 去掉括号说明以保持标签紧凑。
-    label: title.replace(/\s*[(（].*$/, '') || title,
-    icon: (type && SCOPE_ICONS[type]) || 'type'
-  }
-}
-
 const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
   (
     {
       query,
+      scopeFilter,
       commands,
       onQueryChange,
       onKeyDown,
@@ -123,8 +104,9 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     const orgType = detectOrgType(sfHost)
     const inputId = useId()
     const scopeId = `${inputId}-scope`
-    const { chip, remainder } = splitCommandChip(query, commands)
-    const scope = getScopeDetails(chip)
+    const { chip, remainder } =
+      scopeFilter === undefined ? splitCommandChip(query, commands) : { chip: null, remainder: scopeFilter }
+    const scope = chip && getScopeDetails(chip)
 
     // Internal ref to attach native event listener
     const internalRef = useRef<HTMLInputElement | null>(null)
@@ -211,7 +193,11 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             e.stopPropagation()
             e.nativeEvent.stopImmediatePropagation()
           }}
-          placeholder={getSearchPlaceholder(scope?.label ?? null, displayName, pageHasFocus)}
+          placeholder={
+            scopeFilter === undefined
+              ? getSearchPlaceholder(scope?.label ?? null, displayName, pageHasFocus)
+              : t('Filter scopes...')
+          }
           aria-label={t('Search Salesforce metadata')}
           aria-describedby={scope ? scopeId : undefined}
           role="combobox"

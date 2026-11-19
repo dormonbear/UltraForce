@@ -11,11 +11,14 @@ import EmptyState from './EmptyState'
 import HomeScreen from './HomeScreen'
 import IdPreview from './IdPreview'
 import CommandHints from './CommandHints'
+import CommandPanel, { COMMAND_LISTBOX_ID, getCommandOptionId } from './CommandPanel'
+import { useCommandPanel } from './useCommandPanel'
+import { getAutocompleteQuery } from './autocomplete-query'
 import { RecordActions, SearchFooter, StorageWarning, type RecordAction } from './SearchChrome'
 import { SEARCH_MODAL_STYLES } from './styles'
 import { getInterFontFaces } from '~lib/font-loader'
 import { logger } from '~lib/logger'
-import { parseCommand, getMatchingCommands, mergeCommands, getCommandPrefix } from '~lib/command-parser'
+import { parseCommand, getMatchingCommands, mergeCommands } from '~lib/command-parser'
 import { getUnsupportedTypes } from '~lib/salesforce-api'
 import { extractSalesforceId, extractAllSalesforceIds } from '~lib/id-utils'
 import { getRecordSuggestions, getSetupSuggestions, isSetupPage } from '~lib/contextual-suggestions'
@@ -255,6 +258,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
   // Merge builtin and custom commands
   const allCommands = useMemo(() => mergeCommands(customCommands), [customCommands])
 
+  const commandPanel = useCommandPanel(query, allCommands, unsupportedTypes, handleQueryChange, inputRef)
+  const pickerOpen = commandPanel.isOpen
+
   // Parse command from query
   const parsedCommand = useMemo(() => parseCommand(query, allCommands), [query, allCommands])
   const matchingCommands = useMemo(
@@ -293,6 +299,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   }, [onSetupSearch])
 
   useEffect(() => {
+    if (pickerOpen) return
     const searchQuery = parsedCommand.isCommand ? parsedCommand.query : query
     const isSetupCommand = parsedCommand.isCommand && parsedCommand.command?.key === 'g'
 
@@ -338,7 +345,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }, 300)
 
     return () => clearTimeout(debounceTimer)
-  }, [query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
+  }, [pickerOpen, query, parsedCommand, selectedTypes, hasSession, fuzzySearch, hideManagedPackage, settingsReady])
 
   // Reset selection and collapsed state when search results change
   useEffect(() => {
@@ -426,7 +433,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
       modal.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
       )
-    ).filter((el) => !el.hidden && el.getAttribute('aria-hidden') !== 'true')
+    ).filter((el) => !el.hidden && el.getAttribute('aria-hidden') !== 'true' && !el.closest('[inert]'))
     if (focusables.length === 0) return
     const currentIndex = focusables.indexOf(event.target as HTMLElement)
     const next = forward
@@ -447,6 +454,12 @@ const SearchModal: React.FC<SearchModalProps> = ({
       } else if (event.key === 'Tab') {
         trapFocus(event, !event.shiftKey)
       }
+      return
+    }
+
+    if (commandPanel.handleKeyDown(event)) return
+    if (pickerOpen && event.key === 'Tab') {
+      trapFocus(event, !event.shiftKey)
       return
     }
 
@@ -492,64 +505,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
       case 'Tab':
         if (visibleResults[selectedIndex]) {
           event.preventDefault()
-          const selectedResult = visibleResults[selectedIndex]
-          const prefix = getCommandPrefix(parsedCommand)
-          if (selectedResult.type === 'CustomObject') {
-            const objectApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-            setQuery(`${prefix}${objectApiName}.`)
-          } else if (selectedResult.type === 'CustomField') {
-            const objectApiName =
-              selectedResult.metadata?.ObjectApiName || selectedResult.metadata?.EntityDefinition?.QualifiedApiName
-            const fieldApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-            if (objectApiName) {
-              setQuery(`${prefix}${objectApiName}.${fieldApiName}`)
-            }
-          } else if (selectedResult.type === 'CustomMetadataType') {
-            if (selectedResult.metadata?._isTypeDefinition) {
-              const cmdtApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-              setQuery(`${prefix}${cmdtApiName}.`)
-            } else {
-              const parentType = selectedResult.metadata?._parentType
-              const recordName = selectedResult.metadata?.DeveloperName || selectedResult.name
-              if (parentType) {
-                setQuery(`${prefix}${parentType}.${recordName}`)
-              }
-            }
-          } else if (selectedResult.type === 'CustomSetting') {
-            if (selectedResult.metadata?._isSettingDefinition) {
-              const settingApiName = selectedResult.metadata?.QualifiedApiName || selectedResult.name
-              setQuery(`${prefix}${settingApiName}.`)
-            } else {
-              const parentType = selectedResult.metadata?._parentType
-              const recordName = selectedResult.metadata?.Name || selectedResult.name
-              if (parentType) {
-                setQuery(`${prefix}${parentType}.${recordName}`)
-              }
-            }
-          } else if (selectedResult.type === 'Profile') {
-            const profileName = selectedResult.name
-            setQuery(`${prefix}${profileName}.`)
-          } else if (selectedResult.type === 'ProfileSubMenu') {
-            const { profileName, subCategory } = selectedResult.metadata || {}
-            if (profileName && subCategory) {
-              setQuery(`${prefix}${profileName}.${subCategory}.`)
-            }
-          } else if (
-            selectedResult.type === 'ObjectPermission' ||
-            selectedResult.type === 'FieldPermission' ||
-            selectedResult.type === 'CustomPermissionAccess' ||
-            selectedResult.type === 'ApexClassAccess' ||
-            selectedResult.type === 'VFPageAccess' ||
-            selectedResult.type === 'ConnectedAppAccess' ||
-            selectedResult.type === 'AssignedAppAccess'
-          ) {
-            const { profileName, _subCategory } = selectedResult.metadata || {}
-            if (profileName && _subCategory) {
-              setQuery(`${prefix}${profileName}.${_subCategory}.${selectedResult.name}`)
-            }
-          } else if (selectedResult.type === 'ProfileSetupLink') {
-            // Navigate-only link: Enter navigates, Tab does nothing special
-          }
+          const completion = getAutocompleteQuery(visibleResults[selectedIndex], parsedCommand)
+          if (completion !== undefined) setQuery(completion)
         } else {
           // No highlighted result: Tab/Shift+Tab cycle the modal's focusable controls
           trapFocus(event, !event.shiftKey)
@@ -566,12 +523,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }
 
-  const handleQueryChange = (value: string) => {
+  function handleQueryChange(value: string) {
     if (value) setActiveSection(null)
     setQuery(value)
   }
 
   const handleToggleSection = (section: HomeSection) => {
+    commandPanel.close()
     setActiveSection((previous) => (previous === section ? null : section))
     setQuery('')
     inputRef.current?.focus()
@@ -643,7 +601,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 ref={inputRef}
                 query={query}
                 commands={allCommands}
-                onQueryChange={handleQueryChange}
+                scopeFilter={pickerOpen ? commandPanel.filter : undefined}
+                onQueryChange={pickerOpen ? commandPanel.changeFilter : handleQueryChange}
                 onKeyDown={(e) => {
                   if (['Escape', 'ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(e.key)) {
                     handleKeyDown(e)
@@ -651,14 +610,17 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 }}
                 sfHost={sfHost}
                 pageHasFocus={pageHasFocus}
-                expanded={showListbox}
-                controlsId={RESULTS_LISTBOX_ID}
-                activeDescendantId={activeDescendantId}
+                expanded={pickerOpen || showListbox}
+                controlsId={pickerOpen ? COMMAND_LISTBOX_ID : RESULTS_LISTBOX_ID}
+                activeDescendantId={pickerOpen ? getCommandOptionId(commandPanel.selectedKey) : activeDescendantId}
               />
               <SearchBarActions
                 activeSection={activeSection}
                 onToggleSection={handleToggleSection}
-                onSettings={() => setShowSettings(true)}
+                onSettings={() => {
+                  commandPanel.close()
+                  setShowSettings(true)
+                }}
               />
             </div>
           )}
@@ -688,93 +650,105 @@ const SearchModal: React.FC<SearchModalProps> = ({
                 onCustomCommandsChange={setCustomCommands}
               />
             ) : (
-              <>
-                <div className="search-container">
-                  {showCommandHints && <CommandHints commands={matchingCommands} prefix={query} />}
+              <div className="search-panel-views">
+                <div className="search-panel-view" aria-hidden={pickerOpen} inert={pickerOpen}>
+                  <div className="search-container">
+                    {showCommandHints && <CommandHints commands={matchingCommands} prefix={query} />}
 
-                  {!hasSession && !activeSection ? (
-                    <EmptyState type="no-session" />
-                  ) : isLoading && !activeSection ? (
-                    <EmptyState type="loading" />
-                  ) : searchError && !activeSection ? (
-                    <EmptyState type="error" errorMessage={searchError} />
-                  ) : !query.trim() ? (
-                    <>
-                      {recordContext && recordActions.length > 0 && (
-                        <RecordActions
-                          actions={recordActions}
-                          objectApiName={recordContext.objectApiName}
-                          selectedIndex={selectedRecordActionIndex}
+                    {!hasSession && !activeSection ? (
+                      <EmptyState type="no-session" />
+                    ) : isLoading && !activeSection ? (
+                      <EmptyState type="loading" />
+                    ) : searchError && !activeSection ? (
+                      <EmptyState type="error" errorMessage={searchError} />
+                    ) : !query.trim() ? (
+                      <>
+                        {recordContext && recordActions.length > 0 && (
+                          <RecordActions
+                            actions={recordActions}
+                            objectApiName={recordContext.objectApiName}
+                            selectedIndex={selectedRecordActionIndex}
+                          />
+                        )}
+                        <HomeScreen
+                          onNavigate={handleHomeNavigate}
+                          onToggleFavorite={handleToggleFavorite}
+                          onRemoveHistoryItem={handleRemoveHistoryItem}
+                          selectedTypes={selectedTypes}
+                          section={activeSection ?? undefined}
                         />
-                      )}
-                      <HomeScreen
-                        onNavigate={handleHomeNavigate}
-                        onToggleFavorite={handleToggleFavorite}
-                        onRemoveHistoryItem={handleRemoveHistoryItem}
-                        selectedTypes={selectedTypes}
-                        section={activeSection ?? undefined}
-                      />
-                      {setupSuggestions.length > 0 && (
-                        <div className="setup-suggestions">
-                          <div className="setup-suggestions-header">{t('Related Setup Pages')}</div>
-                          <div className="setup-suggestions-list">
-                            {setupSuggestions.map((s) => (
-                              <div
-                                key={s.id}
-                                className="setup-suggestion-item"
-                                onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) =>
-                                  e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
-                                }
-                              >
-                                <span className="setup-suggestion-name">{t(s.name)}</span>
-                                <span className="setup-suggestion-category">{t(s.description)}</span>
-                              </div>
-                            ))}
+                        {setupSuggestions.length > 0 && (
+                          <div className="setup-suggestions">
+                            <div className="setup-suggestions-header">{t('Related Setup Pages')}</div>
+                            <div className="setup-suggestions-list">
+                              {setupSuggestions.map((s) => (
+                                <div
+                                  key={s.id}
+                                  className="setup-suggestion-item"
+                                  onClick={() => onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) =>
+                                    e.key === 'Enter' && onNavigate?.(sfHost ? `https://${sfHost}${s.path}` : s.path)
+                                  }
+                                >
+                                  <span className="setup-suggestion-name">{t(s.name)}</span>
+                                  <span className="setup-suggestion-category">{t(s.description)}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </>
-                  ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
-                    <EmptyState
-                      type="command"
-                      commandTypes={parsedCommand.types || []}
-                      commandDescription={
-                        parsedCommand.command.isBuiltin
-                          ? t(parsedCommand.command.description)
-                          : parsedCommand.command.description
-                      }
-                    />
-                  ) : !hasResults && extractedIds.length > 0 && sfHost ? (
-                    <div className="id-preview-list">
-                      {extractedIds.map((id) => (
-                        <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
-                      ))}
-                    </div>
-                  ) : !hasResults && extractedId ? (
-                    <EmptyState type="id-navigation" query={extractedId} />
-                  ) : !hasResults ? (
-                    !showCommandHints && <EmptyState type="empty" query={query} />
-                  ) : (
-                    <SearchResults
-                      results={limitedSearchResults}
-                      selectedIndex={selectedIndex}
-                      onResultClick={onResultClick}
-                      onActionClick={onActionClick}
-                      onVisibleCountChange={handleVisibleCountChange}
-                      collapsedGroups={collapsedGroups}
-                      onToggleCollapse={handleToggleCollapse}
-                      onToggleFavorite={handleToggleFavorite}
-                      isFavorite={isFavoriteCheck}
-                      listboxId={RESULTS_LISTBOX_ID}
-                    />
-                  )}
-                </div>
+                        )}
+                      </>
+                    ) : parsedCommand.isCommand && !parsedCommand.query && parsedCommand.command ? (
+                      <EmptyState
+                        type="command"
+                        commandTypes={parsedCommand.types || []}
+                        commandDescription={
+                          parsedCommand.command.isBuiltin
+                            ? t(parsedCommand.command.description)
+                            : parsedCommand.command.description
+                        }
+                      />
+                    ) : !hasResults && extractedIds.length > 0 && sfHost ? (
+                      <div className="id-preview-list">
+                        {extractedIds.map((id) => (
+                          <IdPreview key={id} recordId={id} sfHost={sfHost} onNavigate={() => onIdNavigate?.(id)} />
+                        ))}
+                      </div>
+                    ) : !hasResults && extractedId ? (
+                      <EmptyState type="id-navigation" query={extractedId} />
+                    ) : !hasResults ? (
+                      !showCommandHints && <EmptyState type="empty" query={query} />
+                    ) : (
+                      <SearchResults
+                        results={limitedSearchResults}
+                        selectedIndex={selectedIndex}
+                        onResultClick={onResultClick}
+                        onActionClick={onActionClick}
+                        onVisibleCountChange={handleVisibleCountChange}
+                        collapsedGroups={collapsedGroups}
+                        onToggleCollapse={handleToggleCollapse}
+                        onToggleFavorite={handleToggleFavorite}
+                        isFavorite={isFavoriteCheck}
+                        listboxId={RESULTS_LISTBOX_ID}
+                      />
+                    )}
+                  </div>
 
-                <SearchFooter liveStatusText={liveStatusText} />
-              </>
+                  <SearchFooter liveStatusText={liveStatusText} canOpenScopes={commandPanel.canOpen} />
+                </div>
+                {commandPanel.hasOpened && (
+                  <CommandPanel
+                    options={commandPanel.options}
+                    selectedKey={commandPanel.selectedKey}
+                    onHighlight={commandPanel.highlight}
+                    onChoose={commandPanel.choose}
+                    onBack={commandPanel.close}
+                    isOpen={pickerOpen}
+                  />
+                )}
+              </div>
             )}
 
             <StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />
