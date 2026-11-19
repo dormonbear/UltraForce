@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { logger } from '~lib/logger'
 
 vi.mock('~lib/logger', () => ({ logger: { error: vi.fn() } }))
 vi.mock('~lib/storage-service', () => ({
@@ -161,6 +162,31 @@ describe('authentication message boundary', () => {
       key: `${orgId}!synthetic`,
       hostname: host
     })
+  })
+
+  it('uses the tab cookie store when falling back to its URL / 回退到标签页 URL 时使用该标签页的 Cookie 存储区', async () => {
+    const response = await invoke(
+      { message: 'getSession', sfHost: host },
+      {
+        url: undefined,
+        frameId: 0,
+        tab: { url: documentUrl, cookieStoreId: 'fixture-container' } as chrome.tabs.Tab
+      }
+    )
+    expect(response).toEqual({ key: `${orgId}!synthetic`, hostname: host })
+    expect(chrome.cookies.get).toHaveBeenCalledExactlyOnceWith({
+      url: `https://${host}`,
+      name: 'sid',
+      storeId: 'fixture-container'
+    })
+  })
+
+  it('returns an empty response after a cookie read fails / Cookie 读取失败时返回空响应', async () => {
+    chrome.cookies.get.mockRejectedValueOnce(new Error('Synthetic cookie API failure / 模拟 Cookie API 失败'))
+
+    expect(await invoke({ message: 'getSession', sfHost: host })).toBeNull()
+    expect(logger.error).toHaveBeenCalledExactlyOnceWith('Session resolution failed')
+    expect(chrome.cookies.getAll).not.toHaveBeenCalled()
   })
 
   it.each([

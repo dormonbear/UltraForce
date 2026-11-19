@@ -143,6 +143,21 @@ describe('setup-enhancer', () => {
     expect(container.scrollTopWrites).toEqual([])
   })
 
+  it('cancels pending scrolling when the restored extension context is invalid / 恢复后扩展上下文失效时取消待执行的滚动', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    document.body.append(container)
+    await loadModule()
+
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+    Object.assign(chrome.runtime, { id: undefined })
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    await vi.advanceTimersByTimeAsync(5000)
+
+    expect(container.scrollTopWrites).toEqual([])
+    expect(observers[0].disconnect).toHaveBeenCalledOnce()
+  })
+
   it('sets up a URL watcher observing document.body when autoLoadFields is enabled', async () => {
     await loadModule()
 
@@ -214,6 +229,24 @@ describe('setup-enhancer', () => {
     // It scrolled to the bottom at least once then reset to top.
     expect(container.scrollTopWrites).toContain(container.scrollHeight)
     expect(container.scrollTop).toBe(0)
+  })
+
+  it('selects a scrollable fields pane with an unfamiliar class / 选择使用未知类名的可滚动字段面板', async () => {
+    setLocation(fieldsUrl)
+    const container = makeScrollContainer()
+    container.className = 'fixture-fields-pane'
+    container.style.overflowY = 'scroll'
+    const decoy = makeScrollContainer()
+    Object.defineProperty(decoy, 'clientHeight', { value: decoy.scrollHeight })
+    document.body.append(decoy, container)
+
+    await loadModule()
+    await vi.advanceTimersByTimeAsync(4000)
+
+    expect(decoy.scrollTopWrites).toEqual([])
+    expect(container.scrollTopWrites).toContain(1000)
+    expect(container.scrollTop).toBe(0)
+    expect(observers[1].observedTargets).toContain(container)
   })
 
   it('re-runs enhancement when the URL changes via the body MutationObserver', async () => {
@@ -351,9 +384,15 @@ describe('setup-enhancer', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     const duplicate = original.cloneNode()
-    container.append(duplicate)
+    const newRow = document.createElement('div')
+    newRow.setAttribute('data-row-key-value', 'field-2')
+    const batch = document.createElement('div')
+    const repeatedNewRow = newRow.cloneNode()
+    batch.append(duplicate, newRow, repeatedNewRow)
+    container.append(batch, document.createTextNode('Fields / 字段'))
     await vi.advanceTimersByTimeAsync(5000)
-    expect([...container.children]).toEqual([original])
+    expect([...container.children]).toEqual([original, batch])
+    expect([...batch.children]).toEqual([newRow])
     expect(container.scrollTopWrites).toEqual(writesAfterCompletion)
   })
 
