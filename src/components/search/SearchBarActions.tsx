@@ -7,6 +7,7 @@ export type HomeSection = 'history' | 'favorites'
 interface SearchBarActionsProps {
   activeSection: HomeSection | null
   hidden?: boolean
+  settingsOpen: boolean
   onToggleSection: (section: HomeSection) => void
   onSettings: () => void
 }
@@ -16,9 +17,21 @@ const sectionActions = [
   { section: 'favorites', label: 'Favorites', icon: 'star' }
 ] as const
 
+export function SettingsBarTitle() {
+  return (
+    <h2 className="search-input-section settings-bar-title" role="heading" aria-level={2}>
+      <span className="search-icon">
+        <ActionIcon icon="setup" />
+      </span>
+      {t('Settings')}
+    </h2>
+  )
+}
+
 export default function SearchBarActions({
   activeSection,
   hidden = false,
+  settingsOpen,
   onToggleSection,
   onSettings
 }: SearchBarActionsProps) {
@@ -37,6 +50,8 @@ export default function SearchBarActions({
           type="button"
           className="search-bar-action"
           style={{ '--i': index } as CSSProperties}
+          aria-hidden={settingsOpen}
+          inert={settingsOpen}
           aria-label={t(label)}
           aria-pressed={activeSection === section}
           onClick={() => onToggleSection(section)}
@@ -49,10 +64,14 @@ export default function SearchBarActions({
         className="search-bar-action"
         style={{ '--i': sectionActions.length } as CSSProperties}
         data-ultraforce-settings-button
-        aria-label={t('Settings')}
+        aria-label={t(settingsOpen ? 'Close settings' : 'Settings')}
+        aria-pressed={settingsOpen}
         onClick={onSettings}
       >
-        <ActionIcon icon="setup" />
+        <span className="settings-toggle-icons" aria-hidden="true">
+          <ActionIcon icon="setup" />
+          <ActionIcon icon="close" />
+        </span>
       </button>
     </div>
   )

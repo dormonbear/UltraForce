@@ -89,7 +89,7 @@ describe('SearchModal', () => {
       if (view === 'picker') fireEvent.keyDown(input, { key: 'Tab' })
       else fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
-      const heading = screen.getByRole('heading', { name: view === 'picker' ? 'Choose a scope' : 'Settings' })
+      const heading = screen.getByRole('heading', { name: view === 'picker' ? 'Choose a scope' : 'Search Types' })
       fireEvent.keyDown(view === 'picker' ? input : screen.getByRole('dialog'), { key: 'Escape' })
       expect(heading).toBeInTheDocument()
       expect(heading.closest('[inert]')).not.toBeNull()
@@ -339,13 +339,34 @@ describe('SearchModal', () => {
       expect(dismiss).toHaveFocus()
     })
 
-    it('traps Tab focus inside the settings panel', async () => {
-      renderModal()
-      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
-      const modal = screen.getByRole('dialog')
+    it('includes the close button in the settings focus trap / 设置焦点循环包含关闭按钮', async () => {
+      const host = document.body.appendChild(document.createElement('div'))
+      const shadow = host.attachShadow({ mode: 'open' })
+      const container = shadow.appendChild(document.createElement('div'))
+      const { unmount } = renderModal({}, container)
+      try {
+        const modal = within(container).getByRole('dialog')
+        const dialog = within(modal)
+        const intercept = createKeyboardInterceptor({
+          getInput: () => modal.querySelector('[data-ultraforce-input]'),
+          getModal: () => modal,
+          getShadowRoot: () => shadow
+        })
+        await act(async () => fireEvent.click(dialog.getByRole('button', { name: 'Settings' })))
+        const firstSetting = dialog.getByRole('checkbox', { name: 'Apex Classes & Triggers' })
+        const closeSettings = dialog.getByRole('button', { name: 'Close settings' })
 
-      fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Tab' })
-      expect(modal.contains(document.activeElement)).toBe(true)
+        expect(shadow.activeElement).toBe(firstSetting)
+        act(() => intercept(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true })))
+        expect(shadow.activeElement).toBe(closeSettings)
+        act(() => intercept(new KeyboardEvent('keydown', { key: 'Tab' })))
+        expect(shadow.activeElement).toBe(firstSetting)
+        act(() => intercept(new KeyboardEvent('keydown', { key: 'Escape' })))
+        expect(shadow.activeElement).toBe(dialog.getByRole('combobox'))
+      } finally {
+        unmount()
+        host.remove()
+      }
     })
   })
 
@@ -631,35 +652,74 @@ describe('SearchModal', () => {
   })
 
   describe('settings panel', () => {
-    it('opens settings from the round bar button / 通过搜索栏圆形按钮打开设置', async () => {
-      renderModal()
+    it.each([
+      ['en-US', 'Settings', 'Close settings', 'History', 'Favorites', 'Back'],
+      ['zh-CN', '设置', '关闭设置', '历史记录', '收藏', '返回']
+    ])(
+      'toggles settings from the same button in %s / 通过同一按钮切换设置',
+      async (locale, title, close, history, favorites, back) => {
+        const languages = vi.spyOn(navigator, 'languages', 'get').mockReturnValue([locale])
+        try {
+          renderModal()
+          const settingsButton = screen.getByRole('button', { name: title })
+          const row = settingsButton.closest('.search-bar-row')
+          const homeButtons = [history, favorites].map((name) => screen.getByRole('button', { name, exact: true }))
+          await userEvent.click(settingsButton)
 
+          expect(screen.getByRole('button', { name: close, pressed: true })).toBe(settingsButton)
+          expect(settingsButton.closest('.search-bar-row')).toBe(row)
+          expect(within(row as HTMLElement).getByRole('heading', { name: title, level: 2 })).toBeVisible()
+          expect(screen.getAllByRole('heading', { name: title, exact: true })).toHaveLength(1)
+          expect(screen.queryByRole('button', { name: back })).not.toBeInTheDocument()
+          expect(within(row as HTMLElement).queryByRole('combobox')).not.toBeInTheDocument()
+          for (const button of homeButtons) {
+            expect(button.closest('[inert]')).not.toBeNull()
+            expect(button.closest('[aria-hidden="true"]')).not.toBeNull()
+          }
+          for (const name of [history, favorites]) {
+            expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+          }
+
+          await userEvent.click(settingsButton)
+          expect(screen.getByRole('button', { name: title, pressed: false })).toBe(settingsButton)
+          expect(screen.getByRole('combobox')).toHaveFocus()
+        } finally {
+          languages.mockRestore()
+        }
+      }
+    )
+
+    it('restores the query and results mode after settings closes / 关闭设置后恢复查询和结果模式', async () => {
+      renderModal()
+      const dialog = screen.getByRole('dialog')
       const settingsButton = screen.getByRole('button', { name: 'Settings' })
-      expect(settingsButton.closest('.search-bar-row')).toBeInTheDocument()
+      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Account' } })
+      expect(dialog).toHaveAttribute('data-ui-mode', 'results')
+      expect(settingsButton.closest('[inert]')).not.toBeNull()
+
+      fireEvent.click(settingsButton)
+      expect(dialog).toHaveAttribute('data-ui-mode', 'idle')
+      expect(screen.getByRole('button', { name: 'Close settings' })).toBe(settingsButton)
       await userEvent.click(settingsButton)
 
-      await waitFor(() => {
-        expect(screen.getByText('Apex Classes & Triggers')).toBeInTheDocument()
-      })
+      expect(dialog).toHaveAttribute('data-ui-mode', 'results')
+      expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+      const input = screen.getByRole('combobox')
+      expect(input).toHaveValue('Account')
+      expect(input).toHaveFocus()
     })
 
-    it('should close settings panel when Escape is pressed', async () => {
-      renderModal()
+    it('closes settings on Escape and keeps search open / 按 Escape 关闭设置并保留搜索窗口', async () => {
+      const { props } = renderModal()
+      const dialog = screen.getByRole('dialog')
+      await userEvent.click(screen.getByRole('button', { name: 'Settings' }))
+      expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument()
 
-      const settingsButton = screen.getByRole('button', { name: 'Settings' })
-      await userEvent.click(settingsButton)
+      await userEvent.keyboard('{Escape}')
 
-      await waitFor(() => {
-        expect(screen.getByText('Apex Classes & Triggers')).toBeInTheDocument()
-      })
-
-      const modal = document.querySelector('[data-ultraforce-modal]')
-      expect(modal).toBeTruthy()
-      fireEvent.keyDown(modal!, { key: 'Escape' })
-
-      await waitFor(() => {
-        expect(screen.getByRole('combobox')).toBeInTheDocument()
-      })
+      expect(dialog).toBeInTheDocument()
+      expect(screen.getByRole('combobox')).toHaveFocus()
+      expect(props.onClose).not.toHaveBeenCalled()
     })
   })
 

@@ -19,6 +19,12 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
           <path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       )
+    case 'close':
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <path d="m6 6 12 12M18 6 6 18" />
+        </svg>
+      )
     case 'layout':
       return (
         <svg {...ACTION_ICON_PROPS}>

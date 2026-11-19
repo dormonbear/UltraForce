@@ -126,16 +126,19 @@ export function createKeyboardInterceptor(
     // The content script owns the toggle shortcut, including during exit. / 切换快捷键由内容脚本处理，包括退场期间。
     if (e.type === 'keydown' && opts.getToggleShortcut && isToggleShortcut(e, opts.getToggleShortcut())) return
 
-    // If focus is on a form element (input/textarea) that is NOT the search input,
-    // let it handle its own keyboard events (e.g. settings panel form fields)
+    // Preserve settings controls' native keys and route Tab/Escape to the modal.
+    // 保留设置控件的原生按键行为，并将 Tab 和 Escape 交给对话框。
     if (opts.getShadowRoot) {
       const shadowRoot = opts.getShadowRoot()
       const activeEl = shadowRoot?.activeElement
       const searchInput = opts.getInput()
+      const inSettings = activeEl && !searchInput && opts.getModal?.()?.contains(activeEl)
+      const settingsNavigation = inSettings && (e.key === 'Tab' || e.key === 'Escape')
       if (
         activeEl &&
         activeEl !== searchInput &&
-        (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
+        !settingsNavigation &&
+        (inSettings || activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement)
       ) {
         // Still block Salesforce page shortcuts from firing
         e.stopPropagation()

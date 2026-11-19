@@ -150,6 +150,7 @@ export const chineseMessages: Readonly<Record<string, string>> = {
   Open: '打开',
   Close: '关闭',
   Settings: '设置',
+  'Close settings': '关闭设置',
   Dismiss: '关闭',
   'Dismiss storage warning': '关闭存储警告',
   'Search results': '搜索结果',

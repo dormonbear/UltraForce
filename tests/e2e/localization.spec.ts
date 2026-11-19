@@ -67,7 +67,7 @@ for (const locale of ['en-US', 'zh-CN']) {
       await expect(flowScope).toBeVisible()
       await expect(input).toHaveValue('')
       await expect(input).toHaveAccessibleDescription(chinese ? '范围：流程' : 'Scope: Flows')
-      await dialog.getByRole('button', { name: chinese ? '设置' : 'Settings', exact: true }).focus()
+      await dialog.focus()
       await flowScope.click()
       await expect(input).toBeFocused()
       await input.pressSequentially('case')
@@ -85,15 +85,36 @@ for (const locale of ['en-US', 'zh-CN']) {
       await input.selectText()
       await input.press('Backspace')
       await expect(input).toHaveValue('')
-      await page.getByRole('button', { name: chinese ? '设置' : 'Settings', exact: true }).click()
+      await input.press('Backspace')
+      const settingsButton = dialog.getByRole('button', { name: chinese ? '设置' : 'Settings', exact: true })
+      await expect(settingsButton).toBeVisible()
+      await settingsButton.evaluate(async (button) => {
+        await Promise.all(button.getAnimations().map((animation) => animation.finished))
+      })
+      const settingsPosition = (await settingsButton.boundingBox())!
+      await settingsButton.click()
       await expect(page.getByRole('heading', { name: chinese ? '设置' : 'Settings', exact: true })).toBeVisible()
       await expect(
         page.getByRole('checkbox', { name: chinese ? '对象及字段' : 'Objects & Fields', exact: true })
       ).toBeVisible()
       await expect(page.locator('.command-row:not(.command-row-builtin) .command-desc')).toHaveText('Objects & Fields')
       await expect(page.getByRole('link', { name: chinese ? '隐私' : 'Privacy', exact: true })).toBeVisible()
-      await expect(page.getByRole('button', { name: chinese ? '返回' : 'Back', exact: true })).toBeVisible()
+      const closeSettings = dialog.getByRole('button', { name: chinese ? '关闭设置' : 'Close settings', exact: true })
+      await expect(closeSettings).toBeVisible()
+      await expect(closeSettings).toHaveAttribute('aria-pressed', 'true')
+      await expect
+        .poll(async () => {
+          const position = (await closeSettings.boundingBox())!
+          return Math.hypot(position.x - settingsPosition.x, position.y - settingsPosition.y)
+        })
+        .toBeLessThan(0.1)
+      await expect(dialog.getByRole('button', { name: chinese ? '返回' : 'Back', exact: true })).toHaveCount(0)
+      await page.keyboard.press('Shift+Tab')
+      await expect(closeSettings).toBeFocused()
       if (chinese) await page.screenshot({ path: '/tmp/ultraforce-i18n-chinese-settings.png' })
+      await closeSettings.click()
+      await expect(input).toBeFocused()
+      await expect(settingsButton).toBeVisible()
     } finally {
       await context.close()
       rmSync(profile, { recursive: true, force: true })

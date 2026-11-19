@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, useImperative
 import type { SearchResult } from '~types'
 import { isCustomCommand } from '~types'
 import SearchInput from './SearchInput'
-import SearchBarActions, { type HomeSection } from './SearchBarActions'
+import SearchBarActions, { SettingsBarTitle, type HomeSection } from './SearchBarActions'
 import SearchResults from './SearchResults'
 import SettingsPanel from './SettingsPanel'
 import UpdateNotification from './UpdateNotification'
@@ -191,11 +191,13 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [previouslyFocused])
 
-  // Focus management
   useEffect(() => {
     if (isVisible) {
       if (showSettings && modalRef.current) {
-        modalRef.current.focus()
+        const firstSetting = modalRef.current.querySelector<HTMLElement>(
+          '.settings-content :is(input, select, button):not(:disabled)'
+        )
+        ;(firstSetting ?? modalRef.current).focus()
       } else if (inputRef.current) {
         inputRef.current.focus()
         inputRef.current.select()
@@ -270,7 +272,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const commandPanel = useCommandPanel(query, allCommands, unsupportedTypes, handleQueryChange, inputRef)
   const pickerOpen = commandPanel.isOpen
-  const hasText = !pickerOpen && query.trim() !== ''
+  const hasText = !showSettings && !pickerOpen && query.trim() !== ''
 
   // Parse command from query
   const { chip, remainder } = splitCommandChip(query, allCommands)
@@ -447,7 +449,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
       )
     ).filter((el) => !el.hidden && el.getAttribute('aria-hidden') !== 'true' && !el.closest('[inert]'))
     if (focusables.length === 0) return
-    const currentIndex = focusables.indexOf(event.target as HTMLElement)
+    const focused = event.target === modal ? (modal.getRootNode() as Document | ShadowRoot).activeElement : event.target
+    const currentIndex = focusables.indexOf(focused as HTMLElement)
     const next = forward
       ? (focusables[currentIndex + 1] ?? focusables[0])
       : (focusables[currentIndex - 1] ?? focusables[focusables.length - 1])
@@ -609,8 +612,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="search-surface">
-            {!showSettings && (
-              <div className="search-bar-row">
+            <div className="search-bar-row" data-settings-open={showSettings || undefined}>
+              {showSettings ? (
+                <SettingsBarTitle />
+              ) : (
                 <SearchInput
                   ref={inputRef}
                   query={query}
@@ -628,23 +633,25 @@ const SearchModal: React.FC<SearchModalProps> = ({
                   controlsId={pickerOpen ? COMMAND_LISTBOX_ID : RESULTS_LISTBOX_ID}
                   activeDescendantId={pickerOpen ? getCommandOptionId(commandPanel.selectedKey) : activeDescendantId}
                 />
-                <SearchBarActions
-                  activeSection={activeSection}
-                  hidden={hasText}
-                  onToggleSection={handleToggleSection}
-                  onSettings={() => {
-                    commandPanel.close()
-                    setShowSettings(true)
-                  }}
-                />
-              </div>
-            )}
+              )}
+              <SearchBarActions
+                activeSection={activeSection}
+                hidden={hasText}
+                settingsOpen={showSettings}
+                onToggleSection={handleToggleSection}
+                onSettings={() => {
+                  commandPanel.close()
+                  setShowSettings((open) => !open)
+                }}
+              />
+            </div>
             <AnimatedPanel
               view={showSettings ? 'settings' : pickerOpen ? 'picker' : 'search'}
               footer={<StorageWarning messages={storageWarnings} onDismiss={dismissStorageWarnings} />}
             >
               {showSettings ? (
                 <SettingsPanel
+                  showHeader={false}
                   onClose={() => setShowSettings(false)}
                   selectedTypes={selectedTypes}
                   onToggleType={handleTypeToggle}
