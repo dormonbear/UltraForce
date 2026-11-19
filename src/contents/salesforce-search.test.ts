@@ -1,3 +1,4 @@
+import { getSession, getSfHost } from '~lib/auth'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { render, unmount } = vi.hoisted(() => ({ render: vi.fn(), unmount: vi.fn() }))
@@ -16,8 +17,8 @@ const messages = runtime.onMessage as typeof runtime.onMessage & {
 
 const modalSelector = '[id^="ultraforce-modal"]'
 
-function shortcut(): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key: 'b', ctrlKey: true, bubbles: true, cancelable: true })
+function shortcut(modifier: 'ctrlKey' | 'metaKey' = 'ctrlKey'): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key: 'b', [modifier]: true, bubbles: true, cancelable: true })
   document.body.dispatchEvent(event)
   return event
 }
@@ -35,7 +36,7 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
   })
 
   afterEach(() => {
-    window.dispatchEvent(new Event('beforeunload'))
+    window.dispatchEvent(new PageTransitionEvent('pagehide'))
     messages.clearListeners()
     vi.useRealTimers()
     vi.restoreAllMocks()
@@ -43,6 +44,86 @@ describe('search content script lifecycle / 搜索内容脚本生命周期', () 
     runtime.id = undefined
     document.body.replaceChildren()
     document.documentElement.removeAttribute('data-ultraforce-modal-open')
+  })
+
+  it.each([{ modifier: 'ctrlKey' }, { modifier: 'metaKey' }] as const)(
+    'keeps the $modifier shortcut after canceled navigation / 取消导航后保留 $modifier 快捷键',
+    async ({ modifier }) => {
+      await loadContentScript()
+      window.addEventListener('beforeunload', (event) => event.preventDefault(), { once: true })
+      expect(window.dispatchEvent(new Event('beforeunload', { cancelable: true }))).toBe(false)
+
+      expect(shortcut(modifier).defaultPrevented).toBe(true)
+      await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+    }
+  )
+
+  it('keeps one working search instance after a cached page returns / 缓存页面恢复后保留一个可用的搜索实例', async () => {
+    await loadContentScript()
+    const container = document.querySelector(modalSelector)
+
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+
+    expect([...document.querySelectorAll(modalSelector)]).toEqual([container])
+    expect(shortcut().defaultPrevented).toBe(true)
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce())
+  })
+
+  it('shows the update notice once on the shortcut after an invalid cached restore / 失效的缓存页面恢复后按快捷键仅显示一次更新提示', async () => {
+    await loadContentScript()
+    vi.useFakeTimers()
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+    runtime.id = undefined
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+
+    expect(messages.hasListeners()).toBe(false)
+    expect(document.querySelector(modalSelector)).toBeNull()
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+    await vi.advanceTimersByTimeAsync(150)
+    expect(document.querySelector(modalSelector)).toBeNull()
+
+    expect(shortcut().defaultPrevented).toBe(false)
+    await vi.advanceTimersByTimeAsync(150)
+    const notice = document.querySelector(modalSelector)
+    expect(notice?.shadowRoot?.querySelector('[role="alert"]')).toBeTruthy()
+    notice?.remove()
+
+    expect(shortcut().defaultPrevented).toBe(false)
+    await vi.advanceTimersByTimeAsync(150)
+    expect(document.querySelector(modalSelector)).toBeNull()
+    expect(render).not.toHaveBeenCalled()
+  })
+
+  it('does not start search after discard before DOM readiness / 等待 DOM 就绪期间丢弃页面后不会启动搜索', async () => {
+    vi.spyOn(document, 'readyState', 'get').mockReturnValue('loading')
+    vi.resetModules()
+    await import('./salesforce-search')
+
+    window.dispatchEvent(new PageTransitionEvent('pagehide'))
+    document.dispatchEvent(new Event('DOMContentLoaded'))
+    expect(getSfHost).not.toHaveBeenCalled()
+    expect(shortcut().defaultPrevented).toBe(false)
+    expect(messages.hasListeners()).toBe(false)
+    expect(document.querySelector(modalSelector)).toBeNull()
+  })
+
+  it('drops session initialization that resolves after discard / 丢弃页面后忽略延迟返回的会话初始化', async () => {
+    let resolveHost!: (host: string) => void
+    vi.mocked(getSfHost).mockImplementationOnce(() => new Promise((resolve) => (resolveHost = resolve)))
+    vi.resetModules()
+    await import('./salesforce-search')
+    await vi.waitFor(() => expect(resolveHost).toBeDefined())
+    expect(document.querySelector(modalSelector)).not.toBeNull()
+
+    window.dispatchEvent(new PageTransitionEvent('pagehide'))
+    resolveHost('example.my.salesforce.com')
+
+    await vi.waitFor(() => expect(document.querySelector(modalSelector)).toBeNull())
+    expect(getSession).not.toHaveBeenCalled()
+    expect(messages.hasListeners()).toBe(false)
+    expect(shortcut().defaultPrevented).toBe(false)
   })
 
   it('passes the first orphaned shortcut through and tears down once / 放行孤立脚本收到的首个快捷键并仅清理一次', async () => {

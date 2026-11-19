@@ -26,7 +26,20 @@ class SetupEnhancer {
 
   constructor(private readonly release: () => void) {
     const { signal } = this.listeners
-    window.addEventListener('beforeunload', () => this.destroy(), { signal })
+    window.addEventListener(
+      'pagehide',
+      (event) => {
+        if (!event.persisted) this.destroy()
+      },
+      { signal }
+    )
+    window.addEventListener(
+      'pageshow',
+      (event) => {
+        if (event.persisted) this.checkContext()
+      },
+      { signal }
+    )
     document.addEventListener(SETUP_START_EVENT, () => this.checkContext(), { signal })
 
     const start = () => {
@@ -77,6 +90,8 @@ class SetupEnhancer {
     const urlKey = this.getUrlKey()
 
     if (this.completedUrls.has(urlKey)) {
+      const scrollContainer = this.findScrollContainer()
+      if (scrollContainer) this.disableInfiniteScroll(scrollContainer)
       logger.debug('Page already processed, skipping auto-load')
       return
     }
@@ -92,13 +107,10 @@ class SetupEnhancer {
     this.isLoading = true
     const generation = this.scrollGeneration
 
-    this.completedUrls.add(urlKey)
-
     try {
       const scrollContainer = this.findScrollContainer()
       if (!scrollContainer) {
         logger.debug('Scroll container not found')
-        this.isLoading = false
         return
       }
 
@@ -129,9 +141,9 @@ class SetupEnhancer {
       scrollContainer.scrollTop = 0
 
       this.disableInfiniteScroll(scrollContainer)
+      this.completedUrls.add(urlKey)
     } catch (error) {
       logger.error('Auto-load error:', error)
-      this.completedUrls.delete(urlKey)
     } finally {
       if (generation === this.scrollGeneration) this.isLoading = false
     }
@@ -231,6 +243,8 @@ class SetupEnhancer {
     clearTimeout(this.pendingCheck)
     this.scrollGeneration++
     this.isLoading = false
+    this.observer?.disconnect()
+    this.observer = null
   }
 
   private destroy(): void {
@@ -238,7 +252,6 @@ class SetupEnhancer {
     this.release()
     this.stopAutoScroll()
     this.urlObserver?.disconnect()
-    this.observer?.disconnect()
   }
 }
 
