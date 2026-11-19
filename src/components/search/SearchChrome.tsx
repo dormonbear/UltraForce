@@ -9,7 +9,8 @@ const ACTION_ICON_PROPS = {
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: '2'
+  strokeWidth: '2',
+  'aria-hidden': true
 }
 
 export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
@@ -45,6 +46,12 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
         <svg {...ACTION_ICON_PROPS}>
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
+        </svg>
+      )
+    case 'star':
+      return (
+        <svg {...ACTION_ICON_PROPS}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
         </svg>
       )
     case 'related':
@@ -88,13 +95,11 @@ export function ActionIcon({ icon }: { icon: string }): React.ReactNode {
 
 export function SearchFooter({
   liveStatusText,
-  onSettings,
   showUpdateNotification,
   updateVersion,
   onDismissUpdate
 }: {
   liveStatusText: string
-  onSettings: () => void
   showUpdateNotification: boolean
   updateVersion: string
   onDismissUpdate: () => void
@@ -120,23 +125,6 @@ export function SearchFooter({
             <kbd>Esc</kbd> {t('Close')}
           </div>
         </div>
-
-        <button
-          className="settings-button"
-          data-ultraforce-settings-button
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onSettings()
-          }}
-          title={t('Settings')}
-          aria-label={t('Settings')}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
       </div>
 
       {showUpdateNotification && (
@@ -183,6 +171,52 @@ export function StorageWarning({ messages, onDismiss }: { messages: string[]; on
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
+    </div>
+  )
+}
+
+export interface RecordAction {
+  id: string
+  name: string
+  handler: () => void
+  icon: string
+  description?: string
+}
+
+export function RecordActions({
+  actions,
+  objectApiName,
+  selectedIndex
+}: {
+  actions: RecordAction[]
+  objectApiName: string | null
+  selectedIndex: number
+}) {
+  return (
+    <div className="record-actions">
+      <div className="record-actions-header">
+        {t('Record Actions')}
+        {objectApiName && <span className="record-object-name">{objectApiName}</span>}
+      </div>
+      <div className="record-actions-list">
+        {actions.map((action, index) => (
+          <div
+            key={action.id}
+            className={`record-action-item${selectedIndex === index ? ' selected' : ''}`}
+            onClick={action.handler}
+            role="button"
+            tabIndex={0}
+            title={t(action.name)}
+            onKeyDown={(e) => e.key === 'Enter' && action.handler()}
+          >
+            <span className="record-action-icon">
+              <ActionIcon icon={action.icon} />
+            </span>
+            <span className="record-action-text">{t(action.name)}</span>
+            <span className="record-action-desc">{t(action.description ?? action.name)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -6,6 +6,7 @@ import React, { useMemo, useCallback } from 'react'
 import { useHistoryStore, sortByLastVisited } from '~stores/history-store'
 import { useFavoritesStore, type FavoriteItem } from '~stores/favorites-store'
 import type { HistoryItem } from '~stores/history-store'
+import type { HomeSection } from './SearchBarActions'
 
 const MAX_RECENT_ITEMS = 8
 const MAX_FAVORITE_ITEMS = 10
@@ -39,6 +40,7 @@ interface HomeScreenProps {
   onRemoveHistoryItem: (id: string) => void
   /** Selected types hint for the search tips. */
   selectedTypes?: string[]
+  section?: HomeSection
 }
 
 /** Get a short type icon/label for the item badge. */
@@ -63,7 +65,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate,
   onToggleFavorite,
   onRemoveHistoryItem,
-  selectedTypes
+  selectedTypes,
+  section
 }) => {
   const favorites = useFavoritesStore((s) => s.items)
   const historyItems = useHistoryStore((s) => s.items)
@@ -105,7 +108,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     [onRemoveHistoryItem]
   )
 
-  const hasContent = visibleFavorites.length > 0 || recentItems.length > 0
+  const showFavorites = section !== 'history' && visibleFavorites.length > 0
+  const showHistory = section !== 'favorites' && recentItems.length > 0
+  const hasContent = showFavorites || showHistory
+
+  if (!hasContent && section) {
+    return (
+      <div className="home-screen">
+        <div className="home-empty">
+          <div className="home-empty-title">{t(section === 'history' ? 'No recent items' : 'No favorites yet')}</div>
+        </div>
+      </div>
+    )
+  }
 
   if (!hasContent) {
     return (
@@ -132,7 +147,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <div className="home-screen">
-      {visibleFavorites.length > 0 && (
+      {showFavorites && (
         <div className="home-section">
           <div className="home-section-header">
             <span className="home-section-icon">
@@ -182,7 +197,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       )}
 
-      {recentItems.length > 0 && (
+      {showHistory && (
         <div className="home-section">
           <div className="home-section-header">
             <span className="home-section-icon">

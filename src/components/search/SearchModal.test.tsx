@@ -485,11 +485,39 @@ describe('SearchModal', () => {
     })
   })
 
+  describe('search bar actions / 搜索栏操作', () => {
+    it('clears the query and toggles the active section / 清空查询并切换当前分区', async () => {
+      renderModal()
+      const input = screen.getByRole('combobox')
+      await userEvent.type(input, 'account')
+      const history = screen.getByRole('button', { name: 'History', pressed: false })
+
+      await userEvent.click(history)
+      expect(input).toHaveValue('')
+      expect(input).toHaveFocus()
+      expect(history).toHaveAttribute('aria-pressed', 'true')
+
+      await userEvent.click(history)
+      expect(history).toHaveAttribute('aria-pressed', 'false')
+    })
+
+    it('clears the active section when typing / 输入时取消当前分区', async () => {
+      renderModal()
+      const favorites = screen.getByRole('button', { name: 'Favorites', pressed: false })
+
+      await userEvent.click(favorites)
+      expect(favorites).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.type(screen.getByRole('combobox'), 'account')
+      expect(favorites).toHaveAttribute('aria-pressed', 'false')
+    })
+  })
+
   describe('settings panel', () => {
-    it('should open settings panel when settings button is clicked', async () => {
+    it('opens settings from the round bar button / 通过搜索栏圆形按钮打开设置', async () => {
       renderModal()
 
-      const settingsButton = screen.getByTitle('Settings')
+      const settingsButton = screen.getByRole('button', { name: 'Settings' })
+      expect(settingsButton.closest('.search-bar-row')).toBeInTheDocument()
       await userEvent.click(settingsButton)
 
       await waitFor(() => {
@@ -500,7 +528,7 @@ describe('SearchModal', () => {
     it('should close settings panel when Escape is pressed', async () => {
       renderModal()
 
-      const settingsButton = screen.getByTitle('Settings')
+      const settingsButton = screen.getByRole('button', { name: 'Settings' })
       await userEvent.click(settingsButton)
 
       await waitFor(() => {
