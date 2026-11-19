@@ -64,6 +64,28 @@ test('chooses Flows from the Tab scope picker / 从 Tab 搜索范围面板选择
 
     await input.press('Alt+k')
     await expect(dialog).toHaveCount(0)
+
+    await worker.evaluate(() => chrome.storage.local.set({ ultraforce_search_settings: { shortcutKey: 'escape' } }))
+    await page.reload()
+    await waitForContentScript(context, page)
+    await page.keyboard.press('Escape')
+    await expect(input).toBeFocused()
+
+    await dialog.getByRole('button', { name: 'Settings', exact: true }).click()
+    const settings = dialog.getByRole('heading', { name: 'Settings', exact: true })
+    await expect(settings).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(settings).toBeHidden()
+    await expect(input).toBeFocused()
+
+    await input.press('Tab')
+    await expect(heading).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(heading).toBeHidden()
+    await expect(input).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
   } finally {
     await context.close()
     rmSync(profile, { recursive: true, force: true })

@@ -49,7 +49,8 @@ describe('createKeyboardInterceptor', () => {
   it.each([
     ['b', { metaKey: true }, 'b'],
     ['b', { ctrlKey: true }, 'b'],
-    ['i', { altKey: true }, 'alt+i']
+    ['i', { altKey: true }, 'alt+i'],
+    ['Escape', {}, 'escape']
   ])(
     'lets the configured %s shortcut reach the toggle handler / 将配置的快捷键交给切换处理器',
     (key, modifiers, shortcut) => {
@@ -61,6 +62,20 @@ describe('createKeyboardInterceptor', () => {
       expect(input.value).toBe('')
     }
   )
+
+  it('routes the Escape shortcut to the open panel / 将 Escape 快捷键交给已打开的面板', () => {
+    const modal = document.createElement('div')
+    modal.setAttribute('data-escape-dismisses-panel', '')
+    const onKeyDown = vi.fn()
+    modal.addEventListener('keydown', onKeyDown)
+    const handler = createKeyboardInterceptor({ getInput, getModal: () => modal, getToggleShortcut: () => 'escape' })
+    const event = createKeyEvent('keydown', 'Escape')
+
+    handler(event)
+
+    expect(event.stopImmediatePropagation).toHaveBeenCalledOnce()
+    expect(onKeyDown).toHaveBeenCalledWith(expect.objectContaining({ key: 'Escape' }))
+  })
 
   describe('printable characters', () => {
     it('should intercept keydown, preventDefault, and insert character', () => {

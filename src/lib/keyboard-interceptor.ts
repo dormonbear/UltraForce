@@ -127,8 +127,16 @@ export function createKeyboardInterceptor(
     // Never intercept modifier-only keys
     if (MODIFIER_KEYS.has(e.key)) return
 
-    // The content script owns the toggle shortcut, including during exit. / 切换快捷键由内容脚本处理，包括退场期间。
-    if (e.type === 'keydown' && opts.getToggleShortcut && isToggleShortcut(e, opts.getToggleShortcut())) return
+    // Open panels get Escape first. The content script owns the remaining toggle shortcuts.
+    // 已打开的面板优先处理 Escape，其余切换快捷键由内容脚本处理。
+    if (
+      e.type === 'keydown' &&
+      opts.getToggleShortcut &&
+      isToggleShortcut(e, opts.getToggleShortcut()) &&
+      !(e.key === 'Escape' && opts.getModal?.()?.hasAttribute('data-escape-dismisses-panel'))
+    ) {
+      return
+    }
 
     // Preserve settings controls' native keys and route Tab/Escape to the modal.
     // 保留设置控件的原生按键行为，并将 Tab 和 Escape 交给对话框。

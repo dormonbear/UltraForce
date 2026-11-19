@@ -601,6 +601,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
         <div
           className="ultraforce-search-modal"
           data-ultraforce-modal
+          data-escape-dismisses-panel={showSettings || pickerOpen || undefined}
           data-ui-mode={hasText ? 'results' : 'idle'}
           ref={modalRef}
           tabIndex={-1}

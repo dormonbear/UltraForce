@@ -371,6 +371,36 @@ describe('SearchModal', () => {
   })
 
   describe('visibility', () => {
+    it.each(['Settings', 'Choose a scope'])(
+      'dismisses %s before toggling search with Escape / 使用 Escape 切换搜索前先关闭面板',
+      async (panel) => {
+        useSettingsStore.setState({ shortcutKey: 'escape' })
+        const { props } = renderModal()
+        const modal = screen.getByRole('dialog')
+        const intercept = createKeyboardInterceptor({
+          getInput: () => modal.querySelector('[data-ultraforce-input]'),
+          getModal: () => modal,
+          getToggleShortcut: () => useSettingsStore.getState().shortcutKey
+        })
+        if (panel === 'Settings') await userEvent.click(screen.getByRole('button', { name: panel }))
+        else await act(async () => fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Tab' }))
+        expect(screen.getByRole('heading', { name: panel })).toBeVisible()
+
+        const dismiss = new KeyboardEvent('keydown', { key: 'Escape' })
+        const stopDismiss = vi.spyOn(dismiss, 'stopImmediatePropagation')
+        act(() => intercept(dismiss))
+        expect(stopDismiss).toHaveBeenCalledOnce()
+        expect(screen.queryByRole('heading', { name: panel })).not.toBeInTheDocument()
+        expect(screen.getByRole('combobox')).toHaveFocus()
+        expect(props.onClose).not.toHaveBeenCalled()
+
+        const toggle = new KeyboardEvent('keydown', { key: 'Escape' })
+        const stopToggle = vi.spyOn(toggle, 'stopImmediatePropagation')
+        act(() => intercept(toggle))
+        expect(stopToggle).not.toHaveBeenCalled()
+      }
+    )
+
     it('should render search input when store isVisible is true', () => {
       renderModal()
       expect(screen.getByRole('combobox')).toBeInTheDocument()
