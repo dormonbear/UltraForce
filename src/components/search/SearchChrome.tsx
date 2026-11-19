@@ -128,7 +128,7 @@ export function SearchFooter({
             {t('Open')} <kbd>Enter</kbd>
           </div>
           <div className="shortcut-item">
-            <kbd>Tab</kbd> {t('Autocomplete')}
+            <kbd>Tab</kbd> {t(canOpenScopes ? 'Scopes' : 'Autocomplete')}
           </div>
         </div>
       ) : (

@@ -270,7 +270,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const commandPanel = useCommandPanel(query, allCommands, unsupportedTypes, handleQueryChange, inputRef)
   const pickerOpen = commandPanel.isOpen
-  const hasText = !pickerOpen && !commandPanel.canOpen
+  const hasText = !pickerOpen && query.trim() !== ''
 
   // Parse command from query
   const { chip, remainder } = splitCommandChip(query, allCommands)
