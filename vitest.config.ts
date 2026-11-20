@@ -72,11 +72,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '~lib': resolve(__dirname, './src/lib'),
-      '~types': resolve(__dirname, './src/types'),
-      '~components': resolve(__dirname, './src/components'),
-      '~contents': resolve(__dirname, './src/contents'),
-      '~stores': resolve(__dirname, './src/stores')
+      '~lib': resolve(import.meta.dirname, './src/lib'),
+      '~types': resolve(import.meta.dirname, './src/types'),
+      '~components': resolve(import.meta.dirname, './src/components'),
+      '~contents': resolve(import.meta.dirname, './src/contents'),
+      '~stores': resolve(import.meta.dirname, './src/stores')
     }
   }
 })

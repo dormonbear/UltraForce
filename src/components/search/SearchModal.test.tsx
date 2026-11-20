@@ -78,7 +78,8 @@ describe('SearchModal', () => {
   })
 
   it.each(['picker', 'settings'])('keeps the outgoing %s mounted during exit / 退场期间保留该视图', async (view) => {
-    vi.useFakeTimers()
+    // Keep jsdom's focus and animation interval on the real clock. / jsdom 的焦点与动画间隔继续使用真实时钟。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     vi.stubGlobal('CSS', { supports: () => true })
     vi.stubGlobal('matchMedia', () => ({ matches: false }))
     try {
@@ -108,7 +109,7 @@ describe('SearchModal', () => {
     useFavoritesStore
       .getState()
       .addFavorite({ id: 'motion-nav', name: 'Motion favorite', type: 'User', url: '/motion' })
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     vi.stubGlobal('CSS', { supports: () => true })
     vi.stubGlobal('matchMedia', () => ({ matches: false }))
     const open = vi.spyOn(window, 'open').mockReturnValue(null)

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
+import { parse } from 'yaml'
 
 // Use Vitest's actual Vite edge, including its mocker peer. / 使用 Vitest 的实际 Vite 依赖边，包括 mocker 的 peer。
 const require = createRequire(import.meta.url)
@@ -30,6 +31,19 @@ test('Vitest and its mocker resolve one compatible Vite / Vitest 及其 mocker �
   assert.equal(mocker.resolve('vite'), viteEntry)
 })
 
+test('esbuild resolutions satisfy the 0.28.1 floor / esbuild 解析版本满足 0.28.1 下限', () => {
+  const lockfile = parse(readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8'))
+  for (const id of Object.keys(lockfile.packages)) {
+    const packageMatch = /^(?:esbuild|@esbuild\/[^@]+)@(.+)$/.exec(id)
+    if (!packageMatch) continue
+    const version = /^(\d+)\.(\d+)\.(\d+)(-[^+]+)?(?:\+.+)?$/.exec(packageMatch[1])
+    assert.ok(version, `Invalid version / 版本无效: ${id}`)
+    const [major, minor, patch] = version.slice(1, 4).map(Number)
+    const stableFloor = patch === 1 && !version[4]
+    assert.ok(major > 0 || minor > 28 || (minor === 28 && (patch > 1 || stableFloor)), `GHSA-g7r4-m6w7-qqqr: ${id}`)
+  }
+})
+
 test('actual test toolchain transforms TypeScript and loads SSR modules without a listening server / 实际测试工具链无需监听服务器即可转换 TypeScript 并加载 SSR 模块', async () => {
   await fixture(async (root) => {
     const server = await createServer({
@@ -38,7 +52,7 @@ test('actual test toolchain transforms TypeScript and loads SSR modules without 
       envFile: false,
       publicDir: false,
       logLevel: 'silent',
-      server: { middlewareMode: true, hmr: false, watch: null },
+      server: { middlewareMode: true, hmr: false, ws: false, watch: null },
       optimizeDeps: { noDiscovery: true, include: [] }
     })
     try {
@@ -76,7 +90,9 @@ test('actual Vite builds TypeScript, CSS and dynamic chunks through the installe
     assert.ok(output.some((item) => item.type === 'asset' && item.fileName.endsWith('.css')))
     const chunks = output.filter((item) => item.type === 'chunk')
     assert.ok(chunks.some((chunk) => chunk.isEntry))
-    assert.ok(chunks.some((chunk) => chunk.isDynamicEntry && chunk.exports.includes('answer')))
-    assert.ok(chunks.some((chunk) => chunk.code.includes('value * 2')))
+    const dynamicEntry = chunks.find((chunk) => chunk.isDynamicEntry && chunk.exports.includes('answer'))
+    assert.ok(dynamicEntry)
+    const { answer } = await import(`data:text/javascript,${encodeURIComponent(dynamicEntry.code)}`)
+    assert.equal(answer, 42)
   })
 })
