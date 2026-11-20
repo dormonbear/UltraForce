@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import test from 'node:test'
+import { parse } from 'yaml'
 
 // Use Vitest's actual Vite edge, including its mocker peer. / 使用 Vitest 的实际 Vite 依赖边，包括 mocker 的 peer。
 const require = createRequire(import.meta.url)
@@ -28,6 +29,19 @@ async function fixture(run) {
 
 test('Vitest and its mocker resolve one compatible Vite / Vitest 及其 mocker 解析至同一兼容 Vite', () => {
   assert.equal(mocker.resolve('vite'), viteEntry)
+})
+
+test('esbuild resolutions satisfy the 0.28.1 floor / esbuild 解析版本满足 0.28.1 下限', () => {
+  const lockfile = parse(readFileSync(new URL('../pnpm-lock.yaml', import.meta.url), 'utf8'))
+  for (const id of Object.keys(lockfile.packages)) {
+    const packageMatch = /^(?:esbuild|@esbuild\/[^@]+)@(.+)$/.exec(id)
+    if (!packageMatch) continue
+    const version = /^(\d+)\.(\d+)\.(\d+)(-[^+]+)?(?:\+.+)?$/.exec(packageMatch[1])
+    assert.ok(version, `Invalid version / 版本无效: ${id}`)
+    const [major, minor, patch] = version.slice(1, 4).map(Number)
+    const stableFloor = patch === 1 && !version[4]
+    assert.ok(major > 0 || minor > 28 || (minor === 28 && (patch > 1 || stableFloor)), `GHSA-g7r4-m6w7-qqqr: ${id}`)
+  }
 })
 
 test('actual test toolchain transforms TypeScript and loads SSR modules without a listening server / 实际测试工具链无需监听服务器即可转换 TypeScript 并加载 SSR 模块', async () => {
