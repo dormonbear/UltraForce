@@ -15,6 +15,21 @@ updates:
       prefix: chore
       include: scope
 
+  - package-ecosystem: npm
+    directory: /docs
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      docs-dev-dependencies:
+        dependency-type: development
+      docs-production-dependencies:
+        dependency-type: production
+    commit-message:
+      prefix: chore
+      include: scope
+
   - package-ecosystem: github-actions
     directory: /
     target-branch: develop
