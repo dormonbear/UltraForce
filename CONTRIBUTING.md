@@ -11,7 +11,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 **先决条件**
 
 - [Node.js](https://nodejs.org/) 22, as used in CI (ESM project) / [Node.js](https://nodejs.org/) 22，与 CI 一致（ESM 项目）
-- [pnpm](https://pnpm.io/) 9.15.9, pinned in `package.json` via `packageManager` / `package.json` 的 `packageManager` 字段固定 pnpm 版本为 9.15.9
+- [pnpm](https://pnpm.io/) 10.34.9, pinned in `package.json` via `packageManager` / `package.json` 的 `packageManager` 字段固定 pnpm 版本为 10.34.9
 - Chrome or Chromium browser / Chrome 或 Chromium 浏览器
 - A Salesforce org and the Salesforce CLI for live-org E2E tests / 仅真实组织端到端测试需要 Salesforce 组织及 Salesforce CLI
 

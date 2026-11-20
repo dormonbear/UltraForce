@@ -1,0 +1,7 @@
+# Keep docs installs in their own workspace. / 在独立的文档工作区中安装文档站依赖。
+packages:
+  - '.'
+ignoredBuiltDependencies:
+  - esbuild
+  - sharp
+  - workerd

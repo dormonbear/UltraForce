@@ -2,7 +2,7 @@
   "name": "ultraforce-plasmo",
   "version": "0.6.1",
   "type": "module",
-  "packageManager": "pnpm@9.15.9",
+  "packageManager": "pnpm@10.34.9",
   "displayName": "UltraForce for Salesforce",
   "description": "Modern Salesforce metadata search and management tool",
   "author": "UltraForce Team",
