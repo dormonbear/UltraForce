@@ -38,7 +38,7 @@ test('actual test toolchain transforms TypeScript and loads SSR modules without 
       envFile: false,
       publicDir: false,
       logLevel: 'silent',
-      server: { middlewareMode: true, hmr: false, watch: null },
+      server: { middlewareMode: true, hmr: false, ws: false, watch: null },
       optimizeDeps: { noDiscovery: true, include: [] }
     })
     try {
@@ -76,7 +76,9 @@ test('actual Vite builds TypeScript, CSS and dynamic chunks through the installe
     assert.ok(output.some((item) => item.type === 'asset' && item.fileName.endsWith('.css')))
     const chunks = output.filter((item) => item.type === 'chunk')
     assert.ok(chunks.some((chunk) => chunk.isEntry))
-    assert.ok(chunks.some((chunk) => chunk.isDynamicEntry && chunk.exports.includes('answer')))
-    assert.ok(chunks.some((chunk) => chunk.code.includes('value * 2')))
+    const dynamicEntry = chunks.find((chunk) => chunk.isDynamicEntry && chunk.exports.includes('answer'))
+    assert.ok(dynamicEntry)
+    const { answer } = await import(`data:text/javascript,${encodeURIComponent(dynamicEntry.code)}`)
+    assert.equal(answer, 42)
   })
 })
