@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -115,6 +115,13 @@ test('pins pnpm 10 and requires an explicit dependency build policy / 固定 pnp
       }
     }
   }
+})
+
+test('docs has its own pnpm workspace root / 文档站拥有独立的 pnpm 工作区根目录', () => {
+  assert.ok(
+    existsSync(new URL('../docs/pnpm-workspace.yaml', import.meta.url)),
+    'Keep docs installs in the docs workspace / 将文档站依赖安装限定在文档工作区内'
+  )
 })
 
 test('manual release of older tag checks out that exact commit instead of newer main', () =>
