@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -89,6 +89,33 @@ function select(cwd, { event = 'workflow_dispatch', tag = 'v0.4.1', ref = 'refs/
   git(cwd, 'checkout', '--detach', interpolate(checkout.with?.ref || context['github.sha'], context))
   return { status: 0, context }
 }
+
+test('pins pnpm 10 and requires an explicit dependency build policy / 固定 pnpm 10 并要求显式配置依赖构建策略', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.match(manifest.packageManager, /^pnpm@10\./)
+
+  const policy = parse(readFileSync(new URL('../pnpm-workspace.yaml', import.meta.url), 'utf8'))
+  assert.equal(policy.strictDepBuilds, true)
+  assert.deepEqual(policy.ignoredBuiltDependencies.toSorted(), [
+    '@parcel/watcher',
+    '@swc/core',
+    'lmdb',
+    'msgpackr-extract'
+  ])
+  assert.equal(Object.hasOwn(manifest.pnpm ?? {}, 'onlyBuiltDependencies'), false)
+
+  const workflows = new URL('../.github/workflows/', import.meta.url)
+  for (const filename of readdirSync(workflows).filter((name) => name.endsWith('.yml'))) {
+    const { jobs } = parse(readFileSync(new URL(filename, workflows), 'utf8'))
+    for (const [jobId, job] of Object.entries(jobs)) {
+      for (const step of job.steps ?? []) {
+        if (step.uses?.startsWith('pnpm/action-setup@')) {
+          assert.equal(Object.hasOwn(step.with ?? {}, 'version'), false, `${filename}: ${jobId}`)
+        }
+      }
+    }
+  }
+})
 
 test('manual release of older tag checks out that exact commit instead of newer main', () =>
   fixture(({ cwd, sha }) => {

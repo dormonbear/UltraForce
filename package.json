@@ -118,7 +118,6 @@
     "zustand": "^5.1.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": [],
     "overrides": {
       "@svgr/plugin-svgo@6.5.1>deepmerge": "-",
       "@plasmohq/parcel-resolver-post@0.4.5>tsup": "-",

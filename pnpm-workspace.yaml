@@ -1,0 +1,6 @@
+strictDepBuilds: true
+ignoredBuiltDependencies:
+  - '@parcel/watcher'
+  - '@swc/core'
+  - lmdb
+  - msgpackr-extract
