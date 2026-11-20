@@ -1,10 +1,10 @@
 # Windows qualification / Windows 验证
 
 CI retains the existing Ubuntu checks and adds Windows quality/coverage, production,
-and synthetic browser jobs with Node 22 and pnpm 9.15.9. Frozen installation applies
+and synthetic browser jobs with Node 22 and pnpm 10.34.9. Frozen installation applies
 both checked-in pnpm patches without changing package versions or the lockfile.
 
-CI 保留既有 Ubuntu 检查，新增使用 Node 22 与 pnpm 9.15.9 的 Windows 质量／覆盖率、
+CI 保留既有 Ubuntu 检查，新增使用 Node 22 与 pnpm 10.34.9 的 Windows 质量／覆盖率、
 正式构建及合成浏览器任务。冻结安装应用两项已提交 pnpm 补丁，不改变版本或锁文件。
 
 Repository Git attributes keep text checkouts LF on Windows as required by the

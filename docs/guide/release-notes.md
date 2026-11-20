@@ -58,8 +58,8 @@ Release Date: 2026-11-19 / 发布日期：2026-11-19
   修复 SVGO、Vite、Sass 使用的 Immutable、Browserslist、Rollup、Sharp 及其原生库、Vue 与 Svelte 服务端渲染，以及 Babel 源码映射涉及的构建和测试依赖。移除 SVGR 未使用的 `deepmerge` 和 Parcel 解析器未使用的 `tsup`，并取消重复的 Rollup CI 步骤。审计会显示低危详情，[剩余审计](https://github.com/dormonbear/UltraForce/issues/48)继续开放。
 - Build-tool HTTP caches honor mandatory response revalidation while retaining ordinary caching.
   构建工具的 HTTP 缓存遵守响应中的强制重新验证要求，同时保留常规缓存。
-- Windows CI runs unit and selected dependency tests, synthetic browser tests, and a production build with bilingual smoke tests and packaging. CI and release use Node.js 22 and pnpm 9.15.9, retain the Chrome build target, and check that the production search bundle includes its JSX runtime.
-  Windows CI 运行单元测试、选定的依赖测试及合成浏览器测试，并对正式构建执行中英文冒烟测试和打包。CI 和发布流程使用 Node.js 22 和 pnpm 9.15.9，保留 Chrome 构建目标，并检查正式搜索产物是否包含 JSX 运行时。
+- Windows CI runs unit and selected dependency tests, synthetic browser tests, and a production build with bilingual smoke tests and packaging. CI and release use Node.js 22 and the pnpm version pinned in `package.json`, retain the Chrome build target, and check that the production search bundle includes its JSX runtime.
+  Windows CI 运行单元测试、选定的依赖测试及合成浏览器测试，并对正式构建执行中英文冒烟测试和打包。CI 和发布流程使用 Node.js 22 及 `package.json` 固定的 pnpm 版本，保留 Chrome 构建目标，并检查正式搜索产物是否包含 JSX 运行时。
 - Release tooling rejects placeholder notes. Chrome Web Store publishing validates the store response, requires a successful upload before publishing, and removes temporary credentials after the attempt. Package summaries are updated in both languages.
   发布工具会拒绝含占位文本的说明。Chrome 应用商店发布流程会校验商店响应，仅在上传成功后发布，并在流程结束后清理临时凭据。扩展包的中英文摘要均已更新。
 

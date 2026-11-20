@@ -29,11 +29,10 @@ overrides:
 
 patchedDependencies:
   '@plasmohq/parcel-transformer-manifest@0.21.1':
-    hash: e6tmxf34i4x6z2um7x5aiw7liu
+    hash: c8b731efda1473c2c8943d426ccf900614ffc50de92c00ad418ff9de48d4fc5b
     path: patches/@plasmohq__parcel-transformer-manifest@0.21.1.patch
-
   http-cache-semantics@4.2.0:
-    hash: fkfepanoicmm26665zzeo4io3m
+    hash: f5dc93d00e1875d91daa6dfb582fa11bdc748319be1bc60e00525a670366f29b
     path: patches/http-cache-semantics@4.2.0.patch
 
 importers:
@@ -5055,7 +5054,7 @@ snapshots:
       '@plasmohq/parcel-runtime': 0.25.2
       '@plasmohq/parcel-transformer-inject-env': 0.2.12
       '@plasmohq/parcel-transformer-inline-css': 0.3.11
-      '@plasmohq/parcel-transformer-manifest': 0.21.1(patch_hash=e6tmxf34i4x6z2um7x5aiw7liu)
+      '@plasmohq/parcel-transformer-manifest': 0.21.1(patch_hash=c8b731efda1473c2c8943d426ccf900614ffc50de92c00ad418ff9de48d4fc5b)
       '@plasmohq/parcel-transformer-vue': 0.5.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.8.2)
     transitivePeerDependencies:
       - '@swc/helpers'
@@ -5208,7 +5207,7 @@ snapshots:
       browserslist: 4.28.7
       lightningcss: 1.21.8
 
-  '@plasmohq/parcel-transformer-manifest@0.21.1(patch_hash=e6tmxf34i4x6z2um7x5aiw7liu)':
+  '@plasmohq/parcel-transformer-manifest@0.21.1(patch_hash=c8b731efda1473c2c8943d426ccf900614ffc50de92c00ad418ff9de48d4fc5b)':
     dependencies:
       '@mischnic/json-sourcemap': 0.1.1
       '@parcel/core': 2.9.3
@@ -5847,7 +5846,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.0.4
       get-stream: 6.0.1
-      http-cache-semantics: 4.2.0(patch_hash=fkfepanoicmm26665zzeo4io3m)
+      http-cache-semantics: 4.2.0(patch_hash=f5dc93d00e1875d91daa6dfb582fa11bdc748319be1bc60e00525a670366f29b)
       keyv: 4.5.4
       mimic-response: 4.0.0
       normalize-url: 8.0.2
@@ -5857,7 +5856,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.0.4
       get-stream: 9.0.1
-      http-cache-semantics: 4.2.0(patch_hash=fkfepanoicmm26665zzeo4io3m)
+      http-cache-semantics: 4.2.0(patch_hash=f5dc93d00e1875d91daa6dfb582fa11bdc748319be1bc60e00525a670366f29b)
       keyv: 4.5.4
       mimic-response: 4.0.0
       normalize-url: 8.0.2
@@ -6188,7 +6187,7 @@ snapshots:
       domutils: 2.8.0
       entities: 3.0.1
 
-  http-cache-semantics@4.2.0(patch_hash=fkfepanoicmm26665zzeo4io3m): {}
+  http-cache-semantics@4.2.0(patch_hash=f5dc93d00e1875d91daa6dfb582fa11bdc748319be1bc60e00525a670366f29b): {}
 
   http2-wrapper@2.2.1:
     dependencies:
